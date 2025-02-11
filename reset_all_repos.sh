@@ -135,7 +135,7 @@ find "$SEARCH_DIR" -type d -name ".git" | while read -r git_dir; do
   fi
   
   printf "\033[H"   # Move cursor to the top left corner
-  printf "${ERASE_LINE}Resetting repo ${LIGHT_BLUE}%d of %d${RESET}: ${DARK_GRAY}%s${RESET}${YELLOW}\t%s${RESET}\n" "$repo_index" "$repo_count" "$estimated_time" "$repo_dir"
+  printf "${ERASE_LINE}Resetting repo ${LIGHT_BLUE}%d/%d${RESET}: ${DARK_GRAY}%s${RESET}${YELLOW}\t%s${RESET}\n" "$repo_index" "$repo_count" "$estimated_time" "$repo_dir"
   reset_git_repo "$repo_dir"
   
   # Update time per repo calculation after each iteration
