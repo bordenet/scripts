@@ -141,7 +141,7 @@ find "$SEARCH_DIR" -type d -name ".git" | while read -r git_dir; do
   # Update time per repo calculation after each iteration
   iteration_end=$(date +%s)
   iteration_time=$((iteration_end - iteration_start))
-  if [ $repo_index -ge 10 ]; then
+  if [ $repo_index -ge 5 ]; then
     time_per_repo=$(( (time_per_repo * (repo_index - 1) + iteration_time) / repo_index ))
   fi
 done
@@ -149,5 +149,6 @@ done
 end=$(date +%s)
 runtime=$((end - start))
 
-printf "\033[1B"  # Move cursor down one line
+#printf "\033[1B"  # Move cursor down one line
+printf "${CURSOR_HOME}${ERASE_LINE}{0} Done!"
 printf "${ERASE_LINE}Git reset script completed in %d seconds.\n" "$runtime"
