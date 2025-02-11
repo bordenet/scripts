@@ -1,5 +1,4 @@
 #!/bin/bash
-#cd /Users/mattbordenet/GitHub
 #cd /Users/$(whoami)/GitHub
 cd ~/GitHub
 for filename in /Users/$(whoami)/GitHub/*/; do
