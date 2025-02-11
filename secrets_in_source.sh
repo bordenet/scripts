@@ -50,27 +50,6 @@ die() {
     exit 1
 }
 
-# Parse command line arguments
-FILE_TYPES=""
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -t|--type)
-            FILE_TYPES="$2"
-            shift 2
-            ;;
-        *)
-            TARGET_DIR="$1"
-            shift
-            ;;
-    esac
-done
-
-if [ -z "$TARGET_DIR" ]; then
-    echo "Usage: $0 [-t|--type file_types] <directory_path>"
-    echo "Example: $0 --type 'yaml,json' /path/to/dir"
-    exit 1
-fi
-
 # Dependencies check
 command -v grep >/dev/null 2>&1 || die "grep is required but not installed."
 command -v awk >/dev/null 2>&1 || die "awk is required but not installed."
@@ -114,32 +93,11 @@ EXCLUDE_PATTERNS=(
     "Azure Key Vault"
 )
 
-# Function to format time in minutes and seconds
-format_time() {
-    local seconds=$1
-    local minutes=$((seconds / 60))
-    local remaining_seconds=$((seconds % 60))
-    printf "%02d:%02d" $minutes $remaining_seconds
-}
-
 # Function to update the status display
 update_status() {
     secrets_found=$(cat "$COUNT_FILE")
     dirs_processed=$(cat "$DIR_COUNT_FILE")
-    
-    # Calculate estimated time after processing 5 directories
-    if [ "$dirs_processed" -ge 5 ]; then
-        current_time=$(date +%s)
-        elapsed_time=$((current_time - start))
-        time_per_dir=$((elapsed_time / dirs_processed))
-        remaining_dirs=$((TOTAL_DIRS - dirs_processed))
-        estimated_seconds=$((time_per_dir * remaining_dirs))
-        estimated_time=" | Est. remaining: $(format_time $estimated_seconds)"
-    else
-        estimated_time=""
-    fi
-    
-    clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} | Secrets detected: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}${estimated_time}${RESET}\r\n"
+    clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} | Secrets detected: ${BRIGHT_RED}${secrets_found}${RESET}\r\n"
 }
 
 # Function to scan a file for secrets
@@ -177,9 +135,9 @@ scan_file() {
     fi
 }
 
-export -f scan_file update_status format_time
+export -f scan_file update_status
 export COUNT_FILE DIR_COUNT_FILE TOTAL_DIRS
-export RESULTS_FILE start
+export RESULTS_FILE
 export LIGHT_BLUE BRIGHT_RED DARK_RED DARK_GRAY RESET
 export CURSOR_UP CURSOR_HOME ERASE_LINE
 export SECRET_PATTERNS EXCLUDE_PATTERNS
@@ -199,46 +157,17 @@ find "$TARGET_DIR" -maxdepth 1 -type d | while read -r dir; do
     fi
 done
 
-# Build find command file pattern
-if [ -n "$FILE_TYPES" ]; then
-    FILE_PATTERN=""
-    IFS=',' read -ra TYPES <<< "$FILE_TYPES"
-    for i in "${!TYPES[@]}"; do
-        if [ $i -gt 0 ]; then
-            FILE_PATTERN="$FILE_PATTERN -o"
-        fi
-        FILE_PATTERN="$FILE_PATTERN -name \"*.${TYPES[$i]}\""
-    done
-else
-    FILE_PATTERN="-name \"*.js\" -o -name \"*.py\" -o -name \"*.cs\" -o -name \"*env\" -o -name \"*.go\" \
-        -o -name \"*.sh\" -o -name \"*.yml\" -o -name \"*.yaml\" -o -name \"*.json\" -o -name \"ENV\""
-fi
-
-# Process each top-level directory separately to track progress
-find "$TARGET_DIR" -maxdepth 1 -type d | while read -r dir; do
-    if [ "$dir" != "$TARGET_DIR" ]; then
-        dirs_processed=$(($(cat "$DIR_COUNT_FILE") + 1))
-        echo "$dirs_processed" > "$DIR_COUNT_FILE"
-        update_status
-
-        eval "find \"$dir\" -type f \( $FILE_PATTERN \) 2>/dev/null" | while read -r file; do
-            printf "\rScanning: ${LIGHT_BLUE}$file${RESET}${ERASE_LINE}"
-            scan_file "$file"
-        done
-    fi
-done
-
 # Process files in the root directory
-eval "find \"$TARGET_DIR\" -maxdepth 1 -type f \( $FILE_PATTERN \) 2>/dev/null" | while read -r file; do
-    printf "\rScanning: ${LIGHT_BLUE}$file${RESET}${ERASE_LINE}"
+find "$TARGET_DIR" -maxdepth 1 -type f \( -name "*.js" -o -name "*.py" -o -name "*.cs" -o -name "*env" -o -name "*.go" \
+    -o -name "*.sh" -o -name "*.yml" -o -name "*.yaml" -o -name "*.json" -o -name "ENV" \) 2>/dev/null | while read -r file; do
+    printf "\rScanning: ${LIGHT_BLUE}$file${RESET}"
     scan_file "$file"
 done
 
 echo ""
 
 end=$(date +%s)
-runtime=$((end - start))
-echo -e $(date)" | Done ${DARK_GRAY} Elapsed Time: $runtime seconds ${RESET}"
+echo -e $(date)" | Done ${DARK_GRAY} Elapsed Time: $(($end-$start)) seconds ${RESET}"
 
 if [ -s "$RESULTS_FILE" ]; then
     log_info "Potential secrets found in the following files:"
