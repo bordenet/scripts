@@ -31,7 +31,9 @@ FILE_TYPES=(
     "*.tf"
     "*.yml"
     "*.yaml"
+    "*.env"
     "*env"
+    "*.ENV"
     "*ENV"
 )
 
@@ -210,25 +212,26 @@ construct_find_command() {
     echo "$find_expr"
 }
 
+# Process files in the root search directory
+find_expr=$(construct_find_command)
+eval "find "$TARGET_DIR" -maxdepth 1 -type f \( $find_expr \) 2>/dev/null" | while read -r file; do
+    printf "\r${ERASE_LINE}Scanning: ${LIGHT_BLUE}$file${RESET}"
+    scan_file "$file"
+done
+
 # Process each top-level directory separately to track progress
-find "$TARGET_DIR" -maxdepth 1 -type d | while read -r dir; do
+find -P "$TARGET_DIR" -maxdepth 1 -type d | while read -r dir; do
     if [ "$dir" != "$TARGET_DIR" ]; then
         dirs_processed=$(($(cat "$DIR_COUNT_FILE") + 1))
         echo "$dirs_processed" > "$DIR_COUNT_FILE"
         update_status
         
         find_expr=$(construct_find_command)
-        eval "find \"$dir\" -type f \( $find_expr \) 2>/dev/null" | while read -r file; do
+        eval "find -P \"$dir\" -type f \( $find_expr \) 2>/dev/null" | while read -r file; do
             printf "\r${ERASE_LINE}Scanning: ${LIGHT_BLUE}$file${RESET}"
             scan_file "$file"
         done
     fi
-done
-
-# Process files in the root directory -- focus on git repos
-find "$TARGET_DIR" -maxdepth 1 -type f \( -name ".git" \) 2>/dev/null | while read -r file; do
-    printf "\rScanning: ${LIGHT_BLUE}$file${RESET}"
-    scan_file "$file"
 done
 
 echo ""
