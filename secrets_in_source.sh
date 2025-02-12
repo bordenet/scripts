@@ -283,6 +283,19 @@ print_summary_banner "$total_secrets" "$runtime"
 echo ""
 
 if [ -s "$RESULTS_FILE" ]; then
+    # Create the log file name
+    log_file_friendly_name="${script_name}-${timestamp}.log"
+
+    temp_file=$(mktemp)
+    temp_dir=$(dirname "$temp_file")
+    friendly_transcript_file_name="$(basename "$0")_$(date +%s).txt"
+    friendly_transcript_path="$temp_dir/$friendly_transcript_file_name"
+    mv "$temp_file" "$friendly_transcript_path"
+
+    printf "$0 results\nRun by: $(whoami)\nDate: $(date "+%A, %B %d, %Y")\n" >> "$friendly_transcript_path"
+    printf "Execution time: $runtime seconds\nTotal secrets: $total_secrets\n\n" >> "$friendly_transcript_path"
+    cat $RESULTS_FILE >> "$friendly_transcript_path"
+
     log_info "Detailed findings:"
     echo ""
     while IFS= read -r line; do
@@ -292,6 +305,7 @@ if [ -s "$RESULTS_FILE" ]; then
         match_content=$(echo "$match" | cut -d ':' -f 2-)
         printf "${LIGHT_BLUE}$file${DARK_GRAY}:$line_number${RESET}: $match_content\n"
     done < "$RESULTS_FILE"
+    printf "\n\n\n${BRIGHT_RED}Transcript available: $friendly_transcript_path${RESET}"
 elif [[ $total_secrets -eq 0 ]]; then
     log_info "No secrets detected in the specified directory."
 fi
