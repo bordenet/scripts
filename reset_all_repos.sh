@@ -65,17 +65,11 @@ reset_git_repo() {
     if pushd "$repo_path" > /dev/null; then
       log_message "Entered directory: $repo_path"
 
-      git clean -f 2>/dev/null | grep -v "Removing git_reset.log"
-      #git rebase 2>/dev/null | grep -v 'Current branch main is up to date.' | grep -v 'Current branch master is up to date'
-      git pull | grep -v 'Already up to date.'
+      branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's|^refs/remotes/origin/||')
 
-      if git status --porcelain | grep -q "^ M"; then
-          log_message "WARNING: Uncommitted changes after reset in $repo_path.  These were overwritten."
-      fi
-
-      if git status --porcelain | grep -q "^??"; then
-          log_message "WARNING: Untracked files after reset in $repo_path. These were not removed."
-      fi
+      # Fetch and reset to the correct branch
+      git fetch origin >/dev/null
+      git reset --hard origin/$branch >/dev/null
 
       popd > /dev/null
       return 0
@@ -121,6 +115,18 @@ repo_index=0
 time_per_repo=0
 estimated_time=""
 
+# Function to display the gas gauge
+display_gas_gauge() {
+  local current=$1
+  local total=$2
+  local width=50
+  local filled=$((current * width / total))
+  local empty=$((width - filled))
+  local gauge=$(printf "%${filled}s" | tr ' ' '#')
+  local spaces=$(printf "%${empty}s" | tr ' ' ' ')
+  printf "[%s%s] %d%%" "$gauge" "$spaces" $((current * 100 / total))
+}
+
 find "$SEARCH_DIR" -type d -name ".git" | while read -r git_dir; do
   repo_dir=$(dirname "$git_dir")
   repo_index=$((repo_index + 1))
@@ -138,7 +144,13 @@ find "$SEARCH_DIR" -type d -name ".git" | while read -r git_dir; do
   
   printf "\033[H"   # Move cursor to the top left corner
   printf "${ERASE_LINE}Resetting repo ${LIGHT_BLUE}%d/%d${RESET}: ${DARK_GRAY}%s${RESET}${YELLOW}\t%s${RESET}\n" "$repo_index" "$repo_count" "$estimated_time" "$repo_dir"
+  display_gas_gauge "$repo_index" "$repo_count"
+  printf "\n"
   reset_git_repo "$repo_dir"
+
+  # Introduce a random sleep between 0 and 2 seconds
+    sleep_time=$((0 + RANDOM % 2))
+    sleep "$sleep_time"       
   
   # Update time per repo calculation after each iteration
   iteration_end=$(date +%s)
