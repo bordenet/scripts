@@ -36,6 +36,7 @@ DARK_RED='\033[0;31m'
 DARK_GRAY='\033[0;90m'
 YELLOW='\033[33m'
 WHITE_BACKGROUND='\033[47m'
+BOLD='\033[1m'
 RESET='\033[0m'
 CURSOR_UP='\033[1A'      # Move cursor up one line
 CURSOR_HOME='\033[0G'    # Move cursor to beginning of line
@@ -95,7 +96,8 @@ log_message "Starting git reset script..."
 
 # Prompt for confirmation if not in force mode
 if [ "$FORCE" = false ]; then
-  read -p "This script will revert all local changes. Are you sure you want to do this? [Y/n] " response
+  echo -e "${BOLD}${DARK_RED}${WHITE_BACKGROUND}This script will revert all local changes. Are you sure you want to do this?${RESET} ${YELLOW}[Y/n]${RESET} "
+  read -r response
   case "$response" in
     [nN]* )
       echo "No files changed"
