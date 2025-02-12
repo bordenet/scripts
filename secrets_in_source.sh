@@ -16,11 +16,15 @@ if [ "$#" -lt 1 ]; then
     exit 1
 fi
 
+# Dependencies check
+command -v grep >/dev/null 2>&1 || die "grep is required but not installed."
+command -v awk >/dev/null 2>&1 || die "awk is required but not installed."
+
 start=$(date +%s)
 TARGET_DIR="$1"
 shift
 
-# Default file types to scan
+# Default file types to scan -- add yours here
 FILE_TYPES=(
     "*.js"
     "*.json"
@@ -86,9 +90,18 @@ die() {
     exit 1
 }
 
-# Dependencies check
-command -v grep >/dev/null 2>&1 || die "grep is required but not installed."
-command -v awk >/dev/null 2>&1 || die "awk is required but not installed."
+# Function to draw progress bar
+draw_progress_bar() {
+    local percentage=$1
+    local width=50
+    local filled=$((percentage * width / 100))
+    local empty=$((width - filled))
+    
+    printf "["
+    printf "%${filled}s" | tr ' ' '='
+    printf "%${empty}s" | tr ' ' ' '
+    printf "] %d%%" "$percentage"
+}
 
 # Logging function
 log_info() {
@@ -101,6 +114,23 @@ log_info_red() {
 
 log_error_red() {
     printf "${BRIGHT_RED}[ERROR] %s${RESET}\n" "$1"
+}
+
+print_banner_line() {
+    printf "${DARK_GRAY}═══════════════════════════════════════════════════════════════════════════════${RESET}\n"
+}
+
+print_summary_banner() {
+    local total_secrets=$1
+    local runtime=$2
+    
+    print_banner_line
+    printf "${DARK_GRAY}║${RESET}                           PASSHOG SCAN SUMMARY                           ${DARK_GRAY}║${RESET}\n"
+    print_banner_line
+    printf "${DARK_GRAY}║${RESET}  Total Secrets Detected: ${DARK_RED}%-43d${RESET}${DARK_GRAY}║${RESET}\n" "$total_secrets"
+    printf "${DARK_GRAY}║${RESET}  Scan Duration: %-50s${DARK_GRAY}║${RESET}\n" "$(format_time $runtime)"
+    printf "${DARK_GRAY}║${RESET}  Timestamp: %-52s${DARK_GRAY}║${RESET}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
+    print_banner_line
 }
 
 # Status update
@@ -141,7 +171,8 @@ format_time() {
 update_status() {
     secrets_found=$(cat "$COUNT_FILE")
     dirs_processed=$(cat "$DIR_COUNT_FILE")
-    extimated_time=""
+    estimated_time=""
+    
     # Calculate estimated time after processing N directories
     if [ "$dirs_processed" -ge 10 ]; then
         current_time=$(date +%s)
@@ -154,7 +185,16 @@ update_status() {
         fi
     fi
     
-    clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} | Secrets detected: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}${estimated_time}${RESET}\r\n"
+    # Only show progress bar if there are more than 20 directories
+    if [ "$TOTAL_DIRS" -gt 20 ]; then
+        percentage=$((dirs_processed * 100 / TOTAL_DIRS))
+        clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} | Secrets: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}${estimated_time}${RESET}\n"
+        printf "${CURSOR_HOME}${ERASE_LINE}Progress: "
+        draw_progress_bar "$percentage"
+        printf "\n"
+    else
+        clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} | Secrets detected: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}${estimated_time}${RESET}\r\n"
+    fi
 }
 
 # Function to scan a file for secrets
@@ -163,7 +203,7 @@ scan_file() {
     local secrets_found_in_file=false
 
     for pattern in "${SECRET_PATTERNS[@]}"; do
-        grep -Eo "$pattern" "$file" | while IFS= read -r match; do
+        grep -Eno "$pattern" "$file" | while IFS= read -r match; do
             exclude_match=false
             for exclude_pattern in "${EXCLUDE_PATTERNS[@]}"; do
                 if [[ "$match" =~ $exclude_pattern ]]; then
@@ -235,15 +275,24 @@ find -P "$TARGET_DIR" -maxdepth 1 -type d | while read -r dir; do
 done
 
 echo ""
-
 end=$(date +%s)
 runtime=$((end - start))
-echo -e $(date)" | Done ${DARK_GRAY} Elapsed Time: $runtime seconds ${RESET}"
+total_secrets=$(cat "$COUNT_FILE")
+
+print_summary_banner "$total_secrets" "$runtime"
+echo ""
 
 if [ -s "$RESULTS_FILE" ]; then
-    log_info "Potential secrets found in the following files:"
-    cat "$RESULTS_FILE"
-elif [[ $(cat "$COUNT_FILE") -eq 0 ]]; then
+    log_info "Detailed findings:"
+    echo ""
+    while IFS= read -r line; do
+        file=$(echo "$line" | cut -d ':' -f 1)
+        match=$(echo "$line" | cut -d ':' -f 2-)
+        line_number=$(echo "$match" | cut -d ':' -f 1)
+        match_content=$(echo "$match" | cut -d ':' -f 2-)
+        printf "${LIGHT_BLUE}$file${DARK_GRAY}:$line_number${RESET}: $match_content\n"
+    done < "$RESULTS_FILE"
+elif [[ $total_secrets -eq 0 ]]; then
     log_info "No secrets detected in the specified directory."
 fi
 
