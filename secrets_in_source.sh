@@ -23,16 +23,16 @@ shift
 # Default file types to scan
 FILE_TYPES=(
     "*.js"
+    "*.json"
     "*.py"
     "*.cs"
-    "*env"
-    "*ENV"
     "*.go"
     "*.sh"
+    "*.tf"
     "*.yml"
     "*.yaml"
-    "*.json"
-    "tf"
+    "*env"
+    "*ENV"
 )
 
 # Parse optional arguments
