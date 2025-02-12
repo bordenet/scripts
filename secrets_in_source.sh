@@ -147,7 +147,7 @@ echo 0 > "$COUNT_FILE"
 
 # Patterns to detect secrets (PLEASE EXTEND!)
 SECRET_PATTERNS=(
-    "(PASSWORD|PASS|RABBITMQ_DEFAULT_PASS|POSTGRES_PASSWORD)=[\"\']?([^#\$\s\"\']+)"
+    "(SPRING_RABBITMQ_PASSWORD,GIT_PASSWORD,SPRING_DATASOURCE_PASSWORD,CONFIG_PASS,SPRING_DATA_MONGODB_PASSWORD,MONGODB_PASSWORD,PASSWORD|PASS|RABBITMQ_DEFAULT_PASS|POSTGRES_PASSWORD)=[\"\']?([^#\$\s\"\']+)"
     "AWS[ _-]?(SECRET|ACCESS)[ _-]?(KEY)=[\"\']?([^#\$\s\"\']+)"
     'AZURE[ _-]?(CLIENT|STORAGE|SUBSCRIPTION)[ _-]?(SECRET|KEY|ID)[=:\s]\(([A-Za-z0-9]{32,})\)'
     "(KEY|SECRET|PASSWORD)=[\"\']?([^#\$\s\"\']+)"
@@ -157,6 +157,12 @@ SECRET_PATTERNS=(
 # Exclude patterns to avoid false positives
 EXCLUDE_PATTERNS=(
     "Azure Key Vault"
+    "PASS=PASSWORD"
+    "PASS=NEW_PASSWORD"
+    "PASS=pa"
+    "PASS=gue"
+    "PASSWORD=pa"
+    "PASSWORD=gue"
 )
 
 # Function to format time in minutes and seconds
