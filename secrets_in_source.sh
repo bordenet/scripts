@@ -8,16 +8,50 @@
 #              Windows and Ubuntu, et al.
 # Docs: https://emachines.atlassian.net/wiki/spaces/~71202069f0ca4c20614a21b017d991e75ff720/pages/4505600001/Secrets+in+Source
 # Author: Matt Bordenet
-# Usage: ./passhog_simple.sh <directory_path>
+# Usage: ./passhog_simple.sh <directory_path> [-t <file_types>]
 
 # Ensure the script is run with at least one argument
 if [ "$#" -lt 1 ]; then
-    echo "Usage: $0 <directory_path>"
+    echo "Usage: $0 <directory_path> [-t <file_types (list of file suffixes)>]"
     exit 1
 fi
 
 start=$(date +%s)
 TARGET_DIR="$1"
+shift
+
+# Default file types to scan
+FILE_TYPES=(
+    "*.js"
+    "*.py"
+    "*.cs"
+    "*env"
+    "*ENV"
+    "*.go"
+    "*.sh"
+    "*.yml"
+    "*.yaml"
+    "*.json"
+    "tf"
+)
+
+# Parse optional arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -t|--types)
+            IFS=',' read -r -a extensions <<< "$2"
+            FILE_TYPES=()
+            for ext in "${extensions[@]}"; do
+                FILE_TYPES+=("*.$ext")
+            done
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
 
 # ANSI color codes 
 LIGHT_BLUE='\033[1;34m'
@@ -105,17 +139,17 @@ format_time() {
 update_status() {
     secrets_found=$(cat "$COUNT_FILE")
     dirs_processed=$(cat "$DIR_COUNT_FILE")
-    
-    # Calculate estimated time after processing 15 directories
-    if [ "$dirs_processed" -ge 15 ]; then
+    extimated_time=""
+    # Calculate estimated time after processing N directories
+    if [ "$dirs_processed" -ge 10 ]; then
         current_time=$(date +%s)
         elapsed_time=$((current_time - start))
         time_per_dir=$((elapsed_time / dirs_processed))
         remaining_dirs=$((TOTAL_DIRS - dirs_processed))
         estimated_seconds=$((time_per_dir * remaining_dirs))
-        estimated_time=" | Est. remaining: $(format_time $estimated_seconds)"
-    else
-        estimated_time=""
+        if [ "$estimated_seconds" -ge 1 ]; then
+            estimated_time=" | Est. remaining: $(format_time $estimated_seconds)"
+        fi
     fi
     
     clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} | Secrets detected: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}${estimated_time}${RESET}\r\n"
@@ -163,6 +197,19 @@ export LIGHT_BLUE BRIGHT_RED DARK_RED DARK_GRAY RESET
 export CURSOR_UP CURSOR_HOME ERASE_LINE
 export SECRET_PATTERNS EXCLUDE_PATTERNS
 
+find_expr=""
+
+# Construct the find command for file types
+construct_find_command() {
+    local find_expr=""
+    for file_type in "${FILE_TYPES[@]}"; do
+        find_expr+=" -name \"$file_type\" -o"
+    done
+    # Remove the trailing -o
+    find_expr=${find_expr% -o}
+    echo "$find_expr"
+}
+
 # Process each top-level directory separately to track progress
 find "$TARGET_DIR" -maxdepth 1 -type d | while read -r dir; do
     if [ "$dir" != "$TARGET_DIR" ]; then
@@ -170,17 +217,16 @@ find "$TARGET_DIR" -maxdepth 1 -type d | while read -r dir; do
         echo "$dirs_processed" > "$DIR_COUNT_FILE"
         update_status
         
-        find "$dir" -type f \( -name "*.js" -o -name "*.py" -o -name "*.cs" -o -name "*env" -o -name "*.go" \
-            -o -name "*.sh" -o -name "*.yml" -o -name "*.yaml" -o -name "*.json" -o -name "ENV" \) 2>/dev/null | while read -r file; do
-            printf "\rScanning: ${LIGHT_BLUE}$file${RESET}"
+        find_expr=$(construct_find_command)
+        eval "find \"$dir\" -type f \( $find_expr \) 2>/dev/null" | while read -r file; do
+            printf "\r${ERASE_LINE}Scanning: ${LIGHT_BLUE}$file${RESET}"
             scan_file "$file"
         done
     fi
 done
 
-# Process files in the root directory
-find "$TARGET_DIR" -maxdepth 1 -type f \( -name "*.js" -o -name "*.py" -o -name "*.cs" -o -name "*env" -o -name "*.go" \
-    -o -name "*.sh" -o -name "*.yml" -o -name "*.yaml" -o -name "*.json" -o -name "ENV" \) 2>/dev/null | while read -r file; do
+# Process files in the root directory -- focus on git repos
+find "$TARGET_DIR" -maxdepth 1 -type f \( -name ".git" \) 2>/dev/null | while read -r file; do
     printf "\rScanning: ${LIGHT_BLUE}$file${RESET}"
     scan_file "$file"
 done
