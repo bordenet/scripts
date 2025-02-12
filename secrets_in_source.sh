@@ -146,23 +146,51 @@ trap 'rm -f "$COUNT_FILE"' EXIT
 echo 0 > "$COUNT_FILE"
 
 # Patterns to detect secrets (PLEASE EXTEND!)
+
+# Combine these base patterns with "PASS" and "PASSWORD"
+# Poor traditional practices are often consistent across codebases
+COMMON_PATTERN_BASES=(
+    "TEMP_"
+    "COGNITO_"
+    "GIT_"
+    "NEW_"
+    "SSL_"
+    "CONFIG_"
+    "CONFIG_DB_"
+    "DATASOURCE_"
+    "SPRING_DATASOURCE_"
+    "SPRING_DATA_MONGODB_"
+    "SPRING_RABBITMQ_"
+    "MONGODB_"
+    "MONGODB_BLOCKS_"
+    "MONGO_INITDB_ROOT_"
+    "RABBITMQ_"
+    "RABBITMQ_DEFAULT_"
+    "POSTGRES_"
+    "MYSQL_"
+    "MYSQL_ACCESS_"
+    "MYSQL_INVITATION_"
+)
+
 SECRET_PATTERNS=(
-    "(SPRING_RABBITMQ_PASSWORD,GIT_PASSWORD,SPRING_DATASOURCE_PASSWORD,CONFIG_PASS,SPRING_DATA_MONGODB_PASSWORD,MONGODB_PASSWORD,PASSWORD|PASS|RABBITMQ_DEFAULT_PASS|POSTGRES_PASSWORD)=[\"\']?([^#\$\s\"\']+)"
+    "(PASSWORD|PASS)=[\"\']?([^#\$\s\"\']+)"
     "AWS[ _-]?(SECRET|ACCESS)[ _-]?(KEY)=[\"\']?([^#\$\s\"\']+)"
     'AZURE[ _-]?(CLIENT|STORAGE|SUBSCRIPTION)[ _-]?(SECRET|KEY|ID)[=:\s]\(([A-Za-z0-9]{32,})\)'
     "(KEY|SECRET|PASSWORD)=[\"\']?([^#\$\s\"\']+)"
     "private[ _-]?key.*-----BEGIN PRIVATE KEY-----"
 )
 
+# Append combinations of common patterns and PASS, PASSWORD
+for base in "${COMMON_PATTERN_BASES[@]}"; do
+    SECRET_PATTERNS+=("${base}PASSWORD=[\"\']?([^#\$\s\"\']+)")
+    SECRET_PATTERNS+=("${base}PASS=[\"\']?([^#\$\s\"\']+)")
+done
+
 # Exclude patterns to avoid false positives
 EXCLUDE_PATTERNS=(
     "Azure Key Vault"
-    "PASS=PASSWORD"
-    "PASS=NEW_PASSWORD"
-    "PASS=pa"
-    "PASS=gue"
-    "PASSWORD=pa"
-    "PASSWORD=gue"
+#    "PASS=PASSWORD"
+#    "PASS=NEW_PASSWORD"
 )
 
 # Function to format time in minutes and seconds
@@ -243,7 +271,7 @@ export COUNT_FILE DIR_COUNT_FILE TOTAL_DIRS
 export RESULTS_FILE start
 export LIGHT_BLUE BRIGHT_RED DARK_RED DARK_GRAY RESET
 export CURSOR_UP CURSOR_HOME ERASE_LINE
-export SECRET_PATTERNS EXCLUDE_PATTERNS
+export SECRET_PATTERNS EXCLUDE_PATTERNS COMMON_PATTERN_BASES
 
 find_expr=""
 
