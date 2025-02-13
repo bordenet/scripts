@@ -250,7 +250,7 @@ scan_file() {
 
             if [[ $possible_match ]]; then
                   # Check exclusions
-                  for exclude_pattern in "${EXCLUDE_PATTERNS_STRICT[@]}"; do
+                  for exclude_pattern in "${EXCLUDE_PATTERNS[@]}"; do
                     if [[ possible_match ]] && echo "$match" | grep -qE "$exclude_pattern"; then
                       possible_match=false
                       break
