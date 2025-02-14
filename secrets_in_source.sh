@@ -27,71 +27,69 @@ TARGET_DIR="$1"
 shift
 
 # Default file types to scan (PLEASE EXTEND!)
-FILE_TYPES=(  "*.js" "*.json" "*.py" "*.cs" "*.go" "*.sh" "*.tf" "*.yml" "*.yaml" "*.env" "*env" "*.ENV" "*ENV" "*.txt"
+FILE_TYPES=(  "*.js" "*.json" "*.py" "*.cs" "*.go" "*.sh" "*.tf" "*.yml" "*.yaml" "*.env" "*env" "*.ENV" "*ENV"
 )
 
 # Directories we don't want the tool pursuing
-EXCLUDE_DIRS=(  ".git" ".github" "node_modules" "vendor" ".idea" ".vscode" "stella_deploy"
+EXCLUDE_DIRS=(  ".git" ".github" "node_modules" "vendor" ".idea" ".vscode" "stella_deploy" "secrets_in_source"
 )
 
 # Patterns to detect secrets-- used by first screening pass
 SECRET_PATTERNS_FAST_EXPANDED=(
-    "PASS(WORD)"
-    "\b([A-Za-z0-9_]*PASS(WORD)?)\b[=:][\"\']?([^#\$\s\"\']+)"
-    "(PASSWORD|PASS|KEY|SECRET)[=:][\"\']?([^#\$\s\"\']+)"
-    "private[ _-]?key.*-----BEGIN PRIVATE KEY-----"
-    "AWS[ _-]?(SECRET|ACCESS)[ _-]?(KEY)=[\"\']?([^#\$\s\"\']+)"
-    "AZURE[ _-]?(CLIENT|STORAGE|SUBSCRIPTION)[ _-]?(SECRET|KEY|ID)[=:\s]\(([A-Za-z0-9]{32,})\)"
+  "(PASS|PASSWORD|pass|password|KEY|SECRET|pwd)[:=][0-9a-zA-Z]+"
+  "(PASS|PASSWORD|pass|password|KEY|SECRET|pwd)(:|=).*)"
+  "\b([A-Za-z0-9_]*PASS(WORD)?)\b[=:][\"\']?([^#\$\s\"\']+)"
+  "(PASSWORD|PASS|KEY|SECRET)\s[=:][\"\']?([^#\$\s\"\']+)"
+  "private[ _-]?key.*-----BEGIN PRIVATE KEY-----"
+  "AWS[ _-]?(SECRET|ACCESS)[ _-]?(KEY)=[\"\']?([^#\$\s\"\']+)"
+  "AZURE[ _-]?(CLIENT|STORAGE|SUBSCRIPTION)[ _-]?(SECRET|KEY|ID)[=:\s]\(([A-Za-z0-9]{32,})\)"
+  "AWS_SECRET_ACCESS_KEY=[^[:space:]]+"  # Added pattern to match AWS_SECRET_ACCESS_KEY
 )
 
 # Slow--but more thorough-- used by second pass (PLEASE EXTEND!)
 SECRET_PATTERNS_STRICT_EXPANDED=(
+  "(PASS|PASSWORD|pass|password|KEY|SECRET|pwd)[:=][0-9a-zA-Z]+"
+  "(PASS|PASSWORD|pass|password|KEY|SECRET|pwd)(:|=).*)"
+  "\b([A-Za-z0-9_]*PASS(WORD)?)\b[=:][\"\']?([^#\$\s\"\']+)"
+  "(PASSWORD|PASS|KEY|SECRET)\s[=:][\"\']?([^#\$\s\"\']+)"
+  "private[ _-]?key.*-----BEGIN PRIVATE KEY-----"
+  "AWS[ _-]?(SECRET|ACCESS)[ _-]?(KEY)=[\"\']?([^#\$\s\"\']+)"
+  "AZURE[ _-]?(CLIENT|STORAGE|SUBSCRIPTION)[ _-]?(SECRET|KEY|ID)[=:\s]\(([A-Za-z0-9]{32,})\)"
   ".*[_A-Z0-9]+PASS(WORD)\\s*=\\s*[^[:space:]\"']+.*"
   "[Pp]assword\\s*=\\s*[^[:space:]\"']+"
   "[Pp]assword\\s*[:=]\\s*\"[^\"]*\""
   "[Pp]assword\\s*[:=]\\s*'[^']*'"
-
   "[_A-Z0-9]+PASS(WORD)\\s*=\\s*[^[:space:]\"']+"
   "[_A-Z0-9]+PASS(WORD)\\s*[:=]\\s*\"[^\"]*\""
   "[_A-Z0-9]+PASS(WORD)\\s*[:=]\\s*'[^']*'"
-
   "[_A-Z0-9]+API_KEY\\s*=\\s*[^[:space:]\"']+"
   "[_A-Z0-9]+API_KEY\\s*[:=]\\s*\"[^\"]*\""
   "[_A-Z0-9]+API_KEY\\s*[:=]\\s*'[^']*'"
-
   "SECRET\\s*=\\s*[^[:space:]\"']+"
   "SECRET\\s*[:=]\\s*\"[^\"]*\""
   "SECRET\\s*[:=]\\s*'[^']*'"
+  "AWS_SECRET_ACCESS_KEY=[^[:space:]]+"  # Added pattern to match AWS_SECRET_ACCESS_KEY
 )
 
 EXCLUDE_PATTERNS_EXPANDED=(
   ':\s*\$\{[^}]+\}'
   '\${[^}]+}'                               # Matches ${VAR_NAME}
-  '(KEY|PASS|PASSWORD|TOKEN|SECRET):\s*'\'\'
-  '(KEY|PASS|PASSWORD|TOKEN|SECRET)[=:]\$\{{[^}]+}\}'                           # Matches ${{ secrets.SOMETHING }}
-  '\b(password|argocdServerAdminPassword)\s*[:=]\s*""'  # Matches password: ""
-  'export\s+[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$[A-Z_]+'  # Matches export VAR=$OTHER_VAR
-  'export\s+[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$\{[A-Z_]+\}'
-  'export\s+[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$\(\s*cat\s+.*\s*\)'  # Matches password stored in files
-  '\b--env="[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$[A-Z_]+"'  # Match CLI --env=
-  '\b--build-arg\s+[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$\(\s*yarn\s+get:[a-zA-Z0-9:_-]+\s*\)'  # Matches --build-arg in Docker
-  '^[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$[0-9]+$'
-  '^[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$\(\s*echo\s+\$[A-Z_]+\s*\|\s*jq\s+--raw-output\s+.*\)$'
-  '^[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$\(\s*aws\s+secretsmanager\s+get-secret-value\s+--secret-id\s+\$[A-Z_]+\s+--region\s+\$[A-Z_]+\s+--query\s+SecretString\s+--output\s+text\s*\)$'
-  'sed\s+-i\s+".*PASSWORD=.*\$[A-Z_]+.*"'
-  'SECRET=\$\(\s*aws\s+secretsmanager\s+get-secret-value\s+--secret-id\s+".*"\s+--output\s+text\s+--query\s+"SecretString"\s*\)'
-  'kubectl\s+run\b.*--env\s+[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$[A-Z_]+'
-  'docker\s+build\b.*--build-arg\s+[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$\(\s*yarn\s+get:[a-zA-Z0-9:_-]+\s*\)'
-  '.*(KEY|PASS|PASSWORD|TOKEN|SECRET)=$'
-  '(KEY|PASS|PASSWORD|TOKEN|SECRET)"\s*$'
-  'HIDDEN'
-  'kubectl\s+get\s+secret'                  # Matches kubectl secret retrieval
-  '(KEY|PASS|PASSWORD|TOKEN|SECRET)}'
-  '(KEY|PASS|PASSWORD|TOKEN|SECRET)"?\]'
-  '(KEY|PASS|PASSWORD|TOKEN|SECRET)?"\]'
-  '(KEY|PASS|PASSWORD|TOKEN|SECRET)?;$'
-  'password\s*[:=]\s*os\.getenv'            # var auth_password  = process.env.AUTH_PASSWORD; 
-  'os.getenv\('
+  '(PASS|PASSWORD|pass|password|KEY|SECRET):\s*str\s*=\s*None\)\:' # FP01
+  'password\s*=\s*"\$' # FP49 -- first attempt
+  'password\s*=\s*"\$[A-Za-z_][A-Za-z_0-9]*"' # FP49   TODO: FIX BUGBUG
+  'HIDDEN' # FP48
+  '\{\{[^{}]*\}\}|\{[^{}]*\}|\[\[[^\[\]]*\]\]|\[[^\[\]]*\]'  # FP41
+  '(KEY|PASS|PASSWORD|TOKEN|SECRET)\s*[:=]\s*\$' #FP22, FP27, FP28, FP44
+  '(pass|password|PASS|PASSWORD)\s*[:=]\s*(['"'"'"]{2})$'  # FP10, FP46
+  'PASS\s*:\s*A\s*[a-z]+\s*can\s*be' # FP02
+  '(KEY\s*=\s*[a-z\[]*\s*)?\(Value:' # FP03, FP04
+  'pwd\s*=\s*getpass\.getpass\(' # FP05
+  'Settings\s+take\s+the\s+form\s+KEY=VALUE\.' # FP42
+  'password\s*=\s*get_pwd\(\)' # FP50
+  'getpass\(prompt="tl\s+password:\s*"\)' # FP51
+  'password\s*=\s*ENV\[\"' # FP52
+  '(KEY|PASS|PASSWORD|TOKEN|SECRETpass|password).*getenv' # FP53  TODO: FIX BUGBUG
+  '(pass|password|pwd|PWD|controller-client-secret)\=(REDISPW|REDIS_PW|REDIS_PASSWORD|CONTROLLER_PASSWORD)' # FP54
 )
 
 # Combine patterns into a single regex
@@ -161,10 +159,10 @@ draw_progress_bar() {
   local filled=$((percentage * width / 100))
   local empty=$((width - filled))
   
-  printf "["
+  printf "${LIGHT_BLUE}[${RESET}"
   printf "${LIGHT_BLUE}%${filled}s${RESET}" | tr ' ' '='
   printf "%${empty}s" | tr ' ' ' '
-  printf "] %d%%" "$percentage"
+  printf "${LIGHT_BLUE}]${RESET} %d%%" "$percentage"
 }
 
 # Logging function
@@ -180,13 +178,25 @@ print_banner_line() {  printf "${DARK_GRAY}════════════�
 print_summary_banner() {
   local total_secrets=$1
   local runtime=$2
+  local banner_width=79  # Adjust this value if needed to match the width of the banner line
+
   printf "${ERASE_LINE}${CURSOR_UP}${ERASE_LINE}${CURSOR_UP}${ERASE_LINE}${CURSOR_UP}${ERASE_LINE}"
   print_banner_line
   printf "${DARK_GRAY}║${RESET} PASSHOG SCAN SUMMARY ${DARK_GRAY}║${RESET}\n"
   print_banner_line
-  printf "${DARK_GRAY}║${RESET} Total Secrets Detected: ${DARK_RED}%-43d${RESET}${DARK_GRAY}║${RESET}\n" "$total_secrets"
-  printf "${DARK_GRAY}║${RESET} Scan Duration: %-50s${DARK_GRAY}║${RESET}\n" "$(format_time $runtime)"
-  printf "${DARK_GRAY}║${RESET} Timestamp: %-52s${DARK_GRAY}║${RESET}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
+
+  # Print Total Secrets Detected line
+  printf "${DARK_GRAY}║${RESET} Total Secrets Detected: ${DARK_RED}%d${RESET}" "$total_secrets"
+  printf "\033[%dG${DARK_GRAY}║${RESET}\n" "$banner_width"
+
+  # Print Scan Duration line
+  printf "${DARK_GRAY}║${RESET} Scan Duration: %-50s" "$(format_time $runtime)"
+  printf "\033[%dG${DARK_GRAY}║${RESET}\n" "$banner_width"
+
+  # Print Timestamp line
+  printf "${DARK_GRAY}║${RESET} Timestamp: %-52s" "$(date '+%Y-%m-%d %H:%M:%S')"
+  printf "\033[%dG${DARK_GRAY}║${RESET}\n" "$banner_width"
+
   print_banner_line
 }
 
@@ -217,16 +227,24 @@ update_status() {
   estimated_time="Estimating time remaining..."
   elapsed_time="Processing..."
 
-  # Calculate estimated time after processing N directories
-  if [ "$dirs_processed" -ge 10 ]; then
+  # Calculate estimated time after processing 20 directories -- sufficient to ascertain a guess
+  if [ "$dirs_processed" -ge 20 ]; then
     current_time=$(date +%s)
     elapsed_seconds=$((current_time - start))
     elapsed_time="Elapsed: $(format_time $elapsed_seconds)"
-    time_per_dir=$((elapsed_seconds / dirs_processed))
+    if [ "$dirs_processed" -gt 0 ]; then
+      time_per_dir=$((elapsed_seconds / dirs_processed))
+    else
+      time_per_dir=0
+    fi
     remaining_dirs=$((TOTAL_DIRS - dirs_processed))
-    estimated_seconds=$((time_per_dir * remaining_dirs))
+    if [ "$remaining_dirs" -gt 0 ]; then
+      estimated_seconds=$((time_per_dir * remaining_dirs))
+    else
+      estimated_seconds=0
+    fi
     if [ "$estimated_seconds" -ge 1 ]; then
-      estimated_time=" Remaining: $(format_time ~$estimated_seconds)"
+      estimated_time=" Remaining: $(format_time $estimated_seconds)"
     fi
   fi
 
@@ -234,7 +252,7 @@ update_status() {
   if [ "$TOTAL_DIRS" -gt 20 ]; then
     percentage=$((dirs_processed * 100 / TOTAL_DIRS))
     clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} \t Possible Secrets: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}\t ${elapsed_time}\t${RESET}|${DARK_GRAY} ${estimated_time}${RESET}\n"
-    printf "${CURSOR_HOME}${ERASE_LINE}Progress: "
+    printf "${CURSOR_HOME}${ERASE_LINE}Progress:    "
     draw_progress_bar "$percentage"
     printf "\n"
   else
@@ -254,13 +272,14 @@ scan_file() {
 
         # Second pass -- run match through stricter filter (slow)
         if echo "$match" | grep -qE "$SECRET_PATTERN_STRICT"; then
-            # Check exclusions
+            # Check exclusions, stripping nonprintable characters
+            match=$(echo "$match" | sed 's/[^[:print:]\t]//g' | tr -cd '\11\12\15\40-\176') #sanitize
             if ! echo "$match" | grep -qE "$EXCLUDE_PATTERN"; then
                 secret_value="$(echo "$match" | awk '{sub(/^[0-9]+:[^:=]*[:=]/, ""); print}')"
                 if [[ -n "$secret_value" ]]; then
                     # Extra paranoid section -- included for compound statements in input which confuse the exclusion filter
                     # TODO: REMOVE and re-simplify
-                    extra_pass_regex='^\s*\{*\$'
+                    extra_pass_regex='^\s*\{*\$|^o$' #'^\s*\{*\$' and catch the annoying os.getenv case [FP53] and baffling [FP54]  TODO: FIX BUGBUG
                     escaped_secret_value=$secret_value
                     trimmed_secret_value=$(echo "$escaped_secret_value" | sed 's/^[[:space:]]*["'\''"]*//')
                     test_for_invalid_secret=$(echo $trimmed_secret_value | grep -E $extra_pass_regex)
