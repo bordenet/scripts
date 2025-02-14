@@ -31,31 +31,29 @@ FILE_TYPES=(
 
 # Directories we don't want the tool pursuing
 EXCLUDE_DIRS=(
-  ".git" ".github" "node_modules" "vendor" ".idea" ".vscode"
+  ".git" ".github" "node_modules" "vendor" ".idea" ".vscode" "stella_deploy"
 )
 
 # Patterns to detect secrets-- used by first screening pass
 SECRET_PATTERNS_FAST=(
+    "PASS(WORD)"
     "\b([A-Za-z0-9_]*PASS(WORD)?)\b[=:][\"\']?([^#\$\s\"\']+)"
     "(PASSWORD|PASS|KEY|SECRET)[=:][\"\']?([^#\$\s\"\']+)"
     "private[ _-]?key.*-----BEGIN PRIVATE KEY-----"
     "AWS[ _-]?(SECRET|ACCESS)[ _-]?(KEY)=[\"\']?([^#\$\s\"\']+)"
-    'AZURE[ _-]?(CLIENT|STORAGE|SUBSCRIPTION)[ _-]?(SECRET|KEY|ID)[=:\s]\(([A-Za-z0-9]{32,})\)'
+    "AZURE[ _-]?(CLIENT|STORAGE|SUBSCRIPTION)[ _-]?(SECRET|KEY|ID)[=:\s]\(([A-Za-z0-9]{32,})\)"
 )
 
 # Slow--but more thorough-- used by second pass (PLEASE EXTEND!)
 SECRET_PATTERNS_STRICT=(
+  ".*[_A-Z0-9]+PASS(WORD)\\s*=\\s*[^[:space:]\"']+.*"
   "[Pp]assword\\s*=\\s*[^[:space:]\"']+"
   "[Pp]assword\\s*[:=]\\s*\"[^\"]*\""
   "[Pp]assword\\s*[:=]\\s*'[^']*'"
 
-  "[_A-Z0-9]+PASSWORD\\s*=\\s*[^[:space:]\"']+"
-  "[_A-Z0-9]+PASSWORD\\s*[:=]\\s*\"[^\"]*\""
-  "[_A-Z0-9]+PASSWORD\\s*[:=]\\s*'[^']*'"
-
-  "[_A-Z0-9]+PASS\\s*=\\s*[^[:space:]\"']+"
-  "[_A-Z0-9]+PASS\\s*[:=]\\s*\"[^\"]*\""
-  "[_A-Z0-9]+PASS\\s*[:=]\\s*'[^']*'"
+  "[_A-Z0-9]+PASS(WORD)\\s*=\\s*[^[:space:]\"']+"
+  "[_A-Z0-9]+PASS(WORD)\\s*[:=]\\s*\"[^\"]*\""
+  "[_A-Z0-9]+PASS(WORD)\\s*[:=]\\s*'[^']*'"
 
   "[_A-Z0-9]+API_KEY\\s*=\\s*[^[:space:]\"']+"
   "[_A-Z0-9]+API_KEY\\s*[:=]\\s*\"[^\"]*\""
@@ -67,16 +65,16 @@ SECRET_PATTERNS_STRICT=(
 )
 
 EXCLUDE_PATTERNS=(
+  ':\s*\$\{[^}]+\}'
   '\${[^}]+}'                               # Matches ${VAR_NAME}
-  '\$\{{[^}]+}\}'                           # Matches ${{ secrets.SOMETHING }}
+  '(KEY|PASS|PASSWORD|TOKEN|SECRET):\s*'\'\'
+  '(KEY|PASS|PASSWORD|TOKEN|SECRET)[=:]\$\{{[^}]+}\}'                           # Matches ${{ secrets.SOMETHING }}
   '\b(password|argocdServerAdminPassword)\s*[:=]\s*""'  # Matches password: ""
   'export\s+[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$[A-Z_]+'  # Matches export VAR=$OTHER_VAR
   'export\s+[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$\{[A-Z_]+\}'
   'export\s+[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$\(\s*cat\s+.*\s*\)'  # Matches password stored in files
-  'kubectl\s+get\s+secret'                  # Matches kubectl secret retrieval
   '\b--env="[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$[A-Z_]+"'  # Match CLI --env=
   '\b--build-arg\s+[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$\(\s*yarn\s+get:[a-zA-Z0-9:_-]+\s*\)'  # Matches --build-arg in Docker
-  'sed\s+-i\s+"s/^[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=.*/[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$[A-Z_]+/"'
   '^[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$[0-9]+$'
   '^[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$\(\s*echo\s+\$[A-Z_]+\s*\|\s*jq\s+--raw-output\s+.*\)$'
   '^[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$\(\s*aws\s+secretsmanager\s+get-secret-value\s+--secret-id\s+\$[A-Z_]+\s+--region\s+\$[A-Z_]+\s+--query\s+SecretString\s+--output\s+text\s*\)$'
@@ -84,6 +82,15 @@ EXCLUDE_PATTERNS=(
   'SECRET=\$\(\s*aws\s+secretsmanager\s+get-secret-value\s+--secret-id\s+".*"\s+--output\s+text\s+--query\s+"SecretString"\s*\)'
   'kubectl\s+run\b.*--env\s+[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$[A-Z_]+'
   'docker\s+build\b.*--build-arg\s+[A-Z_]*(KEY|PASS|PASSWORD|TOKEN|SECRET)=\$\(\s*yarn\s+get:[a-zA-Z0-9:_-]+\s*\)'
+  '.*(KEY|PASS|PASSWORD|TOKEN|SECRET)=$'
+  '(KEY|PASS|PASSWORD|TOKEN|SECRET)"\s*$'
+  'HIDDEN'
+  'kubectl\s+get\s+secret'                  # Matches kubectl secret retrieval
+  '(KEY|PASS|PASSWORD|TOKEN|SECRET)}'
+  '(KEY|PASS|PASSWORD|TOKEN|SECRET)"?\]'
+  '(KEY|PASS|PASSWORD|TOKEN|SECRET)?"\]'
+  '(KEY|PASS|PASSWORD|TOKEN|SECRET)?;$'
+  'password\s*[:=]\s*os\.getenv'            # var auth_password  = process.env.AUTH_PASSWORD; 
 )
 
 # ANSI color codes -- feel free to customize
@@ -168,7 +175,7 @@ print_banner_line() {
 print_summary_banner() {
   local total_secrets=$1
   local runtime=$2
-  
+  printf "${ERASE_LINE}${CURSOR_UP}${ERASE_LINE}${CURSOR_UP}${ERASE_LINE}${CURSOR_UP}${ERASE_LINE}"
   print_banner_line
   printf "${DARK_GRAY}║${RESET} PASSHOG SCAN SUMMARY ${DARK_GRAY}║${RESET}\n"
   print_banner_line
@@ -240,35 +247,44 @@ scan_file() {
         possible_match=false
         grep -Eno ".*($pattern.*)" "$file" | while IFS= read -r match; do
 
-            # Second pass -- run match through stricter filter (slow)
-            for pattern_strict in "${SECRET_PATTERNS_STRICT[@]}"; do
-              if echo "$match" | grep -qE "$pattern_strict"; then
-                  possible_match=true
-                  break
-              fi
-            done
-
-            if [[ $possible_match ]]; then
+          # Second pass -- run match through stricter filter (slow)
+          for pattern_strict in "${SECRET_PATTERNS_STRICT[@]}"; do
+            if echo "$match" | grep -qE "$pattern_strict"; then
+                possible_match=true
+                break
+            fi
+          done
+            if [[ $possible_match == true ]]; then
                   # Check exclusions
                   for exclude_pattern in "${EXCLUDE_PATTERNS[@]}"; do
-                    if [[ possible_match ]] && echo "$match" | grep -qE "$exclude_pattern"; then
+
+                    if [[ $possible_match == true ]] && echo "$match" | grep -qE "$exclude_pattern"; then
                       possible_match=false
                       break
                     fi
                   done
             fi
- 
+
             if [[ $possible_match == true ]]; then
-                secret_value=$(echo "$match" | cut -d '=' -f 2-)
-                secret_value="${secret_value//[\"\']}"
- 
-                if [[ "$secret_value" != "" && ! "$secret_value" =~ ^\$ && ! "$secret_value" =~ = ]]; then
+                secret_value="$(echo "$match" | awk '{sub(/^[0-9]+:[^:=]*[:=]/, ""); print}')"
+                secret_value="$secret_value"
+                if [[ -n "$secret_value" ]]; then
+
+                # Extra paranoid section -- included for compound statements in input which confuse the exclusion filter
+                # TODO: REMOVE and re-simplify
+                extra_pass_regex='^\s*\{*\$'
+                escaped_secret_value=$secret_value
+                trimmed_secret_value=$(echo "$escaped_secret_value" | sed 's/^[[:space:]]*["'\''"]*//')
+                test_for_invalid_secret=$(echo $trimmed_secret_value | grep -E $extra_pass_regex)
+
+                  if [[ -z "$test_for_invalid_secret" ]]; then
                     printf "${LIGHT_BLUE}$file:${match} (Value: ${BRIGHT_RED}$secret_value${LIGHT_BLUE})${RESET}\n" >> "$RESULTS_FILE"
                     secrets_found_in_file=true
                     secrets_found=$(($(cat "$COUNT_FILE") + 1))
                     echo "$secrets_found" > "$COUNT_FILE"
                     update_status
                 fi
+              fi
             fi
         done
     done
@@ -323,13 +339,21 @@ done
 printf "\n"
 end=$(date +%s)
 runtime=$((end - start))
-total_secrets=$(cat "$COUNT_FILE")
-print_summary_banner "$total_secrets" "$runtime"
-printf "\n"
 
+total_secrets=$(cat "$COUNT_FILE")
+
+if [[ -z "$RESULTS_FILE" ]]; then
+  print_summary_banner "$total_secrets" "$runtime"
+  printf "\n"
+fi
 # Report detailed findings
 if [ -s "$RESULTS_FILE" ]; then
-  # Create the log file name
+  sort -t: -k1,1 -k2,2n "$RESULTS_FILE" | uniq > temp && mv temp "$RESULTS_FILE"
+  total_secrets=$(wc -l < "$RESULTS_FILE" | awk '{print $1}')
+
+  print_summary_banner "$total_secrets" "$runtime"
+
+# Create the log file name
   log_file_friendly_name="${script_name}-${timestamp}.log"
   temp_file=$(mktemp)
   temp_dir=$(dirname "$temp_file")
