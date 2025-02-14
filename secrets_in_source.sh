@@ -172,20 +172,13 @@ draw_progress_bar() {
 }
 
 # Logging function
-log_info() {
-  echo -e "${DARK_GRAY}[INFO] $1${RESET}"
+log_info() { echo -e "${DARK_GRAY}[INFO] $1${RESET}"
 }
-
-log_info_red() {
-  echo -e "${DARK_RED}[INFO] $1${RESET}"
+log_info_red() {  echo -e "${DARK_RED}[INFO] $1${RESET}"
 }
-
-log_error_red() {
-  printf "${BRIGHT_RED}[ERROR] %s${RESET}\n" "$1"
+log_error_red() { printf "${BRIGHT_RED}[ERROR] %s${RESET}\n" "$1"
 }
-
-print_banner_line() {
-  printf "${DARK_GRAY}═══════════════════════════════════════════════════════════════════════════════${RESET}\n"
+print_banner_line() {  printf "${DARK_GRAY}═══════════════════════════════════════════════════════════════════════════════${RESET}\n"
 }
 
 print_summary_banner() {
