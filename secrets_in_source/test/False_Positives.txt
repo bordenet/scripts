@@ -57,6 +57,7 @@
 [FP57]     "dmFlowAssertion": "PASS : A cancel booking can be successfully made .",
 [FP58]                kafka_common_conf_set "$CLIENT_CONF" sasl.jaas.config "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required clientId=\"$SASL_CLIENT_ID\" password=\"$SASL_CLIENT_SECRET\";"
 [FP59]                kafka_common_conf_set "$CLIENT_CONF" sasl.jaas.config "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"$SASL_USERNAME\" password=\"$SASL_USER_PASSWORD\";"
+[FP60]                password=self.TEST_CONFIGURATION.ACTIVEMQ_PASS,
 
 #
 # Known test failures
