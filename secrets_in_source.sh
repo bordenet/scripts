@@ -10,9 +10,10 @@
 #              Windows and Ubuntu, et al.
 # Docs: https://emachines.atlassian.net/wiki/spaces/~71202069f0ca4c20614a21b017d991e75ff720/pages/4505600001/Secrets+in+Source
 # Author: Matt Bordenet
-# Usage: ./passhog_simple.sh <directory_path> [-t <file_types>]
+# Usage: ./passhog_simple.sh <directory_path> [-t <file_suffixes>]
 if [ "$#" -lt 1 ]; then
-  echo "Usage: $0 <directory_path> [-t <file_types (list of file suffixes)>]"
+  echo "Usage: $0 <directory_path> [-t <file_suffixes>]"
+  echo "Example ./{0} . -t sh,yml,yaml"
   exit 1
 fi
 
@@ -25,13 +26,11 @@ TARGET_DIR="$1"
 shift
 
 # Default file types to scan (PLEASE EXTEND!)
-FILE_TYPES=(
-  "*.js" "*.json" "*.py" "*.cs" "*.go" "*.sh" "*.tf" "*.yml" "*.yaml" "*.env" "*env" "*.ENV" "*ENV" "*.txt"
+FILE_TYPES=(  "*.js" "*.json" "*.py" "*.cs" "*.go" "*.sh" "*.tf" "*.yml" "*.yaml" "*.env" "*env" "*.ENV" "*ENV" "*.txt"
 )
 
 # Directories we don't want the tool pursuing
-EXCLUDE_DIRS=(
-  ".git" ".github" "node_modules" "vendor" ".idea" ".vscode" "stella_deploy"
+EXCLUDE_DIRS=(  ".git" ".github" "node_modules" "vendor" ".idea" ".vscode" "stella_deploy"
 )
 
 # Patterns to detect secrets-- used by first screening pass
@@ -100,13 +99,9 @@ combine_patterns() {
     printf "%s" "$*"
 }
 
-# Combine the fast patterns
+# Combine regex patterns for speed
 SECRET_PATTERN_FAST=$(combine_patterns "${SECRET_PATTERNS_FAST_EXPANDED[@]}")
-
-# Combine the strict patterns
 SECRET_PATTERN_STRICT=$(combine_patterns "${SECRET_PATTERNS_STRICT_EXPANDED[@]}")
-
-# Combine the exclude patterns
 EXCLUDE_PATTERN=$(combine_patterns "${EXCLUDE_PATTERNS_EXPANDED[@]}")
 
 # ANSI color codes -- feel free to customize
