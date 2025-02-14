@@ -166,7 +166,7 @@ draw_progress_bar() {
   local empty=$((width - filled))
   
   printf "["
-  printf "%${filled}s" | tr ' ' '='
+  printf "${LIGHT_BLUE}%${filled}s${RESET}" | tr ' ' '='
   printf "%${empty}s" | tr ' ' ' '
   printf "] %d%%" "$percentage"
 }
@@ -225,29 +225,31 @@ format_time() {
 update_status() {
   secrets_found=$(cat "$COUNT_FILE")
   dirs_processed=$(cat "$DIR_COUNT_FILE")
-  estimated_time=""
-  
+  estimated_time="Estimating time remaining..."
+  elapsed_time="Processing..."
+
   # Calculate estimated time after processing N directories
   if [ "$dirs_processed" -ge 10 ]; then
     current_time=$(date +%s)
-    elapsed_time=$((current_time - start))
-    time_per_dir=$((elapsed_time / dirs_processed))
+    elapsed_seconds=$((current_time - start))
+    elapsed_time="Elapsed: $(format_time $elapsed_seconds)"
+    time_per_dir=$((elapsed_seconds / dirs_processed))
     remaining_dirs=$((TOTAL_DIRS - dirs_processed))
     estimated_seconds=$((time_per_dir * remaining_dirs))
     if [ "$estimated_seconds" -ge 1 ]; then
-      estimated_time=" \n Est. remaining: $(format_time $estimated_seconds)"
+      estimated_time=" Remaining: $(format_time ~$estimated_seconds)"
     fi
   fi
-  
+
   # Only show progress bar if there are more than 20 directories
   if [ "$TOTAL_DIRS" -gt 20 ]; then
     percentage=$((dirs_processed * 100 / TOTAL_DIRS))
-    clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} \n Secrets: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}${estimated_time}${RESET}\n"
+    clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} \t Possible Secrets: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}\t ${elapsed_time}\t${RESET}|${DARK_GRAY} ${estimated_time}${RESET}\n"
     printf "${CURSOR_HOME}${ERASE_LINE}Progress: "
     draw_progress_bar "$percentage"
     printf "\n"
   else
-    clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} \n Secrets detected: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}${estimated_time}${RESET}\r\n"
+    clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} \t Secrets detected: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}\t ${elapsed_time}\t${RESET}|${DARK_GRAY} ${estimated_time}${RESET}\r\n"
   fi
 }
 
