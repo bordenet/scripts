@@ -30,7 +30,7 @@ shift
 FILE_TYPES=(  "*.js" "*.json" "*.py" "*.cs" "*.go" "*.sh" "*.tf" "*.yml" "*.yaml" "*.env" "*env" "*.ENV" "*ENV"
 )
 
-# Directories we don't want the tool pursuing
+# Directories we do not want the tool traversing
 EXCLUDE_DIRS=(  ".git" ".github" "node_modules" "vendor" ".idea" ".vscode" "stella_deploy" "secrets_in_source"
 )
 
@@ -92,6 +92,7 @@ EXCLUDE_PATTERNS_EXPANDED=(
   '(pass|password|pwd|PWD|controller-client-secret)\=(REDISPW|REDIS_PW|REDIS_PASSWORD|CONTROLLER_PASSWORD)' # FP54
   'PASS\s*:\s*[A-Z][a-zA-Z]*\s+[a-zA-Z\s]{6,}' # FP57
   'password=\\\"\$[A-Z_]+' # FP58, FP59
+  'password=self\.TEST_CONFIGURATION' # FP60
 )
 
 # Combine patterns into a single regex
@@ -325,18 +326,20 @@ export EXCLUDE_DIRS
 # Process files in the root search directory
 find_expr=$(construct_find_command)
 # For root directory scan:
-eval "find \"$TARGET_DIR\" -maxdepth 1 $find_expr 2>/dev/null" | while read -r file; do
-  printf "\r${ERASE_LINE}Scanning: ${LIGHT_BLUE}$file${RESET}"
-  scan_file "$file"
+eval "find \"$TARGET_DIR\" -maxdepth 1 -type f \( $find_expr \) 2>/dev/null" | while read -r file; do
+  if [[ ! " ${EXCLUDE_DIRS[@]} " =~ " $(basename "$file") " ]]; then
+    printf "\r${ERASE_LINE}Scanning: ${LIGHT_BLUE}$file${RESET}"
+    scan_file "$file"
+  fi
 done
 
 # Process subdirectories
 find -P "$TARGET_DIR" -maxdepth 1 -type d | while read -r dir; do
-    if [ "$dir" != "$TARGET_DIR" ]; then
+    if [ "$dir" != "$TARGET_DIR" ] && [[ ! " ${EXCLUDE_DIRS[@]} " =~ " $(basename "$dir") " ]]; then
         dirs_processed=$(($(cat "$DIR_COUNT_FILE") + 1))
         echo "$dirs_processed" > "$DIR_COUNT_FILE"
         update_status
-         
+
         find_expr=$(construct_find_command)
         eval "find -P \"$dir\" -type f \( $find_expr \) 2>/dev/null" | while read -r file; do
             printf "\r${ERASE_LINE}Scanning: ${LIGHT_BLUE}$file${RESET}"
