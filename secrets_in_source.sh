@@ -35,7 +35,7 @@ EXCLUDE_DIRS=(
 )
 
 # Patterns to detect secrets-- used by first screening pass
-SECRET_PATTERNS_FAST=(
+SECRET_PATTERNS_FAST_EXPANDED=(
     "PASS(WORD)"
     "\b([A-Za-z0-9_]*PASS(WORD)?)\b[=:][\"\']?([^#\$\s\"\']+)"
     "(PASSWORD|PASS|KEY|SECRET)[=:][\"\']?([^#\$\s\"\']+)"
@@ -45,7 +45,7 @@ SECRET_PATTERNS_FAST=(
 )
 
 # Slow--but more thorough-- used by second pass (PLEASE EXTEND!)
-SECRET_PATTERNS_STRICT=(
+SECRET_PATTERNS_STRICT_EXPANDED=(
   ".*[_A-Z0-9]+PASS(WORD)\\s*=\\s*[^[:space:]\"']+.*"
   "[Pp]assword\\s*=\\s*[^[:space:]\"']+"
   "[Pp]assword\\s*[:=]\\s*\"[^\"]*\""
@@ -64,7 +64,7 @@ SECRET_PATTERNS_STRICT=(
   "SECRET\\s*[:=]\\s*'[^']*'"
 )
 
-EXCLUDE_PATTERNS=(
+EXCLUDE_PATTERNS_EXPANDED=(
   ':\s*\$\{[^}]+\}'
   '\${[^}]+}'                               # Matches ${VAR_NAME}
   '(KEY|PASS|PASSWORD|TOKEN|SECRET):\s*'\'\'
@@ -91,7 +91,23 @@ EXCLUDE_PATTERNS=(
   '(KEY|PASS|PASSWORD|TOKEN|SECRET)?"\]'
   '(KEY|PASS|PASSWORD|TOKEN|SECRET)?;$'
   'password\s*[:=]\s*os\.getenv'            # var auth_password  = process.env.AUTH_PASSWORD; 
+  'os.getenv\('
 )
+
+# Combine patterns into a single regex
+combine_patterns() {
+    local IFS="|"
+    printf "%s" "$*"
+}
+
+# Combine the fast patterns
+SECRET_PATTERN_FAST=$(combine_patterns "${SECRET_PATTERNS_FAST_EXPANDED[@]}")
+
+# Combine the strict patterns
+SECRET_PATTERN_STRICT=$(combine_patterns "${SECRET_PATTERNS_STRICT_EXPANDED[@]}")
+
+# Combine the exclude patterns
+EXCLUDE_PATTERN=$(combine_patterns "${EXCLUDE_PATTERNS_EXPANDED[@]}")
 
 # ANSI color codes -- feel free to customize
 LIGHT_BLUE='\033[1;34m'
@@ -241,54 +257,35 @@ update_status() {
 scan_file() {
     local file="$1"
     local secrets_found_in_file=false
- 
+
     # First pass -- scan the file (fast)
-    for pattern in "${SECRET_PATTERNS_FAST[@]}"; do
-        possible_match=false
-        grep -Eno ".*($pattern.*)" "$file" | while IFS= read -r match; do
+    grep -Eno ".*($SECRET_PATTERN_FAST.*)" "$file" | while IFS= read -r match; do
 
-          # Second pass -- run match through stricter filter (slow)
-          for pattern_strict in "${SECRET_PATTERNS_STRICT[@]}"; do
-            if echo "$match" | grep -qE "$pattern_strict"; then
-                possible_match=true
-                break
-            fi
-          done
-            if [[ $possible_match == true ]]; then
-                  # Check exclusions
-                  for exclude_pattern in "${EXCLUDE_PATTERNS[@]}"; do
-
-                    if [[ $possible_match == true ]] && echo "$match" | grep -qE "$exclude_pattern"; then
-                      possible_match=false
-                      break
-                    fi
-                  done
-            fi
-
-            if [[ $possible_match == true ]]; then
+        # Second pass -- run match through stricter filter (slow)
+        if echo "$match" | grep -qE "$SECRET_PATTERN_STRICT"; then
+            # Check exclusions
+            if ! echo "$match" | grep -qE "$EXCLUDE_PATTERN"; then
                 secret_value="$(echo "$match" | awk '{sub(/^[0-9]+:[^:=]*[:=]/, ""); print}')"
-                secret_value="$secret_value"
                 if [[ -n "$secret_value" ]]; then
+                    # Extra paranoid section -- included for compound statements in input which confuse the exclusion filter
+                    # TODO: REMOVE and re-simplify
+                    extra_pass_regex='^\s*\{*\$'
+                    escaped_secret_value=$secret_value
+                    trimmed_secret_value=$(echo "$escaped_secret_value" | sed 's/^[[:space:]]*["'\''"]*//')
+                    test_for_invalid_secret=$(echo $trimmed_secret_value | grep -E $extra_pass_regex)
 
-                # Extra paranoid section -- included for compound statements in input which confuse the exclusion filter
-                # TODO: REMOVE and re-simplify
-                extra_pass_regex='^\s*\{*\$'
-                escaped_secret_value=$secret_value
-                trimmed_secret_value=$(echo "$escaped_secret_value" | sed 's/^[[:space:]]*["'\''"]*//')
-                test_for_invalid_secret=$(echo $trimmed_secret_value | grep -E $extra_pass_regex)
-
-                  if [[ -z "$test_for_invalid_secret" ]]; then
-                    printf "${LIGHT_BLUE}$file:${match} (Value: ${BRIGHT_RED}$secret_value${LIGHT_BLUE})${RESET}\n" >> "$RESULTS_FILE"
-                    secrets_found_in_file=true
-                    secrets_found=$(($(cat "$COUNT_FILE") + 1))
-                    echo "$secrets_found" > "$COUNT_FILE"
-                    update_status
+                    if [[ -z "$test_for_invalid_secret" ]]; then
+                        printf "${LIGHT_BLUE}$file:${match} (Value: ${BRIGHT_RED}$secret_value${LIGHT_BLUE})${RESET}\n" >> "$RESULTS_FILE"
+                        secrets_found_in_file=true
+                        secrets_found=$(($(cat "$COUNT_FILE") + 1))
+                        echo "$secrets_found" > "$COUNT_FILE"
+                        update_status
+                    fi
                 fi
-              fi
             fi
-        done
+        fi
     done
- 
+
     if $secrets_found_in_file; then
         log_info_red "SECRETS DETECTED IN $file!"
     fi
