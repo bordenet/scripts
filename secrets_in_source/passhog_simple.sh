@@ -90,6 +90,8 @@ EXCLUDE_PATTERNS_EXPANDED=(
   'password\s*=\s*ENV\[\"' # FP52
   '(KEY|PASS|PASSWORD|TOKEN|SECRETpass|password).*getenv' # FP53  TODO: FIX BUGBUG
   '(pass|password|pwd|PWD|controller-client-secret)\=(REDISPW|REDIS_PW|REDIS_PASSWORD|CONTROLLER_PASSWORD)' # FP54
+  'PASS\s*:\s*[A-Z][a-zA-Z]*\s+[a-zA-Z\s]{6,}' # FP57
+  'password=\\\"\$[A-Z_]+' # FP58, FP59
 )
 
 # Combine patterns into a single regex
