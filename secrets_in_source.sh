@@ -13,7 +13,8 @@
 # Usage: ./passhog_simple.sh <directory_path> [-t <file_suffixes>]
 if [ "$#" -lt 1 ]; then
   echo "Usage: $0 <directory_path> [-t <file_suffixes>]"
-  echo "Example ./{0} . -t sh,yml,yaml"
+  echo "Example 1: $0 . -t sh,yml,yaml"
+  echo "Example 2: $0 ."
   exit 1
 fi
 
