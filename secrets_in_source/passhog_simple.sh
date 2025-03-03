@@ -1,5 +1,8 @@
 #!/bin/bash
-
+#
+# NOTE: THIS SCRIPT IS WEAK. I've got a Go-based version, in partnership with Daniel G. Taylor, which is 10x faster (30k 
+# files in ~54 seconds) and extremely thorough with low false-positive rates. Ping me if interested.
+#
 # Script: passhog_simple.sh
 # Purpose: Scan #!/bin/bash
 # Script: passhog_simple.sh
