@@ -1,11 +1,43 @@
 #!/bin/bash
+
+#==============================================================================
 # reset_all_repos.sh
-# Script to reset multiple git repositories to the main branch on the remote
-# Purpose: Scan GitHub repository clones, reset contents, and keep them updated.
-# Description: I don't make a lot of code changes, but I want to stay up-to-date
-# Docs: N/A
+#==============================================================================
+# 
+# Description: Automated Git repository reset utility for multiple repositories
+# 
+# This script scans for Git repositories in a specified directory and resets
+# each repository to match its remote main/master branch. It's designed to keep
+# local repository clones synchronized with upstream changes without preserving
+# local modifications.
+#
+# Usage: ./reset_all_repos.sh [-f|--force] [directory_path]
+#
+# Parameters:
+#   -f, --force       Skip confirmation prompt and execute immediately
+#   directory_path    Target directory to search for repositories (default: current)
+#
+# Prerequisites:
+#   - Git installed and configured
+#   - Valid Git repositories in target directory
+#   - Network connectivity to remote repositories
+#
+# Features:
+#   - Interactive confirmation prompt (unless --force is used)
+#   - Progress tracking with visual gas gauge display
+#   - Comprehensive logging to git_reset.log
+#   - Estimated completion time calculation
+#   - Color-coded terminal output
+#   - Automatic detection of default branch (main/master)
+#
 # Author: Matt Bordenet
-# Usage: ./reset_all_repos.sh [-f|--force] <directory_path>
+# Created: [Date]
+# Modified: [Date]
+#
+# Warning: This script performs hard resets and will discard all local changes!
+#          Use with caution and ensure important work is committed elsewhere.
+#
+#==============================================================================
 
 start=$(date +%s)
 
@@ -64,6 +96,8 @@ reset_git_repo() {
   if [ -d "$repo_path" ]; then
     if pushd "$repo_path" > /dev/null; then
       log_message "Entered directory: $repo_path"
+
+      git pull origin main
 
       branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's|^refs/remotes/origin/||')
 
@@ -127,7 +161,8 @@ display_gas_gauge() {
   printf "[%s%s] %d%%" "$gauge" "$spaces" $((current * 100 / total))
 }
 
-find "$SEARCH_DIR" -type d -name ".git" | while read -r git_dir; do
+# Use process substitution instead of pipe to avoid subshell variable scope issues
+while read -r git_dir; do
   repo_dir=$(dirname "$git_dir")
   repo_index=$((repo_index + 1))
   iteration_start=$(date +%s)
@@ -149,8 +184,8 @@ find "$SEARCH_DIR" -type d -name ".git" | while read -r git_dir; do
   reset_git_repo "$repo_dir"
 
   # Introduce a random sleep between 0 and 2 seconds
-    sleep_time=$((0 + RANDOM % 2))
-    sleep "$sleep_time"       
+  sleep_time=$((0 + RANDOM % 2))
+  sleep "$sleep_time"       
   
   # Update time per repo calculation after each iteration
   iteration_end=$(date +%s)
@@ -158,7 +193,7 @@ find "$SEARCH_DIR" -type d -name ".git" | while read -r git_dir; do
   if [ $repo_index -ge 5 ]; then
     time_per_repo=$(( (time_per_repo * (repo_index - 1) + iteration_time) / repo_index ))
   fi
-done
+done < <(find "$SEARCH_DIR" -type d -name ".git")
 
 end=$(date +%s)
 runtime=$((end - start))
