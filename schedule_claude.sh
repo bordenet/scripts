@@ -56,12 +56,27 @@ fi
 
 # --- Keep system awake while waiting ---
 echo "⚡ Using caffeinate to keep macOS awake..."
-caffeinate -dimsu sleep $TOTAL_SECONDS &
+caffeinate -dimsu &
+CAFFEINATE_PID=$!
 
-# --- Sleep until time ---
-sleep $TOTAL_SECONDS
+# --- Countdown ticker (per second) ---
+SECONDS_LEFT=$TOTAL_SECONDS
+while [[ $SECONDS_LEFT -gt 0 ]]; do
+  HOURS_LEFT=$(( SECONDS_LEFT / 3600 ))
+  MINUTES_LEFT=$(( (SECONDS_LEFT % 3600) / 60 ))
+  SECS_LEFT=$(( SECONDS_LEFT % 60 ))
+
+  # ANSI escape sequence to clear line and move cursor to beginning
+  printf "\r\033[K⏳ Time left: %02d:%02d:%02d" "$HOURS_LEFT" "$MINUTES_LEFT" "$SECS_LEFT"
+
+  sleep 1
+  SECONDS_LEFT=$(( SECONDS_LEFT - 1 ))
+done
+echo ""
 
 # --- Execute resume script ---
+kill $CAFFEINATE_PID >/dev/null 2>&1
+
 if [[ -x "$RESUME_SCRIPT" ]]; then
   echo "🚀 Running $RESUME_SCRIPT -p \"$PROMPT\"..."
   "$RESUME_SCRIPT" -p "$PROMPT"
@@ -69,3 +84,4 @@ else
   echo "❌ Error: $RESUME_SCRIPT not found or not executable."
   exit 1
 fi
+
