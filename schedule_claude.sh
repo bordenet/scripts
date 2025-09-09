@@ -43,9 +43,19 @@ if [[ $TOTAL_SECONDS -le 0 ]]; then
 fi
 
 # --- Compute target wall-clock time ---
-TARGET_TIME=$(date -v+${HOURS}H -v+${MINUTES}M +"%H:%M:%S %Z")
+#TARGET_TIME=$(date -v+${HOURS}H -v+${MINUTES}M +"%H:%M:%S %Z")
+#TARGET_TIME=$(date -v+${HOURS}H -v+${MINUTES}M +"%H:%M:%S %Z")
+# --- Compute target wall-clock time ---
+if date -v+0H >/dev/null 2>&1; then
+  # macOS BSD date supports -v
+  TARGET_TIME=$(date -v+${HOURS}H -v+${MINUTES}M +"%H:%M:%S %Z")
+else
+  # GNU date (Linux or gdate on macOS with coreutils)
+  TARGET_TIME=$(date -d "now + ${HOURS} hours + ${MINUTES} minutes" +"%H:%M:%S %Z")
+fi
 
 echo "⏳ Waiting ${HOURS} hours and ${MINUTES} minutes ($TOTAL_SECONDS seconds)..."
+echo "Prompt: \"$PROMPT\""
 echo "🕒 Will run at $TARGET_TIME"
 
 # --- Dry run check ---
