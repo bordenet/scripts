@@ -1,17 +1,17 @@
 #!/bin/bash
-#cd /Users/$(whoami)/GitHub
+#
+# Script: fetch-github-projects.sh
+# Description: This script automates the process of updating all local Git repositories
+#              located within the '~/GitHub' directory. It iterates through each
+#              repository and performs a 'git pull' to fetch and merge changes
+#              from their respective remote origins.
+# Usage: ./fetch-github-projects.sh
+# Dependencies: git
+#
 cd ~/GitHub
 for filename in /Users/$(whoami)/GitHub/*/; do
-#  echo "dir: $filename"
   pushd $filename
   echo $(pwd)
-#  git maintenance start
-#  git reset --hard
-#  git clean -d -x -f
-#  git fetch
-#git fetch origin
-#git reset --hard origin/master
-#git clean -fd
-git pull
+  git pull
   popd
 done

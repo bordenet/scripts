@@ -1,43 +1,23 @@
 #!/bin/bash
-
-#==============================================================================
-# reset_all_repos.sh
-#==============================================================================
-# 
-# Description: Automated Git repository reset utility for multiple repositories
-# 
-# This script scans for Git repositories in a specified directory and resets
-# each repository to match its remote main/master branch. It's designed to keep
-# local repository clones synchronized with upstream changes without preserving
-# local modifications.
 #
+# Script: reset_all_repos.sh
+# Description: This script automates the process of resetting multiple Git repositories
+#              to match their remote main/master branch. It scans a specified directory
+#              for Git repositories and performs a hard reset, discarding all local changes.
+#              Features include interactive confirmation (unless --force is used),
+#              progress tracking, logging, estimated completion time, and color-coded output.
 # Usage: ./reset_all_repos.sh [-f|--force] [directory_path]
-#
-# Parameters:
-#   -f, --force       Skip confirmation prompt and execute immediately
-#   directory_path    Target directory to search for repositories (default: current)
-#
+# Arguments:
+#   -f, --force: Skip confirmation prompt and execute immediately.
+#   directory_path: Target directory to search for repositories (default: current directory).
 # Prerequisites:
-#   - Git installed and configured
-#   - Valid Git repositories in target directory
-#   - Network connectivity to remote repositories
-#
-# Features:
-#   - Interactive confirmation prompt (unless --force is used)
-#   - Progress tracking with visual gas gauge display
-#   - Comprehensive logging to git_reset.log
-#   - Estimated completion time calculation
-#   - Color-coded terminal output
-#   - Automatic detection of default branch (main/master)
-#
-# Author: Matt Bordenet
-# Created: [Date]
-# Modified: [Date]
-#
+#   - Git installed and configured.
+#   - Valid Git repositories in the target directory.
+#   - Network connectivity to remote repositories.
 # Warning: This script performs hard resets and will discard all local changes!
 #          Use with caution and ensure important work is committed elsewhere.
+# Dependencies: git, find, date, wc, awk, sed, pushd, popd
 #
-#==============================================================================
 
 start=$(date +%s)
 

@@ -1,4 +1,15 @@
 #!/bin/bash
+#
+# Script: setup_podman_for_terraform.sh
+# Description: This script automates the setup and configuration of Podman
+#              to be used as a Docker-compatible environment for Terraform.
+#              It installs Podman (if necessary), initializes and starts the
+#              Podman virtual machine, and sets the DOCKER_HOST environment
+#              variable to enable Terraform's Docker provider to connect to Podman.
+# Usage: ./setup_podman_for_terraform.sh
+# Dependencies: Homebrew (macOS), Podman, Terraform (for usage context)
+#
+#!/bin/bash
 
 echo "🔧 Checking for Homebrew..."
 if ! command -v brew >/dev/null 2>&1; then
