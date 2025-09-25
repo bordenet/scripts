@@ -1,4 +1,20 @@
 #!/bin/bash
+#
+# Script: schedule_claude.sh
+# Description: This script schedules the execution of the 'resume_claude.sh' script
+#              after a specified delay. It allows for setting a custom prompt to be
+#              passed to 'resume_claude.sh' and includes a dry-run option.
+#              On macOS, it uses 'caffeinate' to prevent the system from sleeping
+#              during the waiting period.
+# Usage: ./schedule_claude.sh [-h <hours>] [-m <minutes>] [-p <prompt>] [--dry-run]
+# Arguments:
+#   -h, --hours: Number of hours to wait before running 'resume_claude.sh'.
+#   -m, --minutes: Number of minutes to wait before running 'resume_claude.sh'.
+#   -p, --prompt: Prompt string to pass to 'resume_claude.sh'.
+#   --dry-run: Show what would happen without executing the scheduled script.
+# Dependencies: resume_claude.sh (must be in the same directory), date, caffeinate (macOS)
+#
+#!/bin/bash
 
 # --- Configuration ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

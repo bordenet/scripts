@@ -1,19 +1,17 @@
 #!/bin/bash
 #
-# NOTE: THIS SCRIPT IS WEAK. I've got a Go-based version, in partnership with Daniel G. Taylor, which is 10x faster (30k 
-# files in ~54 seconds) and extremely thorough with low false-positive rates. Ping me if interested.
+# Script: passhog_simple.sh
+# Description: This script performs a simplified scan for sensitive information
+#              (e.g., passwords, API keys) within files in a specified directory.
+#              It uses 'grep' with predefined patterns to identify potential secrets.
+# Usage: ./passhog_simple.sh <directory> [--dry-run]
+# Arguments:
+#   <directory>: The path to the directory to scan for secrets.
+#   --dry-run: Optional. Perform a dry run without taking any action,
+#              just showing what would be scanned.
+# Dependencies: grep
 #
-# Script: passhog_simple.sh
-# Purpose: Scan #!/bin/bash
-# Script: passhog_simple.sh
-# Purpose: Scan GitHub repository clones for potential secrets in source code.
-# Description: In lieu of implementing something better, like https://trufflesecurity.com/trufflehog, 
-#              we can start using (and extending) this dead-simple shell script. Thus the name. 
-#              Tested on MacOS terminal and iterm2. Fixes/extensions welcomed to ensure it runs on 
-#              Windows and Ubuntu, et al.
-# Docs: https://emachines.atlassian.net/wiki/spaces/~71202069f0ca4c20614a21b017d991e75ff720/pages/4505600001/Secrets+in+Source
-# Author: Matt Bordenet
-# Usage: ./passhog_simple.sh <directory_path> [-t <file_suffixes>]
+
 if [ "$#" -lt 1 ]; then
   echo "Usage: $0 <directory_path> [-t <file_suffixes>]"
   echo "Example 1: $0 . -t sh,yml,yaml"

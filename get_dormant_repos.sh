@@ -1,4 +1,18 @@
 #!/bin/bash
+#
+# Script: get_dormant_repos.sh
+# Description: This script identifies and lists dormant GitHub repositories within a specified
+#              organization. A repository is considered dormant if it has NOT had a push
+#              within the last year. For each dormant repository, it reports its name,
+#              the last push timestamp, and the total lines of code.
+# Usage: ./get_dormant_repos.sh
+# Configuration:
+#   Before running, update GITHUB_ORG, GITHUB_ORG_URL, GITHUB_API_URL, and GITHUB_TOKEN
+#   variables within the script. The GITHUB_TOKEN requires sufficient permissions to
+#   access the repositories in the specified GitHub organization.
+# Dependencies: curl, jq, git, date (GNU date for -v option on macOS, or equivalent)
+#
+#!/bin/bash
 
 GITHUB_ORG="ORG-NAME-HERE"
 GITHUB_ORG_URL="https://GHE-URL-HERE/$GITHUB_ORG/"

@@ -1,4 +1,17 @@
 #!/bin/bash
+#
+# Script: resume_claude.sh
+# Description: This script automates the process of resuming an AI assistant session
+#              with "Claude" within VS Code. It opens a specified project, activates
+#              VS Code, opens the integrated terminal, initiates Claude, and sends
+#              a predefined or custom prompt to continue a conversation or task.
+# Usage: ./resume_claude.sh [-p <prompt>|--prompt <prompt>]
+# Arguments:
+#   -p, --prompt <text>: Optional. A custom prompt string to send to Claude.
+#                        If not provided, a default prompt will be used.
+# Dependencies: VS Code, osascript (macOS), pgrep
+#
+#!/bin/bash
 
 # --- Defaults ---
 PROJECT_PATH="/Users/$(whoami)/GitHub/RecipeArchive"

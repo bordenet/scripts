@@ -1,4 +1,17 @@
 #!/bin/bash
+#
+# Script: get_active_repos.sh
+# Description: This script identifies and lists active GitHub repositories within a specified
+#              organization. A repository is considered active if it has had a push
+#              within the last year. For each active repository, it reports its name,
+#              the last push timestamp, and the total lines of code.
+# Usage: ./get_active_repos.sh
+# Configuration:
+#   Before running, update GITHUB_ORG, GITHUB_ORG_URL, GITHUB_API_URL, and GITHUB_TOKEN
+#   variables within the script. The GITHUB_TOKEN requires sufficient permissions to
+#   access the repositories in the specified GitHub organization.
+# Dependencies: curl, jq, git, date (GNU date for -v option on macOS, or equivalent)
+#
 
 GITHUB_ORG="ORG-NAME-HERE"
 GITHUB_ORG_URL="https://GHE-URL-HERE/$GITHUB_ORG/"
