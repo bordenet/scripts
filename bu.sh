@@ -33,8 +33,12 @@ mas upgrade
 #./reset_all_repos.sh -f
 #popd > /dev/null
 
-sudo -H pip install --upgrade pip
-sudo -H pip3 install --upgrade pip
+#sudo -H pip install --upgrade pip
+pip install --upgrade pip
+
+#sudo -H pip3 install --upgrade pip
+pip3 install --upgrade pip3
+
 
 #~/GitHub/fetch-github-projects.sh
 #/Users/matt/GitHub/fetch-github-projects.sh
