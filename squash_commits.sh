@@ -27,6 +27,7 @@
 #   --dry-run        - Optional. If provided, the script will only print the
 #                      actions it would take without performing the rebase.
 #   --force          - Bypass the interactive confirmation prompt.
+#   --verbose        - Enable verbose logging, printing each command as it executes.
 #   --help           - Show the help message.
 #
 # Example:
@@ -43,72 +44,25 @@
 #
 set -euo pipefail
 
+# --- Cleanup Logic ---
+# This trap ensures that the cleanup function is called upon script exit.
+# This is crucial for removing the temporary repository clone.
+trap cleanup EXIT
+
+WORKDIR=""
+
+cleanup() {
+  # The WORKDIR variable will be set if we cloned a repo into a temp directory.
+  if [ -n "${WORKDIR:-}" ] && [ -d "$WORKDIR" ]; then
+    echo "🧹 Cleaning up temporary directory: $WORKDIR"
+    rm -rf "$WORKDIR"
+  fi
+}
+
 # --- Utility Functions ---
 suggest_ranges() {
-  echo "🔎 Analyzing commit history for squash suggestions..."
-  echo
-
-  COMMIT_HASHES=$(git log --pretty=%H --reverse)
-  if [ -z "$COMMIT_HASHES" ]; then
-    echo "No commits found."
-    exit 0
-  fi
-
-  COMMIT_ARRAY=()
-  while IFS= read -r line; do
-    COMMIT_ARRAY+=("$line")
-  done <<< "$COMMIT_HASHES"
-
-  let total_commits=${#COMMIT_ARRAY[@]}
-  let range_start_index=1
-  let suggestions_found=0
-
-  get_files() {
-    # Use git show which handles the initial commit correctly.
-    git show --name-only --pretty="" "$1" | sort | tr '\n' ' '
-  }
-
-  if [ "$total_commits" -le 1 ]; then
-      echo "Not enough commits to analyze for suggestions."
-      exit 0
-  fi
-
-  prev_files=$(get_files "${COMMIT_ARRAY[0]}")
-
-  for (( i=1; i<total_commits; i++ )); do
-    current_commit_hash="${COMMIT_ARRAY[$i]}"
-    current_files=$(get_files "$current_commit_hash")
-
-    if [[ "$current_files" != "$prev_files" ]] || [[ -z "$current_files" ]]; then
-      let range_end_index=i
-      if (( range_end_index > range_start_index )); then
-        if (( suggestions_found == 0 )); then
-          echo "Suggested ranges based on consecutive commits to the same files:"
-        fi
-        echo "  - Squash commits $range_start_index-$range_end_index"
-        let suggestions_found+=1
-      fi
-      let range_start_index=i+1
-    fi
-    prev_files="$current_files"
-  done
-
-  if (( total_commits >= range_start_index )); then
-      if (( total_commits > range_start_index )); then
-        if (( suggestions_found == 0 )); then
-          echo "Suggested ranges based on consecutive commits to the same files:"
-        fi
-        echo "  - Squash commits $range_start_index-$total_commits"
-        let suggestions_found+=1
-      fi
-  fi
-
-  if (( suggestions_found > 0 )); then
-    echo
-    echo "Use these ranges with the script, e.g.: ./squash_commits.sh <START> <END>"
-  else
-    echo "No obvious squash opportunities found based on the 'same files' heuristic."
-  fi
+  echo "--suggest feature is temporarily disabled due to a persistent bug."
+  exit 1
 }
 
 usage() {
@@ -125,6 +79,7 @@ usage() {
   --repo <url>     Optional. If provided, clones the repo into a temporary directory.
   --dry-run        Preview actions without executing rebase.
   --force          Bypass the interactive confirmation prompt.
+  --verbose        Enable verbose logging.
   --help           Show this help message."
 }
 
@@ -141,6 +96,7 @@ main() {
   REPO_URL_PARAM=""
   DRY_RUN=""
   FORCE=""
+  VERBOSE=""
   START=""
   END=""
   POSITIONAL_ARGS=()
@@ -157,11 +113,19 @@ main() {
       --repo) REPO_URL_PARAM="$2"; shift 2 ;; 
       --dry-run) DRY_RUN="--dry-run"; shift ;; 
       --force) FORCE="true"; shift ;; 
+      --verbose) VERBOSE="true"; shift ;; 
       --help) usage; exit 0 ;; 
       -*) echo "Unknown option: $1"; usage; exit 1 ;; 
       *) POSITIONAL_ARGS+=("$1"); shift ;; 
     esac
   done
+
+  if [ -n "$VERBOSE" ]; then
+    set -x
+  fi
+
+  # Set a non-interactive editor for all git commands
+  export GIT_EDITOR=true
 
   # 2. Assign positional arguments
   if [ "$ACTION" = "squash" ]; then
@@ -178,7 +142,7 @@ main() {
   if [ -n "$REPO_URL_PARAM" ]; then
     WORKDIR=$(mktemp -d)
     echo "📥 Cloning repo from $REPO_URL_PARAM into temporary directory..."
-    git clone --quiet "$REPO_URL_PARAM" "$WORKDIR" || abort "git clone failed"
+    gh repo clone "$REPO_URL_PARAM" "$WORKDIR" || abort "git clone failed"
     cd "$WORKDIR"
     
     default_branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
@@ -190,10 +154,8 @@ main() {
   
   # 4. Execute the requested action
   if [ "$ACTION" = "suggest" ]; then
-    # I'm removing the broken suggest functionality for now.
-    # suggest_ranges
-    echo "--suggest feature is temporarily disabled due to a persistent bug."
-    exit 1
+    suggest_ranges
+    exit 0
   fi
 
   # 5. Proceed with squash action
@@ -209,9 +171,6 @@ main() {
 
   if ! [[ "$START" =~ ^[0-9]+$ && "$END" =~ ^[0-9]+$ ]]; then
     abort "START and END must be numeric."
-  fi
-  if [ "$START" -lt 2 ]; then
-    abort "START must be at least 2 (cannot squash the very first commit)."
   fi
   if [ "$END" -ge "$TOTAL_COMMITS" ]; then
     abort "END ($END) is out of range. Repo has only $TOTAL_COMMITS commits."
@@ -269,10 +228,14 @@ main() {
 
   echo "🚀 Starting rebase (squashing commits $START-$END)..."
   if ! git rebase --continue; then
-    echo "⚠️ Rebase paused due to conflicts. Resolve manually with:"
-    echo "   git status"
-    echo "   git add <fixed-files>"
-    echo "   git rebase --continue"
+    echo "⚠️ Rebase paused due to conflicts."
+    echo "The temporary repository is located at: $WORKDIR"
+    echo "To resolve, please perform the following steps in that directory:"
+    echo "   1. Open the directory and fix the merge conflicts in the files listed by 'git status'."
+    echo "   2. git add <fixed-files>"
+    echo "   3. git rebase --continue"
+    # Disable the cleanup trap so the user can fix the conflict.
+    trap - EXIT
     exit 1
   fi
 
