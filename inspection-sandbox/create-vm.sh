@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Automated VM Creation Script for Malware Inspection Sandbox
-# This script creates a UTM VM using VIRTUALIZE mode (much faster than emulate!)
+# VM Creation Script for Malware Inspection Sandbox
+# Uses Emulate mode due to Virtualize mode UEFI boot issues
 #
 
 set -euo pipefail
@@ -33,78 +33,78 @@ fi
 mkdir -p "${SHARED_DIR}"
 
 echo ""
-echo "📦 Creating VM with VIRTUALIZE mode (native performance)..."
+echo "📦 Creating VM with EMULATE mode..."
 echo ""
-
-# Create the VM using UTM CLI
-# Note: UTM CLI is limited, so we'll provide clear manual instructions
+echo "⚠️  NOTE: We use Emulate mode because Virtualize mode has UEFI boot issues with Alpine ISO."
+echo ""
 
 cat <<'EOF'
 
-⚠️  UTM doesn't support full CLI automation yet. Follow these steps:
+UTM doesn't support full CLI automation. Follow these steps:
 
 1. Open UTM app
 2. Click "+" (Create a New Virtual Machine)
-3. Select "Virtualize" (NOT Emulate - much faster!)
-4. Select "Linux"
-5. Use these settings:
+3. Select "Emulate" (NOT Virtualize - boot compatibility)
+4. Select "Other"
+5. Skip ISO for now (we'll add it in settings)
+6. Use these settings:
 
-   **Boot ISO Image:**
-   Browse and select: alpine.iso (in this directory)
+   **Architecture:** x86_64
+   **RAM:** 2048 MB
+   **CPU Cores:** 2
 
-   **Hardware:**
-   - RAM: 2048 MB
-   - CPU Cores: 2
-
-   **Storage:**
+7. **Storage:**
    - Size: 8 GB
    - Leave other settings as default
 
-   **Shared Directory:**
+8. **Shared Directory:**
    - Browse and select the "shared" directory in this folder
-   - IMPORTANT: Click "Advanced" and set to "Read Only"
+   - Set to "Read Only"
 
-   **Summary:**
+9. **Summary:**
    - Name: inspection-sandbox
    - Click "Save"
 
-6. BEFORE starting the VM, click the VM name, then click the 🎛️ (Edit) icon:
+10. AFTER creating the VM, click the VM name, then click the 🎛️ (Edit) icon:
 
-   **Network Tab:**
-   - Network Mode: "Emulated VLAN"
-   - ✅ Show Advanced Settings
-   - ✅ Isolate Guest from Host
+    **Add the Alpine ISO:**
+    - Look for "Drives" section in the left sidebar
+    - Click "New..." or "+"
+    - Select "Removable" or "CD/DVD"
+    - Browse and select: alpine.iso (in this directory)
 
-   **Port Forwarding (under Network):**
-   - Click "New..."
-   - Protocol: TCP
-   - Guest Port: 22
-   - Host Address: 127.0.0.1
-   - Host Port: 2222
+    **Network Tab:**
+    - Network Mode: "Shared Network" (we'll isolate it AFTER installation)
+    - Do NOT check "Isolate Guest from Host" yet
 
-   **Sharing Tab:**
-   - ✅ Directory Share Mode: VirtFS
-   - Shared Directory: (should already be set to "shared" folder)
-   - ❌ Uncheck "Enable Clipboard Sharing"
+    **Port Forwarding (under Network):**
+    - Click "New..."
+    - Protocol: TCP
+    - Guest Port: 22
+    - Host Address: 127.0.0.1
+    - Host Port: 2222
 
-7. Save the settings
+    **Sharing Tab:**
+    - Directory Share Mode: VirtFS (won't work with standard Alpine, but set it anyway)
+    - ❌ Uncheck "Enable Clipboard Sharing"
 
-8. Start the VM
+11. Save the settings
 
-   ⚠️  If the VM boots to "UEFI Interactive Shell" instead of Alpine:
+12. Start the VM and follow the installation instructions in:
+    ./ACTUAL-WORKING-SETUP.md
 
-   In the UEFI shell, type these commands:
-
-   fs0:
-   \EFI\BOOT\BOOTX64.EFI
-
-   This will boot the Alpine installer. See TROUBLESHOOTING.md for more details.
-
-9. After Alpine boots, run: ./provision-vm.sh
+    Key steps:
+    - Login as root (no password)
+    - Run: setup-alpine
+    - Follow prompts
+    - After install, use HTTP server method to transfer SSH key
 
 EOF
 
 echo ""
-echo "After creating the VM as described above, run:"
+echo "After creating the VM, follow the setup guide:"
+echo "  cat ACTUAL-WORKING-SETUP.md"
+echo ""
+echo "Or use the automated provisioning script (experimental):"
 echo "  ./provision-vm.sh"
 echo ""

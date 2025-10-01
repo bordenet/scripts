@@ -61,52 +61,59 @@ This will show you step-by-step instructions to create the VM in UTM. The key se
 
 ### Step 3: Install Alpine Linux
 
-After creating and starting the VM in UTM:
+See [ACTUAL-WORKING-SETUP.md](ACTUAL-WORKING-SETUP.md) for detailed step-by-step instructions.
 
-1. **Login as `root`** (no password needed initially)
-2. **Run:** `setup-alpine`
-3. **Follow the prompts:**
-   - Keyboard: `us`
-   - Hostname: `sandbox`
-   - Network: `eth0`, IP: `dhcp`
-   - Root password: Choose a strong password
-   - Timezone: Your timezone
-   - Proxy: `none`
-   - NTP: `chrony`
-   - APK mirror: `1` (first option) or `f` (find fastest)
-   - SSH: `openssh`
-   - Allow root SSH: `prohibit-password`
-   - Disk: `sda`
-   - Use: `sys`
+**Quick version:**
 
-4. **After installation completes, run these commands:**
+1. Start the VM, login as `root`, run `setup-alpine`
+2. Follow prompts (choose `prohibit-password` for SSH)
+3. After installation, set up SSH using the HTTP server method:
 
+**On your Mac:**
 ```bash
-apk add bash curl sudo
-mkdir -p /media/shared
-echo "shared /media/shared 9p trans=virtio,version=9p2000.L,ro,_netdev 0 0" >> /etc/fstab
-mount -a
+cd ~/GitHub/scripts/inspection-sandbox
+python3 -m http.server 8000
+```
+
+**In the VM:**
+```bash
+# Bring up network
+ifconfig eth0 up
+udhcpc -i eth0
+
+# Get host IP
+ip route | grep default  # Usually 192.168.64.1
+
+# Download SSH key (replace HOST_IP with actual IP)
 mkdir -p /root/.ssh
 chmod 700 /root/.ssh
-cat /media/shared/id_rsa.pub >> /root/.ssh/authorized_keys
+wget http://HOST_IP:8000/id_rsa.pub -O /root/.ssh/authorized_keys
 chmod 600 /root/.ssh/authorized_keys
+
+# Install and start SSH
+apk update
+apk add openssh bash curl
+rc-update add sshd
 service sshd start
+
+# Shutdown
 poweroff
 ```
 
-5. **After VM shuts down, isolate the network:**
-   - Edit VM → Network tab
-   - Change to "Emulated VLAN"
-   - ✅ Check "Isolate Guest from Host"
+4. **After VM shuts down:**
+   - Stop the Python web server (Ctrl+C)
+   - Edit VM → Network → "Emulated VLAN" + ✅ "Isolate Guest from Host"
    - Save
 
-6. **Test the connection:**
-
+5. **Test:**
 ```bash
 ./status.sh
 ```
 
-The VM is now fully isolated and ready for malware analysis.
+**OR use the helper script:**
+```bash
+./provision-vm.sh
+```
 
 ### Step 4: Inspect Files
 
