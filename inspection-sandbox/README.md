@@ -55,7 +55,8 @@ This will show you step-by-step instructions to create the VM in UTM. The key se
 - **Storage:** 8 GB
 - **Network:** Emulated VLAN with "Isolate Guest from Host" enabled
 - **Port Forwarding:** Host 127.0.0.1:2222 → Guest :22
-- **Shared Directory:** Read-only mount of `shared/` folder
+- **Shared Directory:** Read-only mount of `shared/` folder (VirtFS mode)
+- **Clipboard Sharing:** Disabled for security
 
 ### Step 3: Provision the VM
 

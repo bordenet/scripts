@@ -87,9 +87,6 @@ cat <<'EOF'
    - Shared Directory: (should already be set to "shared" folder)
    - ❌ Uncheck "Enable Clipboard Sharing"
 
-   **Display Tab:**
-   - ❌ Uncheck "Enable SPICE Agent" (for security)
-
 7. Save the settings
 
 8. Start the VM and run: ./provision-vm.sh
