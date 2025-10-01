@@ -1,8 +1,10 @@
 # Ignore files and directories created by the sandbox script
-shared/
+shared/*
+!shared/analyze.sh
 vm/
 alpine.iso
-shared/DANGER/*
+id_rsa
+id_rsa.pub
 
 git_reset.log
 .DS_Store

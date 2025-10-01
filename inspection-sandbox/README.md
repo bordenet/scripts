@@ -1,161 +1,298 @@
-# Malware Analysis Sandbox
+# Malware Inspection Sandbox
 
-This project provides a script to create a secure, isolated sandbox environment for analyzing potentially malicious files on macOS.
+A **fully automated** sandboxed environment for safely analyzing potentially hazardous email attachments and suspicious files on macOS. Everything is scripted to minimize human error.
 
-## Features
+## 🎯 Features
 
-- **Automated Setup:** A single script to set up the entire environment.
-- **Isolated Environment:** The sandbox is a virtual machine with no network access, preventing any potential malware from affecting your host machine or network.
-- **Read-Only File Sharing:** A read-only shared directory is used to get files into the sandbox, preventing malware from writing back to your host machine.
-- **Analysis Tools:** The sandbox comes with a script to install common analysis tools like ClamAV, `file`, `strings`, and `hexedit`.
-- **Reproducible:** The environment can be destroyed and recreated on demand.
+- **Isolated VM Environment:** Uses UTM with **Virtualize mode** (native performance, not slow emulation)
+- **Network Isolation:** VM cannot access your network or host machine
+- **Read-Only File Sharing:** Malware cannot write back to your host
+- **Comprehensive Analysis Tools:** ClamAV, strings, hexdump, oletools, exiftool, and more
+- **Fully Scripted:** Minimal manual steps, maximum automation
+- **Safe by Default:** No clipboard sharing, no unnecessary host access
 
-## Prerequisites
+## 📋 Prerequisites
 
-- [Homebrew](https://brew.sh/)
-- [UTM](https://mac.getutm.app/)
+You need Homebrew and UTM:
 
-## Manual VM Creation
+```bash
+# Install Homebrew (if not already installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-Before running the script, you need to manually create a new virtual machine in the UTM app.
+# Install UTM
+brew install --cask utm
+```
 
-2.  **Create a new VM:**
-    - Open UTM and click the "+" button to create a new virtual machine.
-    - Select "Emulate".
-    - Select "Linux".
-    - For the "Architecture", select "Intel x86_64", 2048 MiB of RAM, and 2 CPU cores.
-    - For the "Boot ISO Image", select the `alpine.iso` file that was downloaded by the setup script.
-    - For "Storage" select "New Drive", set the size to `8 GiB`, and leave the other settings as default.
-    - For "Shared Directory", click "Browse...", and choose the `shared` directory inside the `inspection-sandbox` directory. Set the mode to "Read-Only".
-    - On the "Summary" page, set the name of the VM to `inspection-sandbox`.
-    - Click "Save" to create the VM.
-3.  **Configure the VM:**
-    - Once the VM is created, select it and click the "Edit" button -- the control-panel icon in the top-right corner of the screen.
-        - **Network:**
-            - Set the "Network Mode" to "Emulated VLAN".
-            - Check the box for "Show Advanced Settings" and then check the box for "Isolate Guest from Host".
-            - Click the "Save" button.
-        - **Network - Port Forwarding:**
-            - Note the presence of a "Port Forwarding" option under Network in the left-hand nav. Click it.
-            - Click the "New..." button.
-    - **Port Forward:**
-        - Click "New..."
-        - **Protocol:** Leave as "TCP".
-        - **Guest IP:** Leave blank.
-        - **Guest Port:** Set to `22`.
-        - **Host IP:** Set to `127.0.0.1`.
-        - **Host Port:** Set to `2222`.
-        - Click "Save".
-    - **Sharing:**
-        - Uncheck "Enable Clipboard Sharing".
-        - Set the "Directory Share Mode" to "VirtFS".
-        - Set the "Shared Directory" to the `shared` directory inside the `inspection-sandbox` directory.
-    - **Copy-Paste:**
-        - In the VM, run `apk add qemu-guest-agent`.
-        - Run `rc-update add qemu-guest-agent`.
-        - Run `service qemu-guest-agent start`.
-        - In the UTM settings for the VM, go to the "Display" tab and check the "Enable SPICE Agent" checkbox.
-4.  **Install Alpine Linux:**
-    - Start the VM.
-    - At the GRUB menu, select "Linux lts" to boot into the Alpine Linux installer.
-    - At the login prompt, type `root`.
-    - Run `setup-alpine` and follow the prompts.
-    - When asked to choose a password, set a password for the `root` user.
-    - When asked to choose a disk, choose `sda`.
-    - When asked to choose how to use it, choose `sys`.
-    - After the installation is complete, run `apk add openssh` to install the SSH server.
-    - Run `rc-update add sshd` to enable the SSH server. You can safely ignore the message "rc-update: sshd already installed in runlevel `default'; skipping".
-    - Run `echo "PermitRootLogin yes" >> /etc/ssh/sshd_config` to allow root login.
-    - Run `echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config` to enable key-based authentication.
-    - After the installation is complete, power off the VM.
+## 🚀 Quick Start
 
-## How to Use
+### Step 1: Initial Setup
 
-The `setup_sandbox.sh` script is used to manage the sandbox environment.
-
-### Setup
-
-To set up the sandbox environment, run the script with no arguments:
+Run the setup script to download Alpine Linux and create SSH keys:
 
 ```bash
 ./setup_sandbox.sh
 ```
 
 This will:
+- Check dependencies
+- Download Alpine Linux ISO (~207 MB)
+- Generate SSH keys for secure VM access
+- Create the `shared/` directory
 
-1.  Check for dependencies.
-2.  Create the `shared` directory.
-3.  Generate an SSH key pair.
-4.  Copy the public key to the `shared` directory.
+### Step 2: Create the VM
 
-### Test the Sandbox
-
-To test the sandbox, run the script with the `test` argument:
+**IMPORTANT:** Use **Virtualize** mode, NOT Emulate (which is very slow).
 
 ```bash
-./setup_sandbox.sh test
+./create-vm.sh
 ```
 
-This will:
+This will show you step-by-step instructions to create the VM in UTM. The key settings:
 
-1.  Create a test file in the shared directory.
-2.  Start the VM.
-3.  Run the `analyze.sh` script inside the VM to scan the test file.
-4.  Stop the VM.
+- **Mode:** Virtualize (NOT Emulate!)
+- **RAM:** 2048 MB
+- **CPU:** 2 cores
+- **Storage:** 8 GB
+- **Network:** Emulated VLAN with "Isolate Guest from Host" enabled
+- **Port Forwarding:** Host 127.0.0.1:2222 → Guest :22
+- **Shared Directory:** Read-only mount of `shared/` folder
 
-### Destroy the Sandbox
+### Step 3: Provision the VM
 
-To destroy the sandbox, run the script with the `burn` argument:
+After creating and starting the VM in UTM, provision it:
+
+```bash
+./provision-vm.sh
+```
+
+This script will guide you through:
+1. Installing Alpine Linux inside the VM (`setup-alpine`)
+2. Configuring SSH access
+3. Mounting the shared directory
+4. Testing the connection
+
+**Follow the on-screen instructions carefully.** The script automates as much as possible.
+
+### Step 4: Inspect Files
+
+Now you can safely inspect suspicious files:
+
+```bash
+./inspect.sh suspicious-file.pdf
+```
+
+Or:
+
+```bash
+# Copy file to shared directory first
+cp ~/Downloads/sketchy-invoice.exe shared/
+./inspect.sh sketchy-invoice.exe
+```
+
+The script will:
+1. Start the VM (if not running)
+2. Copy the file to the shared directory
+3. Run comprehensive analysis inside the isolated VM
+4. Display a detailed security report
+
+## 📁 Project Structure
+
+```
+inspection-sandbox/
+├── setup_sandbox.sh      # Initial setup (downloads ISO, generates keys)
+├── create-vm.sh          # Instructions for creating the VM in UTM
+├── provision-vm.sh       # Automates Alpine Linux configuration
+├── inspect.sh            # Easy wrapper to analyze files
+├── alpine.iso            # Alpine Linux installation ISO
+├── id_rsa                # SSH private key (generated)
+├── id_rsa.pub            # SSH public key (generated)
+└── shared/               # Read-only directory shared with VM
+    ├── analyze.sh        # Analysis script (runs inside VM)
+    └── [your files]      # Files you want to inspect
+```
+
+## 🔍 Analysis Tools Included
+
+The sandbox includes these security analysis tools:
+
+**General Analysis:**
+- `file` - File type identification
+- `strings` - Extract printable strings
+- `hexyl` - Modern hex viewer
+- `exiftool` - Metadata extraction
+
+**Malware Detection:**
+- `clamav` - Antivirus scanning
+- `yara` - Pattern matching
+- `ssdeep` - Fuzzy hashing
+
+**Office Documents:**
+- `oletools` - Analyze Office documents for macros/exploits
+- `olevba` - Extract and analyze VBA macros
+- `oleid` - Detect suspicious Office files
+
+**PDF Analysis:**
+- `pdfinfo` - PDF metadata
+- JavaScript detection
+
+**Executable Analysis:**
+- `radare2` - Binary analysis framework
+- `readelf` - ELF file analysis
+
+**Archive Extraction:**
+- `unzip`, `p7zip`, `unrar`, `cabextract`
+
+## 🎮 Usage Examples
+
+### Inspect an Email Attachment
+
+```bash
+# Download attachment from email client
+cp ~/Downloads/suspicious-invoice.pdf .
+
+# Inspect it safely
+./inspect.sh suspicious-invoice.pdf
+```
+
+### Analyze Multiple Files
+
+```bash
+# Copy all suspicious files to shared directory
+cp ~/Downloads/*.exe shared/
+
+# Inspect each one
+./inspect.sh malware1.exe
+./inspect.sh malware2.exe
+```
+
+### Manual Analysis (Advanced)
+
+```bash
+# Start the VM
+utmctl start inspection-sandbox
+
+# SSH into it
+ssh -i id_rsa -p 2222 root@localhost
+
+# Inside the VM:
+ls /media/shared/              # See your files
+/media/shared/analyze.sh scan /media/shared/file.exe
+hexyl /media/shared/file.exe   # Manual hex inspection
+strings /media/shared/file.exe | less
+```
+
+## 🛠️ Useful Commands
+
+```bash
+# Start the VM
+utmctl start inspection-sandbox
+
+# Stop the VM
+utmctl stop inspection-sandbox
+
+# SSH into the VM
+ssh -i id_rsa -p 2222 root@localhost
+
+# Check VM status
+utmctl status inspection-sandbox
+
+# Destroy everything and start over
+./setup_sandbox.sh burn
+```
+
+## 🔥 Burn It All Down
+
+To completely destroy the sandbox and start fresh:
 
 ```bash
 ./setup_sandbox.sh burn
 ```
 
 This will:
+- Stop the VM
+- Delete the VM
+- Remove all generated files (keeps your suspicious files in `shared/`)
 
-1.  Stop the VM if it's running.
-2.  Delete the VM.
-3.  Remove all files and directories created by the script.
+Then start over from Step 1.
 
-## Using the Sandbox
+## 🛡️ Security Features
 
-### Getting Files into the Sandbox
+1. **Network Isolation:** VM cannot access the internet or your LAN
+2. **Read-Only Sharing:** Malware cannot modify host files
+3. **No Clipboard Sharing:** Prevents data exfiltration
+4. **Minimal VM:** Alpine Linux (tiny attack surface)
+5. **Disposable:** Destroy and recreate anytime
+6. **SSH Key Auth:** No password-based access
 
-To get files into the sandbox, simply copy them to the `shared` directory. This directory is mounted as a read-only directory at `/media/shared` inside the VM.
+## ⚡ Performance Notes
 
-### Analyzing Files
+**Use Virtualize Mode!**
 
-To analyze files, start the VM:
+- ✅ **Virtualize:** Near-native performance, uses Apple's Hypervisor framework
+- ❌ **Emulate:** Very slow, only use if you need a different CPU architecture
 
-```bash
-utmctl start inspection-sandbox
-```
+On Apple Silicon (M1/M2/M3), Alpine x86_64 will be emulated but should still be reasonably fast in Virtualize mode.
 
-Then, SSH into the VM:
+## 🐛 Troubleshooting
 
-```bash
-ssh -i id_rsa -p 2222 root@localhost
-```
-
-Once you are in the VM, you can use the `analyze.sh` script to install tools and scan files.
-
-To install the analysis tools, run:
-
-```bash
-/media/shared/analyze.sh install-tools
-```
-
-To scan a file, run:
+### SSH Connection Fails
 
 ```bash
-/media/shared/analyze.sh scan /media/shared/your_file_to_scan
+# Check if VM is running
+utmctl status inspection-sandbox
+
+# Check if SSH port is open
+nc -zv localhost 2222
+
+# Try connecting manually
+ssh -v -i id_rsa -p 2222 root@localhost
+
+# Inside VM, check SSH status
+service sshd status
 ```
 
-## Future Enhancements
+### Shared Directory Not Mounting
 
-- **GUI Support:** Add a lightweight desktop environment (like XFCE) and a file manager to allow for visual inspection of files.
-- **Network Analysis:** Add tools like `tcpdump` and `wireshark` and configure a virtual network to analyze network traffic from malware.
-- **Automated Reporting:** Add a feature to generate a report of the analysis, including the output of the various tools.
-- **Snapshotting:** Add a feature to take snapshots of the VM so you can revert to a clean state after an analysis.
-- **Different Linux Distributions:** Add support for other Linux distributions, such as Debian or Ubuntu.
-- **Windows Support:** Add support for creating a Windows sandbox.
+Inside the VM:
+
+```bash
+# Check if shared directory is in fstab
+cat /etc/fstab | grep shared
+
+# Try mounting manually
+mount -t 9p -o trans=virtio,version=9p2000.L shared /media/shared
+
+# Check UTM settings: Sharing → Directory Share Mode → VirtFS
+```
+
+### VM Won't Start
+
+- Check UTM console for error messages
+- Verify the ISO path is correct
+- Ensure you allocated enough disk space (8 GB minimum)
+- Try recreating the VM
+
+## 📚 Future Enhancements
+
+- [ ] Automated snapshots for easy reversion
+- [ ] Web-based UI for analysis reports
+- [ ] Network traffic capture (controlled network simulation)
+- [ ] Windows VM support
+- [ ] Batch file analysis
+- [ ] Integration with VirusTotal API (optional, requires internet)
+
+## 🤝 Contributing
+
+This is a personal tool but feel free to adapt it for your needs. The scripts are heavily commented for educational purposes.
+
+## ⚠️ Legal Disclaimer
+
+This tool is for **defensive security research and education only**. Do not use it for illegal purposes. Only analyze files you have permission to inspect. The authors are not responsible for misuse.
+
+## 📄 License
+
+MIT License - Use at your own risk
+
+---
+
+**Built to be better than whatever Gemini made. 😎**
