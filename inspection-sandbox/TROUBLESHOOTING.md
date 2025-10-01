@@ -25,35 +25,38 @@ You should see EFI files. Then run:
 
 This will boot the Alpine installer.
 
-### Option 2: Fix Boot Order in UTM (Permanent Fix)
+### Option 2: Boot Using UEFI Setup Menu
 
-1. **Stop the VM** (if running)
-2. In UTM, click the VM name, then click 🎛️ (Edit)
-3. Go to **"Drives"** tab
-4. You should see two drives:
-   - The Alpine ISO (CD/DVD)
-   - The hard disk (8 GB)
-5. **Important:** The ISO drive must be ABOVE the hard disk in the list
-6. If it's not, drag the ISO to the top
-7. Click **"Save"**
-8. Start the VM
+1. **Restart the VM**
+2. Immediately press **ESC** repeatedly during boot
+3. You should enter the UEFI setup menu
+4. Look for "Boot Manager" or "Boot Options"
+5. Select the CD-ROM/ISO drive to boot from
+6. This will boot the Alpine installer
 
-### Option 3: Change Boot Order at Startup
+### Option 3: Fix in UTM Settings (For Future Boots)
 
-Some UTM versions allow you to press ESC during boot to enter the UEFI setup menu where you can change boot order.
+Unfortunately, UTM's Virtualize mode doesn't allow manual boot order configuration in the UI like Emulate mode does. The workaround is to use the UEFI shell method (Option 1) or boot menu (Option 2) each time, OR remove the ISO after installation (see below).
 
-### After Installing Alpine
+### After Installing Alpine (Remove the ISO)
 
 Once you've installed Alpine Linux to the hard disk:
 
-1. **Shut down the VM completely**
-2. In UTM, edit the VM settings
-3. Go to **"Drives"** tab
-4. **Remove** or **disable** the Alpine ISO drive
-5. Keep only the hard disk drive
-6. Save and restart
+1. **Shut down the VM completely** (`poweroff` inside the VM)
+2. In UTM, click the VM name, then click 🎛️ (Edit)
+3. In the left sidebar, look for your drives under a section (not a "Drives" tab)
+4. Click on the **CD/DVD drive** (the one with alpine.iso)
+5. Look for options like:
+   - "Remove" button, OR
+   - "Clear" button, OR
+   - Change "Image Type" to "None"
+6. This removes the ISO from the VM
+7. Click **"Save"**
+8. Restart the VM
 
-This ensures the VM boots from the installed system, not the installer.
+Now it will boot directly from the installed Alpine system on the hard disk.
+
+**Alternative:** If you can't find how to remove the ISO, just use Option 1 (the UEFI shell commands) each time you boot until Alpine is fully installed. After running the Alpine installer and choosing `poweroff`, subsequent boots should automatically go to the hard disk.
 
 ---
 
