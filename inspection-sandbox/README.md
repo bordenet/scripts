@@ -246,7 +246,7 @@ fs0:
 \EFI\BOOT\BOOTX64.EFI
 ```
 
-**Permanent fix:** Edit VM → Drives tab → Drag ISO to top of list
+**Permanent fix:** After installing Alpine, remove the ISO from VM settings or use the UEFI shell method each boot.
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for details.
 

@@ -89,18 +89,18 @@ cat <<'EOF'
 
 7. Save the settings
 
-8. **IMPORTANT - Boot Order:**
-   - Go to the "Drives" tab
-   - Make sure the Alpine ISO (CD/DVD) is ABOVE the hard disk in the list
-   - Drag it to the top if needed
-   - This ensures it boots from the installer
-   - Save again
-
-9. Start the VM and run: ./provision-vm.sh
+8. Start the VM
 
    ⚠️  If the VM boots to "UEFI Interactive Shell" instead of Alpine:
-   - See TROUBLESHOOTING.md for the fix
-   - Quick fix: In UEFI shell, type: fs0: then \EFI\BOOT\BOOTX64.EFI
+
+   In the UEFI shell, type these commands:
+
+   fs0:
+   \EFI\BOOT\BOOTX64.EFI
+
+   This will boot the Alpine installer. See TROUBLESHOOTING.md for more details.
+
+9. After Alpine boots, run: ./provision-vm.sh
 
 EOF
 
