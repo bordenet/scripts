@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # VM Provisioning Script
-# Run this AFTER installing Alpine Linux in the VM
-# This script automates SSH setup and installs analysis tools
+# Run this AFTER creating the VM and installing Alpine Linux
+# This script helps automate SSH key setup using HTTP server method
 #
 
 set -euo pipefail
@@ -26,102 +26,94 @@ fi
 
 # Check if VM is running
 if ! utmctl status "${VM_NAME}" | grep -q "started"; then
-    echo "🚀 Starting VM..."
-    utmctl start "${VM_NAME}"
-    echo "⏳ Waiting 30 seconds for VM to boot..."
-    sleep 30
+    echo "⚠️  VM is not running. Start it first in UTM."
+    exit 1
 fi
 
-echo "📋 MANUAL STEPS REQUIRED IN THE VM:"
+echo "This script will help you set up SSH access to the VM."
 echo ""
-echo "1. In the VM console, login as 'root' (no password yet)"
-echo "2. Run: setup-alpine"
-echo "3. Follow the prompts:"
-echo "   - Keyboard: us"
-echo "   - Hostname: sandbox"
-echo "   - Network: eth0"
-echo "   - IP address: dhcp"
-echo "   - Root password: SET A STRONG PASSWORD"
-echo "   - Timezone: (your timezone)"
-echo "   - Proxy: none"
-echo "   - NTP: chrony"
-echo "   - APK mirror: 1 (first option)"
-echo "   - SSH: openssh"
-echo "   - Disk: sda"
-echo "   - Use: sys"
+echo "PREREQUISITES:"
+echo "1. You've installed Alpine Linux in the VM using setup-alpine"
+echo "2. The VM is currently running with SHARED NETWORK (not isolated yet)"
+echo "3. You have network connectivity from the VM"
 echo ""
-echo "4. After installation, run these commands in the VM:"
+read -p "Have you completed Alpine installation? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Please complete Alpine installation first. See ACTUAL-WORKING-SETUP.md"
+    exit 1
+fi
+
 echo ""
-cat <<'VMEOF'
-# Enable SSH and configure it
-rc-update add sshd
-echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
-echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config
+echo "📡 Starting HTTP server to transfer SSH key..."
+echo ""
 
-# Install required packages
-apk add bash curl sudo
+# Start Python HTTP server in background
+python3 -m http.server 8000 &
+HTTP_PID=$!
 
-# Create mount point for shared directory
-mkdir -p /media/shared
+# Ensure we kill the server on exit
+trap "kill $HTTP_PID 2>/dev/null || true" EXIT
 
-# Add to fstab for auto-mounting
-echo "shared /media/shared 9p trans=virtio,version=9p2000.L,ro,_netdev 0 0" >> /etc/fstab
+echo "✅ HTTP server running on port 8000 (PID: $HTTP_PID)"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "NOW, IN THE VM CONSOLE, run these commands:"
+echo ""
+cat <<'VMCMDS'
+# Ensure network is up
+ifconfig eth0 up
+udhcpc -i eth0
 
-# Mount the shared directory
-mount -a
+# Get host IP (look for "via" address)
+ip route | grep default
 
-# Setup SSH key
+# Download SSH key (replace HOST_IP with the IP from above, usually 192.168.64.1)
 mkdir -p /root/.ssh
 chmod 700 /root/.ssh
-cat /media/shared/id_rsa.pub >> /root/.ssh/authorized_keys
+wget http://HOST_IP:8000/id_rsa.pub -O /root/.ssh/authorized_keys
 chmod 600 /root/.ssh/authorized_keys
 
-# Start SSH
+# Verify the key was downloaded
+cat /root/.ssh/authorized_keys
+
+# Install and start SSH if not already done
+apk update
+apk add openssh bash curl
+rc-update add sshd
 service sshd start
 
-# Reboot to ensure everything works
-echo "Setup complete! Rebooting..."
-reboot
-VMEOF
+# Shutdown the VM
+poweroff
+VMCMDS
 
 echo ""
-echo "5. After VM reboots, press ENTER here to test SSH connection..."
-read -r
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "⏳ Waiting for VM to download the SSH key..."
+echo "   (The HTTP server will show the request when it happens)"
+echo ""
+echo "Press CTRL+C when the VM has shut down."
+echo ""
+
+# Wait for interrupt
+wait $HTTP_PID 2>/dev/null || true
 
 echo ""
-echo "🔍 Testing SSH connection..."
-
-max_attempts=30
-attempt=0
-
-while [ $attempt -lt $max_attempts ]; do
-    if nc -z localhost ${SSH_PORT} 2>/dev/null; then
-        echo "✅ SSH port is open"
-        break
-    fi
-    echo "⏳ Waiting for SSH... (attempt $((attempt + 1))/${max_attempts})"
-    sleep 2
-    attempt=$((attempt + 1))
-done
-
-if [ $attempt -eq $max_attempts ]; then
-    echo "❌ SSH port never became available"
-    exit 1
-fi
-
-echo "🔐 Attempting SSH connection..."
-if ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p ${SSH_PORT} root@localhost "echo '✅ SSH connection successful!'; uname -a"; then
-    echo ""
-    echo "🎉 VM is fully provisioned and ready!"
-    echo ""
-    echo "Next steps:"
-    echo "  - Copy suspicious files to: ${SCRIPT_DIR}/shared/"
-    echo "  - Run: ./inspect.sh filename"
-else
-    echo "❌ SSH connection failed"
-    echo "Troubleshooting:"
-    echo "  1. Check if SSH is running in VM: service sshd status"
-    echo "  2. Check if key is installed: cat /root/.ssh/authorized_keys"
-    echo "  3. Check port forwarding in UTM settings"
-    exit 1
-fi
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "AFTER THE VM SHUTS DOWN:"
+echo ""
+echo "1. Edit VM in UTM → Network tab"
+echo "2. Change to 'Emulated VLAN'"
+echo "3. ✅ Check 'Isolate Guest from Host'"
+echo "4. Save"
+echo ""
+echo "5. (Optional) Remove the Alpine ISO from the VM drives"
+echo ""
+echo "6. Start the VM and test SSH:"
+echo "   ./status.sh"
+echo ""
+echo "If SSH works, you're done! Use ./inspect.sh to analyze files."
+echo ""
