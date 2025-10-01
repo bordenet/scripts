@@ -23,7 +23,13 @@ You need Homebrew and UTM:
 brew install --cask utm
 ```
 
-## 🚀 Quick Start
+## ⚠️ CURRENT STATUS
+
+**This setup is currently broken.** See [WHERE-WE-LEFT-OFF.md](WHERE-WE-LEFT-OFF.md) for details.
+
+**Recommended fix:** See [RECOMMENDED-FIX.md](RECOMMENDED-FIX.md) - use alpine-virt ISO or VirtualBox/Docker instead.
+
+## 🚀 Quick Start (Theoretical - Currently Not Working)
 
 ### Step 1: Initial Setup
 
