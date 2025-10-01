@@ -236,6 +236,20 @@ On Apple Silicon (M1/M2/M3), Alpine x86_64 will be emulated but should still be 
 
 ## 🐛 Troubleshooting
 
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed solutions.
+
+### VM Boots to UEFI Shell (Shell> _)
+
+**Quick fix:** In the UEFI shell, type:
+```
+fs0:
+\EFI\BOOT\BOOTX64.EFI
+```
+
+**Permanent fix:** Edit VM → Drives tab → Drag ISO to top of list
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for details.
+
 ### SSH Connection Fails
 
 ```bash
