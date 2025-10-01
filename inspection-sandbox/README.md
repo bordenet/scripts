@@ -41,38 +41,72 @@ This will:
 
 ### Step 2: Create the VM
 
-**IMPORTANT:** Use **Virtualize** mode, NOT Emulate (which is very slow).
-
 ```bash
 ./create-vm.sh
 ```
 
 This will show you step-by-step instructions to create the VM in UTM. The key settings:
 
-- **Mode:** Virtualize (NOT Emulate!)
+- **Mode:** Emulate (Virtualize has ISO boot issues)
+- **Architecture:** x86_64
 - **RAM:** 2048 MB
 - **CPU:** 2 cores
 - **Storage:** 8 GB
-- **Network:** Emulated VLAN with "Isolate Guest from Host" enabled
+- **Network:** Shared Network (during installation, we'll isolate it after)
 - **Port Forwarding:** Host 127.0.0.1:2222 → Guest :22
 - **Shared Directory:** Read-only mount of `shared/` folder (VirtFS mode)
 - **Clipboard Sharing:** Disabled for security
 
-### Step 3: Provision the VM
+**Note:** We use Emulate mode because Virtualize mode has UEFI boot issues with Alpine ISO.
 
-After creating and starting the VM in UTM, provision it:
+### Step 3: Install Alpine Linux
+
+After creating and starting the VM in UTM:
+
+1. **Login as `root`** (no password needed initially)
+2. **Run:** `setup-alpine`
+3. **Follow the prompts:**
+   - Keyboard: `us`
+   - Hostname: `sandbox`
+   - Network: `eth0`, IP: `dhcp`
+   - Root password: Choose a strong password
+   - Timezone: Your timezone
+   - Proxy: `none`
+   - NTP: `chrony`
+   - APK mirror: `1` (first option) or `f` (find fastest)
+   - SSH: `openssh`
+   - Allow root SSH: `prohibit-password`
+   - Disk: `sda`
+   - Use: `sys`
+
+4. **After installation completes, run these commands:**
 
 ```bash
-./provision-vm.sh
+apk add bash curl sudo
+mkdir -p /media/shared
+echo "shared /media/shared 9p trans=virtio,version=9p2000.L,ro,_netdev 0 0" >> /etc/fstab
+mount -a
+mkdir -p /root/.ssh
+chmod 700 /root/.ssh
+cat /media/shared/id_rsa.pub >> /root/.ssh/authorized_keys
+chmod 600 /root/.ssh/authorized_keys
+service sshd start
+poweroff
 ```
 
-This script will guide you through:
-1. Installing Alpine Linux inside the VM (`setup-alpine`)
-2. Configuring SSH access
-3. Mounting the shared directory
-4. Testing the connection
+5. **After VM shuts down, isolate the network:**
+   - Edit VM → Network tab
+   - Change to "Emulated VLAN"
+   - ✅ Check "Isolate Guest from Host"
+   - Save
 
-**Follow the on-screen instructions carefully.** The script automates as much as possible.
+6. **Test the connection:**
+
+```bash
+./status.sh
+```
+
+The VM is now fully isolated and ready for malware analysis.
 
 ### Step 4: Inspect Files
 
@@ -227,12 +261,7 @@ Then start over from Step 1.
 
 ## ⚡ Performance Notes
 
-**Use Virtualize Mode!**
-
-- ✅ **Virtualize:** Near-native performance, uses Apple's Hypervisor framework
-- ❌ **Emulate:** Very slow, only use if you need a different CPU architecture
-
-On Apple Silicon (M1/M2/M3), Alpine x86_64 will be emulated but should still be reasonably fast in Virtualize mode.
+**We use Emulate mode** due to Virtualize mode having UEFI boot issues with Alpine ISO. While slower than Virtualize, Emulate mode is still adequate for malware analysis tasks and provides better compatibility.
 
 ## 🐛 Troubleshooting
 
