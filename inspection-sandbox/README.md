@@ -47,12 +47,14 @@ Before running the script, you need to manually create a new virtual machine in 
         - **Host Port:** Set to `2222`.
         - Click "Save".
     - **Sharing:**
-        - Click on the Edit button again to return to the main settings menu.
-        - Click on "Sharing" in the left-hand nav.
-        - *Uncheck* "Enable Clipboard Sharing". This is a security vulnerability.
-        - Ensure that the Directory Share Mode is set to "VirtFS"
-        - Ensure that the "Mode" is set to _"Read-Only"_.
-        - Click "Save".
+        - Uncheck "Enable Clipboard Sharing".
+        - Set the "Directory Share Mode" to "VirtFS".
+        - Set the "Shared Directory" to the `shared` directory inside the `inspection-sandbox` directory.
+    - **Copy-Paste:**
+        - In the VM, run `apk add qemu-guest-agent`.
+        - Run `rc-update add qemu-guest-agent`.
+        - Run `service qemu-guest-agent start`.
+        - In the UTM settings for the VM, go to the "Display" tab and check the "Enable SPICE Agent" checkbox.
 4.  **Install Alpine Linux:**
     - Start the VM.
     - At the GRUB menu, select "Linux lts" to boot into the Alpine Linux installer.
@@ -61,7 +63,8 @@ Before running the script, you need to manually create a new virtual machine in 
     - When asked to choose a password, set a password for the `root` user.
     - When asked to choose a disk, choose `sda`.
     - When asked to choose how to use it, choose `sys`.
-    - After the installation is complete, run `rc-update add sshd` to enable the SSH server. You can safely ignore the message "rc-update: sshd already installed in runlevel `default'; skipping".
+    - After the installation is complete, run `apk add openssh` to install the SSH server.
+    - Run `rc-update add sshd` to enable the SSH server. You can safely ignore the message "rc-update: sshd already installed in runlevel `default'; skipping".
     - Run `echo "PermitRootLogin yes" >> /etc/ssh/sshd_config` to allow root login.
     - Run `echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config` to enable key-based authentication.
     - After the installation is complete, power off the VM.
