@@ -5,7 +5,7 @@
 # --- Configuration ---
 SANDBOX_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 SHARED_DIR="${SANDBOX_DIR}/shared"
-VM_NAME="malware-inspector"
+VM_NAME="inspection-sandbox"
 
 # --- Functions ---
 
@@ -45,6 +45,19 @@ create_directories() {
 }
 
 #
+# Downloads the Alpine Linux ISO.
+#
+download_iso() {
+    echo "Downloading Alpine Linux ISO..."
+    if [ ! -f "${SANDBOX_DIR}/alpine.iso" ]; then
+        curl -L -o "${SANDBOX_DIR}/alpine.iso" "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-standard-3.19.1-x86_64.iso"
+    else
+        echo "Alpine Linux ISO already downloaded."
+    fi
+    echo "Alpine Linux ISO ready."
+}
+
+#
 # Generates an SSH key pair.
 #
 generate_ssh_key() {
@@ -78,6 +91,9 @@ burn() {
 test_sandbox() {
     echo "Testing sandbox environment..."
 
+    # List all VMs
+    utmctl list
+
     # Check if the VM is registered
     if ! utmctl status "${VM_NAME}" &>/dev/null; then
         echo "Error: VM is not registered. Please create it manually in the UTM app."
@@ -91,11 +107,16 @@ test_sandbox() {
     # Start the VM
     utmctl start "${VM_NAME}"
 
-    # Wait for the VM to boot
-    sleep 10
+    # Wait for the VM to boot and for the SSH port to be open
+    echo "Waiting for VM to boot..."
+    local i=0
+    while ! nc -z localhost 2222 && [ $i -lt 30 ]; do
+        sleep 1
+        i=$((i+1))
+    done
 
     # Run the analysis script
-    ssh -i "${SANDBOX_DIR}/id_rsa" -o StrictHostKeyChecking=no -p 2222 root@localhost -- "/media/shared/analyze.sh scan /media/shared/test_file.txt"
+    ssh -v -i "${SANDBOX_DIR}/id_rsa" -o StrictHostKeyChecking=no -p 2222 root@localhost -- "/media/shared/analyze.sh scan /media/shared/test_file.txt"
 
     # Stop the VM
     utmctl stop "${VM_NAME}"
@@ -111,6 +132,7 @@ main() {
         echo "Starting sandbox setup..."
         check_dependencies
         create_directories
+        download_iso
         generate_ssh_key
         echo "Sandbox setup complete."
         exit 0
@@ -122,6 +144,9 @@ main() {
             ;;
         test)
             test_sandbox
+            ;;
+        start)
+            utmctl start "${VM_NAME}"
             ;;
         *)
             echo "Invalid command: $1"
