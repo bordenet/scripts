@@ -1,0 +1,4 @@
+# Ignore files and directories created by the sandbox script
+shared/
+vm/
+alpine.iso
