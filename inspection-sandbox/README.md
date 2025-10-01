@@ -19,31 +19,51 @@ This project provides a script to create a secure, isolated sandbox environment 
 
 Before running the script, you need to manually create a new virtual machine in the UTM app.
 
-1.  **Download Alpine Linux:** Download the "Standard" x86_64 image from the [Alpine Linux downloads page](https://alpinelinux.org/downloads/).
 2.  **Create a new VM:**
     - Open UTM and click the "+" button to create a new virtual machine.
-    - Select "Virtualize".
+    - Select "Emulate".
     - Select "Linux".
-    - For the "Boot ISO Image", select the Alpine Linux ISO you downloaded.
-    - Click "Continue" and accept the defaults for the rest of the setup.
+    - For the "Architecture", select "Intel x86_64", 2048 MiB of RAM, and 2 CPU cores.
+    - For the "Boot ISO Image", select the `alpine.iso` file that was downloaded by the setup script.
+    - For "Storage" select "New Drive", set the size to `8 GiB`, and leave the other settings as default.
+    - For "Shared Directory", click "Browse...", and choose the `shared` directory inside the `inspection-sandbox` directory. Set the mode to "Read-Only".
+    - On the "Summary" page, set the name of the VM to `inspection-sandbox`.
+    - Click "Save" to create the VM.
 3.  **Configure the VM:**
-    - Once the VM is created, select it and click the "Edit" button.
-    - **Name:** Set the name to `malware-inspector`.
-    - **Memory:** Set the memory to 2048 MB.
-    - **CPUs:** Set the CPUs to 2.
-    - **Network:**
-        - Set the "Network Mode" to "Isolated".
-        - Add a new port forward: `tcp:2222:22`.
+    - Once the VM is created, select it and click the "Edit" button -- the control-panel icon in the top-right corner of the screen.
+        - **Network:**
+            - Set the "Network Mode" to "Emulated VLAN".
+            - Check the box for "Show Advanced Settings" and then check the box for "Isolate Guest from Host".
+            - Click the "Save" button.
+        - **Network - Port Forwarding:**
+            - Note the presence of a "Port Forwarding" option under Network in the left-hand nav. Click it.
+            - Click the "New..." button.
+    - **Port Forward:**
+        - Click "New..."
+        - **Protocol:** Leave as "TCP".
+        - **Guest IP:** Leave blank.
+        - **Guest Port:** Set to `22`.
+        - **Host IP:** Set to `127.0.0.1`.
+        - **Host Port:** Set to `2222`.
+        - Click "Save".
     - **Sharing:**
-        - Set the "Shared Directory" to the `shared` directory inside the `inspection-sandbox` directory.
-        - Set the "Mode" to "Read-Only".
+        - Click on the Edit button again to return to the main settings menu.
+        - Click on "Sharing" in the left-hand nav.
+        - *Uncheck* "Enable Clipboard Sharing". This is a security vulnerability.
+        - Ensure that the Directory Share Mode is set to "VirtFS"
+        - Ensure that the "Mode" is set to _"Read-Only"_.
+        - Click "Save".
 4.  **Install Alpine Linux:**
     - Start the VM.
+    - At the GRUB menu, select "Linux lts" to boot into the Alpine Linux installer.
     - At the login prompt, type `root`.
     - Run `setup-alpine` and follow the prompts.
-    - When asked to choose a disk, choose `vda`.
-    - When asked to choose how to use it, choose `sys`.
     - When asked to choose a password, set a password for the `root` user.
+    - When asked to choose a disk, choose `sda`.
+    - When asked to choose how to use it, choose `sys`.
+    - After the installation is complete, run `rc-update add sshd` to enable the SSH server. You can safely ignore the message "rc-update: sshd already installed in runlevel `default'; skipping".
+    - Run `echo "PermitRootLogin yes" >> /etc/ssh/sshd_config` to allow root login.
+    - Run `echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config` to enable key-based authentication.
     - After the installation is complete, power off the VM.
 
 ## How to Use
@@ -105,7 +125,7 @@ To get files into the sandbox, simply copy them to the `shared` directory. This 
 To analyze files, start the VM:
 
 ```bash
-utmctl start malware-inspector
+utmctl start inspection-sandbox
 ```
 
 Then, SSH into the VM:

@@ -2,3 +2,7 @@
 shared/
 vm/
 alpine.iso
+shared/DANGER/*
+
+git_reset.log
+.DS_Store
