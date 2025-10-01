@@ -2,6 +2,7 @@
 shared/*
 !shared/analyze.sh
 vm/
+iso/
 alpine.iso
 id_rsa
 id_rsa.pub
