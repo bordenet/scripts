@@ -9,3 +9,6 @@ id_rsa.pub
 
 git_reset.log
 .DS_Store
+
+# Environment variables and secrets
+.env
