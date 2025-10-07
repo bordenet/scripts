@@ -8,7 +8,9 @@ SANDBOX_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 SHARED_DIR="${SANDBOX_DIR}/shared"
 VM_NAME="inspection-sandbox"
 ENV_FILE="${SANDBOX_DIR}/.env"
-ALPINE_ISO_URL="https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-virt-3.19.1-x86_64.iso"
+# Alpine Linux latest stable version (check https://alpinelinux.org/downloads/ for updates)
+ALPINE_VERSION="3.22.1"
+ALPINE_ISO_URL="https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION%.*}/releases/x86_64/alpine-virt-${ALPINE_VERSION}-x86_64.iso"
 
 # --- Functions ---
 
@@ -94,7 +96,8 @@ VM_USER=root
 # =============================================================================
 SHARED_DIR=./shared
 ALPINE_ISO=./alpine.iso
-ALPINE_ISO_URL=https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-virt-3.19.1-x86_64.iso
+ALPINE_VERSION=3.22.1
+ALPINE_ISO_URL=https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/x86_64/alpine-virt-3.22.1-x86_64.iso
 EOF
         echo ".env file created."
     fi
