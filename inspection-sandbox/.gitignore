@@ -3,7 +3,6 @@ shared/*
 !shared/analyze.sh
 vm/
 iso/
-alpine.iso
 id_rsa
 id_rsa.pub
 
@@ -12,3 +11,6 @@ git_reset.log
 
 # Environment variables and secrets
 .env
+
+# ISO files (Alpine Linux images - too large for git)
+*.iso
