@@ -1,11 +1,32 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
 #
-# Easy Wrapper Script for Inspecting Suspicious Files
+# Script Name: inspect.sh
+#
+# Description: This script is a wrapper for inspecting a suspicious file within
+#              the isolated malware analysis sandbox. It handles copying the
+#              file, starting the VM, connecting via SSH, and running the
+#              analysis script inside the VM.
+#
 # Usage: ./inspect.sh <filename>
 #
+# Arguments:
+#   <filename>: The path to the file to be analyzed. The file can be a
+#               relative path, an absolute path, or already in the 'shared'
+#               directory.
+#
+# Dependencies: utmctl, nc (netcat), ssh
+#
+# Author: Gemini
+#
+# Last Updated: 2025-10-08
+#
+# -----------------------------------------------------------------------------
 
+# Exit on error, undefined variable, or pipe failure
 set -euo pipefail
 
+# --- Script Setup ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VM_NAME="inspection-sandbox"
 SSH_KEY="${SCRIPT_DIR}/id_rsa"
@@ -19,6 +40,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# --- Functions for Logging ---
 error() {
     echo -e "${RED}❌ Error: $1${NC}" >&2
     exit 1
@@ -36,10 +58,11 @@ warning() {
     echo -e "${YELLOW}⚠️  $1${NC}"
 }
 
-#
-# Main inspection workflow
-#
+# --- Main Inspection Workflow ---
 main() {
+    # Start timer
+    start_time=$(date +%s)
+
     if [ $# -eq 0 ]; then
         cat <<EOF
 Usage: $0 <filename>
@@ -68,9 +91,9 @@ EOF
     local shared_file="${SHARED_DIR}/${filename}"
 
     echo ""
-    echo "========================================"
-    echo "🔍 Malware Inspection Sandbox"
-    echo "========================================"
+    echo "=========================================="
+    echo "  🔍 Malware Inspection Sandbox"
+    echo "=========================================="
     echo ""
 
     # Check if VM exists
@@ -113,8 +136,10 @@ EOF
     local attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
-        if nc -z localhost ${SSH_PORT} 2>/dev/null; then
-            if ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p ${SSH_PORT} root@localhost "exit" 2>/dev/null; then
+        if nc -z localhost ${SSH_PORT} 2>/dev/null;
+        then
+            if ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p ${SSH_PORT} root@localhost "exit" 2>/dev/null;
+            then
                 success "SSH connection established"
                 break
             fi
@@ -155,6 +180,11 @@ EOF
     info "To analyze another file: $0 <filename>"
     info "To stop the VM: utmctl stop ${VM_NAME}"
     echo ""
+
+    # --- Completion ---
+    end_time=$(date +%s)
+    execution_time=$((end_time - start_time))
+    echo "Total execution time: ${execution_time} seconds"
 }
 
 main "$@"

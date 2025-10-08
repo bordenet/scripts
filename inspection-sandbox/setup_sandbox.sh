@@ -1,7 +1,27 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
+#
+# Script Name: setup_sandbox.sh
+#
+# Description: This script sets up a secure sandbox environment for inspecting
+#              potentially malicious files. It handles dependency checking,
+#              directory creation, downloading the Alpine Linux ISO, and
+#              generating and managing SSH keys via a .env file.
+#
+# Usage:
+#   ./setup_sandbox.sh        - Run the default setup process.
+#   ./setup_sandbox.sh burn   - Destroy the entire sandbox environment.
+#   ./setup_sandbox.sh test   - Run a test of the sandbox environment.
+#   ./setup_sandbox.sh start  - Start the sandbox VM.
+#
+# Author: Gemini
+#
+# Last Updated: 2025-10-08
+#
+# -----------------------------------------------------------------------------
 
-# This script sets up a secure sandbox environment for inspecting potentially malicious files.
-# PKI assets are stored in .env as the single source of truth and are NEVER committed to git.
+# Exit immediately if a command exits with a non-zero status.
+set -e
 
 # --- Configuration ---
 SANDBOX_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
@@ -14,22 +34,18 @@ ALPINE_ISO_URL="https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION%.*}/rele
 
 # --- Functions ---
 
-#
 # Checks for required dependencies.
-#
 check_dependencies() {
-    echo "Checking for dependencies..."
+    echo "--- Checking for dependencies ---"
     local missing_deps=0
 
-    # Check for Homebrew
     if ! command -v brew &>/dev/null; then
-        echo "Error: Homebrew is not installed. Please install it from https://brew.sh/"
+        echo "❌ Error: Homebrew is not installed. Please install it from https://brew.sh/"
         missing_deps=$((missing_deps + 1))
     fi
 
-    # Check for UTM
     if ! command -v utmctl &>/dev/null; then
-        echo "Error: UTM is not installed. Please install it via 'brew install --cask utm'"
+        echo "❌ Error: UTM is not installed. Please install it via 'brew install --cask utm'"
         missing_deps=$((missing_deps + 1))
     fi
 
@@ -37,37 +53,32 @@ check_dependencies() {
         echo "Please install the missing dependencies and run the script again."
         exit 1
     fi
-    echo "All dependencies are installed."
+    echo "✅ All dependencies are installed."
 }
 
-#
 # Creates the required directories.
-#
 create_directories() {
-    echo "Creating directories..."
+    echo "--- Creating directories ---"
     mkdir -p "${SHARED_DIR}"
-    echo "Directories created."
+    echo "✅ Directories created."
 }
 
-#
-# Downloads the Alpine Linux ISO (virt edition for VM support).
-#
+# Downloads the Alpine Linux ISO.
 download_iso() {
-    echo "Downloading Alpine Linux ISO (virt edition)..."
+    echo "--- Downloading Alpine Linux ISO ---"
     if [ ! -f "${SANDBOX_DIR}/alpine.iso" ]; then
+        echo "Downloading from ${ALPINE_ISO_URL}..."
         curl -L -o "${SANDBOX_DIR}/alpine.iso" "${ALPINE_ISO_URL}"
     else
-        echo "Alpine Linux ISO already downloaded."
+        echo "✅ Alpine Linux ISO already exists."
     fi
-    echo "Alpine Linux ISO ready."
+    echo "✅ Alpine Linux ISO is ready."
 }
 
-#
 # Initializes .env file with configuration if it doesn't exist.
-#
 init_env_file() {
     if [ ! -f "${ENV_FILE}" ]; then
-        echo "Creating .env file..."
+        echo "--- Initializing .env file ---"
         cat > "${ENV_FILE}" << 'EOF'
 # Malware Inspection Sandbox - Environment Variables
 # This file stores sensitive keys and configuration
@@ -99,117 +110,121 @@ ALPINE_ISO=./alpine.iso
 ALPINE_VERSION=3.22.1
 ALPINE_ISO_URL=https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/x86_64/alpine-virt-3.22.1-x86_64.iso
 EOF
-        echo ".env file created."
+        echo "✅ .env file created."
     fi
 }
 
-#
 # Generates an SSH key pair and stores it in .env.
-# IMPORTANT: Keys are NEVER stored as files in git - only in .env (which is gitignored)
-#
 generate_ssh_key() {
-    echo "Checking for SSH key pair..."
+    echo "--- Managing SSH key pair ---"
 
-    # Check if keys exist in .env
     if [ -f "${ENV_FILE}" ]; then
         source "${ENV_FILE}"
         if [ -n "$SSH_PRIVATE_KEY_B64" ] && [ -n "$SSH_PUBLIC_KEY" ]; then
-            echo "SSH keys found in .env, extracting to temporary files..."
-            # Extract private key from .env
+            echo "SSH keys found in .env, extracting to runtime files..."
             echo "$SSH_PRIVATE_KEY_B64" | base64 -d > "${SANDBOX_DIR}/id_rsa"
             chmod 600 "${SANDBOX_DIR}/id_rsa"
-            # Extract public key from .env
             echo "$SSH_PUBLIC_KEY" > "${SANDBOX_DIR}/id_rsa.pub"
             chmod 644 "${SANDBOX_DIR}/id_rsa.pub"
-            # Copy public key to shared folder
             cp "${SANDBOX_DIR}/id_rsa.pub" "${SHARED_DIR}/id_rsa.pub"
-            echo "SSH keys extracted from .env."
+            echo "✅ SSH keys extracted from .env."
             return 0
         fi
     fi
 
-    # Keys don't exist, generate new ones
     echo "Generating new SSH key pair..."
     ssh-keygen -t rsa -b 4096 -f "${SANDBOX_DIR}/id_rsa" -N ""
 
-    # Store keys in .env (Base64 encode private key)
     echo "Storing SSH keys in .env..."
     local private_key_b64=$(base64 -i "${SANDBOX_DIR}/id_rsa" | tr -d '\n')
     local public_key=$(cat "${SANDBOX_DIR}/id_rsa.pub")
 
-    # Update .env with keys
     if [ -f "${ENV_FILE}" ]; then
-        # Replace existing empty keys
         sed -i '' "s|^SSH_PRIVATE_KEY_B64=\"\"$|SSH_PRIVATE_KEY_B64=\"${private_key_b64}\"|" "${ENV_FILE}"
         sed -i '' "s|^SSH_PUBLIC_KEY=\"\"$|SSH_PUBLIC_KEY=\"${public_key}\"|" "${ENV_FILE}"
     fi
 
-    # Copy public key to shared folder
     cp "${SANDBOX_DIR}/id_rsa.pub" "${SHARED_DIR}/id_rsa.pub"
 
-    echo "SSH key pair generated and stored in .env."
+    echo "✅ SSH key pair generated and stored in .env."
     echo "⚠️  IMPORTANT: id_rsa and id_rsa.pub files are in .gitignore and will NOT be committed."
 }
 
-#
 # Destroys the sandbox environment.
-#
 burn() {
-    echo "Destroying sandbox environment..."
-    if utmctl status "${VM_NAME}" | grep -q "running"; then
-        utmctl stop "${VM_NAME}"
+    start_time=$(date +%s)
+    echo "--- Destroying sandbox environment ---"
+    if utmctl status "${VM_NAME}" &>/dev/null; then
+        if utmctl status "${VM_NAME}" | grep -q "started"; then
+            echo "Stopping VM..."
+            utmctl stop "${VM_NAME}"
+        fi
+        echo "Deleting VM..."
+        utmctl delete "${VM_NAME}"
     fi
-    utmctl delete "${VM_NAME}"
+    echo "Removing sandbox directories and keys..."
     rm -rf "${SHARED_DIR}"
-    rm -f "${SANDBOX_DIR}/id_rsa" "${SANDBOX_DIR}/id_rsa.pub"
-    echo "Sandbox environment destroyed."
+    rm -f "${SANDBOX_DIR}/id_rsa" "${SANDBOX_DIR}/id_rsa.pub" "${SANDBOX_DIR}/alpine.iso"
+    echo "✅ Sandbox environment destroyed."
+    end_time=$(date +%s)
+    execution_time=$((end_time - start_time))
+    echo "Execution time: ${execution_time} seconds."
 }
 
-#
 # Tests the sandbox environment.
-#
 test_sandbox() {
-    echo "Testing sandbox environment..."
+    start_time=$(date +%s)
+    echo "--- Testing sandbox environment ---"
 
-    # List all VMs
+    echo "Listing all VMs..."
     utmctl list
 
-    # Check if the VM is registered
     if ! utmctl status "${VM_NAME}" &>/dev/null; then
-        echo "Error: VM is not registered. Please create it manually in the UTM app."
+        echo "❌ Error: VM is not registered. Please create it first."
         exit 1
     fi
 
-    # Create a test file
+    echo "Creating a test file..."
     local test_file="${SHARED_DIR}/test_file.txt"
     echo "This is a test file." > "${test_file}"
 
-    # Start the VM
-    utmctl start "${VM_NAME}"
+    if ! utmctl status "${VM_NAME}" | grep -q "started"; then
+        echo "Starting VM..."
+        utmctl start "${VM_NAME}"
+    fi
 
-    # Wait for the VM to boot and for the SSH port to be open
-    echo "Waiting for VM to boot..."
+    echo "Waiting for VM to boot and SSH to be available..."
     local i=0
     while ! nc -z localhost 2222 && [ $i -lt 30 ]; do
+        echo -n "."
         sleep 1
         i=$((i+1))
     done
+    echo
 
-    # Run the analysis script
+    if [ $i -eq 30 ]; then
+        echo "❌ Error: Timed out waiting for SSH port."
+        exit 1
+    fi
+
+    echo "Running analysis script inside the VM..."
     ssh -v -i "${SANDBOX_DIR}/id_rsa" -o StrictHostKeyChecking=no -p 2222 root@localhost -- "/media/shared/analyze.sh scan /media/shared/test_file.txt"
 
-    # Stop the VM
+    echo "Stopping the VM..."
     utmctl stop "${VM_NAME}"
 
-    echo "Sandbox environment test complete."
+    echo "✅ Sandbox environment test complete."
+    end_time=$(date +%s)
+    execution_time=$((end_time - start_time))
+    echo "Execution time: ${execution_time} seconds."
 }
 
-#
 # Main function
-#
 main() {
+    start_time=$(date +%s)
+
     if [ $# -eq 0 ]; then
-        echo "Starting sandbox setup..."
+        echo "--- Starting Sandbox Setup ---"
         check_dependencies
         create_directories
         init_env_file
@@ -219,12 +234,15 @@ main() {
         echo "✅ Sandbox setup complete!"
         echo ""
         echo "📝 Next steps:"
-        echo "   1. Create VM in UTM following SETUP-GUIDE.md"
-        echo "   2. Install Alpine Linux in the VM"
-        echo "   3. Run ./provision-vm.sh to install analysis tools"
+        echo "   1. Create the VM in UTM by following './create-vm.sh'."
+        echo "   2. Install Alpine Linux inside the VM."
+        echo "   3. Provision the VM using './provision-vm.sh'."
         echo ""
-        echo "⚠️  IMPORTANT: PKI files (id_rsa, id_rsa.pub) are in .gitignore"
-        echo "   The single source of truth is .env (also gitignored)"
+        echo "⚠️  The single source of truth for SSH keys is the .env file (which is gitignored)."
+        
+        end_time=$(date +%s)
+        execution_time=$((end_time - start_time))
+        echo "Total setup time: ${execution_time} seconds."
         exit 0
     fi
 
@@ -237,11 +255,11 @@ main() {
             ;;
         start)
             utmctl start "${VM_NAME}"
-            ;;
+            ;;    
         *)
             echo "Invalid command: $1"
             exit 1
-            ;;
+            ;;    
     esac
 }
 

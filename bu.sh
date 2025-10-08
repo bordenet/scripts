@@ -1,45 +1,89 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
 #
-# Script: bu.sh
-# Description: This script performs a comprehensive system update and cleanup.
-#              It updates various package managers and tools including Homebrew,
-#              apm, bower, npm, mas, and pip. It also cleans up Homebrew installations,
-#              resets local Git repositories, and performs a macOS software update.
+# Script Name: bu.sh
+#
+# Description: This script performs a comprehensive system update and cleanup
+#              for a macOS environment. It updates Homebrew, npm, mas (Mac App
+#              Store), and pip. It also cleans up Homebrew installations and
+#              triggers a macOS software update.
+#
 # Usage: ./bu.sh
-# Dependencies: Homebrew, apm, bower, npm, mas, pip, git, reset_all_repos.sh
 #
-sudo ls
+# Dependencies:
+#   - Homebrew: For managing packages.
+#   - npm: For managing Node.js packages.
+#   - mas: For managing Mac App Store applications.
+#   - pip: For managing Python packages.
+#
+# Author: Gemini
+#
+# Last Updated: 2025-10-08
+#
+# -----------------------------------------------------------------------------
+
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
+# Start timer
+start_time=$(date +%s)
+
+# --- Initial Setup ---
+echo "Starting the system update and cleanup process..."
+# Request sudo privileges upfront to avoid prompts later.
+sudo -v
 clear
+
+# --- Homebrew Updates ---
+echo "Updating Homebrew..."
 brew update
+echo "Upgrading Homebrew packages..."
 brew upgrade
+echo "Cleaning up old Homebrew package versions..."
 brew cleanup -s
+echo "Upgrading Homebrew Casks..."
 brew upgrade --cask
+echo "Removing the homebrew/cask tap (no longer necessary)..."
 brew untap homebrew/cask
 
+echo "Running Homebrew Doctor to check for issues..."
 brew doctor
+echo "Checking for missing Homebrew dependencies..."
 brew missing
-#apm upgrade -c false
 
-#bower update
+# --- npm Updates ---
+echo "Updating global npm packages..."
 npm update -g --force
+echo "Updating npm itself..."
 npm install -g npm --force
 
-brew install mas
+# --- Mac App Store Updates (mas) ---
+echo "Checking for Mac App Store updates..."
+if ! command -v mas &> /dev/null; then
+    echo "mas command not found. Installing..."
+    brew install mas
+fi
 mas outdated
-echo "install with: mas upgrade"
+echo "Upgrading all outdated Mac App Store apps..."
 mas upgrade
 
-#pushd ~/GitHub > /dev/null
-#./reset_all_repos.sh -f
-#popd > /dev/null
-
-#sudo -H pip install --upgrade pip
+# --- Pip Updates ---
+echo "Upgrading pip for Python 2..."
 pip install --upgrade pip
 
-#sudo -H pip3 install --upgrade pip
-pip3 install --upgrade pip3
+echo "Upgrading pip for Python 3..."
+pip3 install --upgrade pip
 
-
-#~/GitHub/fetch-github-projects.sh
-#/Users/matt/GitHub/fetch-github-projects.sh
+# --- macOS Software Update ---
+echo "Checking for and installing macOS software updates..."
 sudo softwareupdate --all --install --force -R
+
+# --- Completion ---
+echo "System update and cleanup process completed."
+
+# End timer
+end_time=$(date +%s)
+
+# Calculate and display execution time
+execution_time=$((end_time - start_time))
+echo "Total execution time: ${execution_time} seconds"

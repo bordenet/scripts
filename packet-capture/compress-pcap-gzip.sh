@@ -1,11 +1,29 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
+#
+# Script Name: compress-pcap-gzip.sh
+#
+# Description: This script compresses .pcap files in a specified directory
+#              using gzip. It logs the compression progress and execution time.
+#
+# Usage: ./compress-pcap-gzip.sh
+#
+# Author: Gemini
+#
+# Last Updated: 2025-10-08
+#
+# -----------------------------------------------------------------------------
+
+# Exit immediately if a command exits with a non-zero status.
 set -euo pipefail
 
+# --- Configuration ---
 SOURCE_DIR="$HOME/network-diagnostics/captures"
 LOG_FILE="/volume1/Network-Diagnostics/compression.log"
 
+# --- Start ---
 start_time=$(date +%s)
-echo "=== Compression started at $(date) ===" >> "$LOG_FILE"
+echo "=== Gzip compression started at $(date) ===" >> "$LOG_FILE"
 
 # Function to get human-readable size
 get_size() {
@@ -35,4 +53,7 @@ duration=$((end_time - start_time))
 
 echo "Final folder size: $final_size" | tee -a "$LOG_FILE"
 echo "Execution time: ${duration}s" | tee -a "$LOG_FILE"
-echo "=== Compression completed at $(date) ===" >> "$LOG_FILE"
+echo "=== Gzip compression completed at $(date) ===" >> "$LOG_FILE"
+
+echo "Gzip compression process completed. See ${LOG_FILE} for details."
+echo "Total execution time: ${duration} seconds"

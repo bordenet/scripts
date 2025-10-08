@@ -1,23 +1,38 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
 #
-# Malware Analysis Script
-# Runs inside the VM to analyze potentially malicious files
+# Script Name: analyze.sh
 #
+# Description: This script runs inside the Alpine Linux VM to analyze
+#              potentially malicious files. It can install a suite of analysis
+#              tools and then perform a multi-faceted scan of a target file.
+#
+# Usage:
+#   ./analyze.sh install-tools   - Installs all required analysis tools.
+#   ./analyze.sh scan <file>     - Scans the specified file.
+#
+# Author: Gemini
+#
+# Last Updated: 2025-10-08
+#
+# -----------------------------------------------------------------------------
 
+# Exit on error, undefined variable, or pipe failure
 set -euo pipefail
 
+# --- Configuration ---
 TOOLS_INSTALLED_MARKER="/root/.analysis_tools_installed"
 
-#
+# --- Functions ---
+
 # Install analysis tools
-#
 install_tools() {
-    echo "========================================"
-    echo "Installing Analysis Tools"
-    echo "========================================"
+    start_time=$(date +%s)
+    echo "========================================="
+    echo "  Installing Analysis Tools"
+    echo "========================================="
     echo ""
 
-    # Update package repository
     echo "📦 Updating package repository..."
     apk update
 
@@ -60,12 +75,14 @@ install_tools() {
 
     echo ""
     echo "✅ All analysis tools installed successfully!"
+    end_time=$(date +%s)
+    execution_time=$((end_time - start_time))
+    echo "Installation time: ${execution_time} seconds."
 }
 
-#
 # Scan a file
-#
 scan_file() {
+    start_time=$(date +%s)
     local target="$1"
 
     if [ ! -e "${target}" ]; then
@@ -73,12 +90,12 @@ scan_file() {
         exit 1
     fi
 
-    echo "========================================"
-    echo "Malware Analysis Report"
-    echo "========================================"
-    echo "Target: ${target}"
-    echo "Date: $(date)"
-    echo "========================================"
+    echo "========================================="
+    echo "  Malware Analysis Report"
+    echo "========================================="
+    echo "  Target: ${target}"
+    echo "  Date:   $(date)"
+    echo "========================================="
     echo ""
 
     # Check if tools are installed
@@ -204,11 +221,12 @@ scan_file() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "✅ Analysis complete!"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    end_time=$(date +%s)
+    execution_time=$((end_time - start_time))
+    echo "Scan time: ${execution_time} seconds."
 }
 
-#
 # Show usage
-#
 usage() {
     cat <<EOF
 Usage: $0 <command> [arguments]
@@ -225,10 +243,9 @@ Examples:
 EOF
 }
 
-#
-# Main
-#
+# Main function
 main() {
+    start_time=$(date +%s)
     if [ $# -eq 0 ]; then
         usage
         exit 1
@@ -237,7 +254,7 @@ main() {
     case "$1" in
         install-tools)
             install_tools
-            ;;
+            ;; 
         scan)
             if [ $# -lt 2 ]; then
                 echo "Error: scan command requires a file path"
@@ -245,16 +262,19 @@ main() {
                 exit 1
             fi
             scan_file "$2"
-            ;;
+            ;; 
         help)
             usage
-            ;;
+            ;; 
         *)
             echo "Error: Unknown command '$1'"
             usage
             exit 1
-            ;;
+            ;; 
     esac
+    end_time=$(date +%s)
+    execution_time=$((end_time - start_time))
+    echo "Total script execution time: ${execution_time} seconds."
 }
 
 main "$@"

@@ -1,9 +1,27 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
+#
+# Script Name: compress-pcap-zstd.sh
+#
+# Description: This script compresses .pcap files in a specified directory
+#              using zstd. It logs the compression progress and execution time.
+#
+# Usage: ./compress-pcap-zstd.sh
+#
+# Author: Gemini
+#
+# Last Updated: 2025-10-08
+#
+# -----------------------------------------------------------------------------
+
+# Exit immediately if a command exits with a non-zero status.
 set -euo pipefail
 
+# --- Configuration ---
 SOURCE_DIR="$HOME/network-diagnostics/captures"
 LOG_FILE="/volume1/Network-Diagnostics/compression.log"
 
+# --- Start ---
 start_time=$(date +%s)
 echo "=== Compression started at $(date) ===" >> "$LOG_FILE"
 
@@ -26,7 +44,6 @@ find "$SOURCE_DIR" -type f -name '*.pcap' | while read -r file; do
   count=$((count + 1))
   echo "[$count/$total_files] Compressing: $file" | tee -a "$LOG_FILE"
   /opt/bin/zstd -19 --rm "$file"
-#  gzip -9 "$file"
 done
 
 # Record final size
@@ -37,3 +54,6 @@ duration=$((end_time - start_time))
 echo "Final folder size: $final_size" | tee -a "$LOG_FILE"
 echo "Execution time: ${duration}s" | tee -a "$LOG_FILE"
 echo "=== Compression completed at $(date) ===" >> "$LOG_FILE"
+
+echo "Compression process completed. See ${LOG_FILE} for details."
+echo "Total execution time: ${duration} seconds"

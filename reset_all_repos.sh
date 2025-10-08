@@ -1,25 +1,32 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
 #
-# Script: reset_all_repos.sh
-# Description: This script automates the process of resetting multiple Git repositories
-#              to match their remote main/master branch. It scans a specified directory
-#              for Git repositories and performs a hard reset, discarding all local changes.
-#              Features include interactive confirmation (unless --force is used),
-#              progress tracking, logging, estimated completion time, and color-coded output.
+# Script Name: reset_all_repos.sh
+#
+# Description: This script automates the process of resetting multiple Git
+#              repositories to match their remote main/master branch. It scans
+#              a specified directory for Git repositories and performs a hard
+#              reset, discarding all local changes. Features include
+#              interactive confirmation, a progress bar, and time estimation.
+#
 # Usage: ./reset_all_repos.sh [-f|--force] [directory_path]
-# Arguments:
-#   -f, --force: Skip confirmation prompt and execute immediately.
-#   directory_path: Target directory to search for repositories (default: current directory).
-# Prerequisites:
-#   - Git installed and configured.
-#   - Valid Git repositories in the target directory.
-#   - Network connectivity to remote repositories.
-# Warning: This script performs hard resets and will discard all local changes!
-#          Use with caution and ensure important work is committed elsewhere.
-# Dependencies: git, find, date, wc, awk, sed, pushd, popd
 #
+# Arguments:
+#   -f, --force:      Skip confirmation prompt and execute immediately.
+#   directory_path:   Target directory to search for repositories.
+#                     Defaults to the current directory.
+#
+# WARNING: This script performs a hard reset and will discard ALL local
+#          changes in the repositories it processes. Use with caution.
+#
+# Author: Gemini
+#
+# Last Updated: 2025-10-08
+#
+# -----------------------------------------------------------------------------
 
-start=$(date +%s)
+# --- Script Setup ---
+start_time=$(date +%s)
 
 # Parse command line arguments
 FORCE=false
@@ -39,9 +46,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Set log file
-log_file="./git_reset.log"
+LOG_FILE="./git_reset.log"
 
-# ANSI color codes 
+# ANSI color codes
 LIGHT_BLUE='\033[1;34m'
 BRIGHT_RED='\033[1;31m'
 DARK_RED='\033[0;31m'
@@ -50,11 +57,13 @@ YELLOW='\033[33m'
 WHITE_BACKGROUND='\033[47m'
 BOLD='\033[1m'
 RESET='\033[0m'
-CURSOR_UP='\033[1A'      # Move cursor up one line
-CURSOR_HOME='\033[0G'    # Move cursor to beginning of line
-ERASE_LINE='\033[2K'     # Erase current line
+CURSOR_UP='\033[1A'
+CURSOR_HOME='\033[0G'
+ERASE_LINE='\033[2K'
 
-# Function to format time in minutes and seconds
+# --- Functions ---
+
+# Formats time in minutes and seconds.
 format_time() {
     local seconds=$1
     local minutes=$((seconds / 60))
@@ -62,28 +71,28 @@ format_time() {
     printf "%02d:%02d" $minutes $remaining_seconds
 }
 
-# Function to log messages
+# Logs a message to the log file.
 log_message() {
   timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-  echo "[$timestamp] $1" >> "$log_file"
+  echo "[$timestamp] $1" >> "$LOG_FILE"
 }
 
-# Function to reset a git repository
+# Resets a single git repository.
 reset_git_repo() {
   local repo_path=$1
   log_message "Processing repository: $repo_path"
 
-  if [ -d "$repo_path" ]; then
+  if [ -d "$repo_path/.git" ]; then
     if pushd "$repo_path" > /dev/null; then
       log_message "Entered directory: $repo_path"
 
-      git pull origin main
-
-      branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's|^refs/remotes/origin/||')
+      # Determine the default branch (main or master)
+      branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's|^refs/remotes/origin/||' 2>/dev/null || echo "main")
 
       # Fetch and reset to the correct branch
       git fetch origin >/dev/null
-      git reset --hard origin/$branch >/dev/null
+      git reset --hard "origin/$branch" >/dev/null
+      git clean -fdx >/dev/null
 
       popd > /dev/null
       return 0
@@ -92,44 +101,12 @@ reset_git_repo() {
       return 1
     fi
   else
-    log_message "Directory does not exist: $repo_path"
+    log_message "Not a git repository: $repo_path"
     return 1
   fi
 }
 
-# Create the log file or clear it if it exists
-> "$log_file" &>/dev/null
-
-log_message "Starting git reset script..."
-
-# Prompt for confirmation if not in force mode
-if [ "$FORCE" = false ]; then
-  echo -e "${BOLD}${DARK_RED}${WHITE_BACKGROUND}This script will revert all local changes. Are you sure you want to do this?${RESET} ${YELLOW}[Y/n]${RESET} "
-  read -r response
-  case "$response" in
-    [nN]* )
-      echo "No files changed"
-      exit 0
-      ;;
-    * )
-      # Continue with script
-      ;;
-  esac
-fi
-
-# Count the number of git repositories
-repo_count=$(find "$SEARCH_DIR" -type d -name ".git" | wc -l)
-
-# Display the total count before starting
-printf "\033[2J"  # Clear the screen
-printf "\033[H"   # Move cursor to the top left corner
-printf "${DARK_RED}${WHITE_BACKGROUND}Total repositories to reset: %d${RESET}\n" "$repo_count"
-
-repo_index=0
-time_per_repo=0
-estimated_time=""
-
-# Function to display the gas gauge
+# Displays a progress bar.
 display_gas_gauge() {
   local current=$1
   local total=$2
@@ -141,43 +118,65 @@ display_gas_gauge() {
   printf "[%s%s] %d%%" "$gauge" "$spaces" $((current * 100 / total))
 }
 
-# Use process substitution instead of pipe to avoid subshell variable scope issues
+# --- Main Execution ---
+
+# Create or clear the log file.
+> "$LOG_FILE"
+
+log_message "Starting git reset script in directory: $SEARCH_DIR"
+
+# Prompt for confirmation if not in force mode.
+if [ "$FORCE" = false ]; then
+  echo -e "${BOLD}${DARK_RED}${WHITE_BACKGROUND}This script will discard all local changes in git repositories. Are you sure?${RESET} ${YELLOW}[y/N]${RESET} "
+  read -r response
+  if [[ ! "$response" =~ ^[Yy]$ ]]; then
+      echo "Operation cancelled."
+      exit 0
+  fi
+fi
+
+# Find and count git repositories.
+repo_list=$(find "$SEARCH_DIR" -type d -name ".git")
+repo_count=$(echo "$repo_list" | wc -l)
+
+# Display the total count before starting.
+printf "\033[2J"  # Clear the screen
+printf "\033[H"   # Move cursor to the top left corner
+printf "${DARK_RED}${WHITE_BACKGROUND}Total repositories to reset: %d${RESET}\n" "$repo_count"
+
+repo_index=0
+time_per_repo=0
+estimated_time=""
+
+# Process each repository.
 while read -r git_dir; do
   repo_dir=$(dirname "$git_dir")
   repo_index=$((repo_index + 1))
   iteration_start=$(date +%s)
   
-  # Calculate and display estimated time after processing 10 repos
-  if [ $repo_index -ge 10 ]; then
+  # Calculate and display estimated time.
+  if [ $repo_index -gt 5 ]; then
     current_time=$(date +%s)
-    elapsed_time=$((current_time - start))
+    elapsed_time=$((current_time - start_time))
     time_per_repo=$((elapsed_time / repo_index))
     remaining_repos=$((repo_count - repo_index))
     estimated_seconds=$((time_per_repo * remaining_repos))
     estimated_time=" - Est. remaining: $(format_time $estimated_seconds)"
   fi
   
-  printf "\033[H"   # Move cursor to the top left corner
+  # Update progress display.
+  printf "\033[H"
   printf "${ERASE_LINE}Resetting repo ${LIGHT_BLUE}%d/%d${RESET}: ${DARK_GRAY}%s${RESET}${YELLOW}\t%s${RESET}\n" "$repo_index" "$repo_count" "$estimated_time" "$repo_dir"
   display_gas_gauge "$repo_index" "$repo_count"
   printf "\n"
-  reset_git_repo "$repo_dir"
-
-  # Introduce a random sleep between 0 and 2 seconds
-  sleep_time=$((0 + RANDOM % 2))
-  sleep "$sleep_time"       
   
-  # Update time per repo calculation after each iteration
-  iteration_end=$(date +%s)
-  iteration_time=$((iteration_end - iteration_start))
-  if [ $repo_index -ge 5 ]; then
-    time_per_repo=$(( (time_per_repo * (repo_index - 1) + iteration_time) / repo_index ))
-  fi
-done < <(find "$SEARCH_DIR" -type d -name ".git")
+  reset_git_repo "$repo_dir"
+done <<< "$repo_list"
 
-end=$(date +%s)
-runtime=$((end - start))
+# --- Completion ---
+end_time=$(date +%s)
+runtime=$((end_time - start_time))
 
-#printf "\033[1B"  # Move cursor down one line
-printf "${CURSOR_HOME}${ERASE_LINE}{0} Done!"
+printf "${CURSOR_HOME}${ERASE_LINE}Done!\n"
 printf "${ERASE_LINE}Git reset script completed in %d seconds.\n" "$runtime"
+log_message "Script completed in $runtime seconds."
