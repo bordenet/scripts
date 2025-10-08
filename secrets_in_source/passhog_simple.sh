@@ -12,6 +12,11 @@
 # Dependencies: grep
 #
 
+
+echo "This script is deprecated and no longer maintained."
+echo "Please use the successor project: https://github.com/bordenet/secrets-in-source"
+exit 1
+
 if [ "$#" -lt 1 ]; then
   echo "Usage: $0 <directory_path> [-t <file_suffixes>]"
   echo "Example 1: $0 . -t sh,yml,yaml"
@@ -28,21 +33,19 @@ TARGET_DIR="$1"
 shift
 
 # Default file types to scan (PLEASE EXTEND!)
-FILE_TYPES=(  "*.js" "*.json" "*.py" "*.cs" "*.go" "*.sh" "*.tf" "*.yml" "*.yaml" "*.env" "*env" "*.ENV" "*ENV"
-)
+FILE_TYPES=("*.js" "*.json" "*.py" "*.cs" "*.go" "*.sh" "*.tf" "*.yml" "*.yaml" "*.env" "*env" "*.ENV" "*ENV")
 
 # Directories we do not want the tool traversing
-EXCLUDE_DIRS=(  ".git" ".github" "node_modules" "vendor" ".idea" ".vscode" "stella_deploy" "secrets_in_source"
-)
+EXCLUDE_DIRS=(".git" ".github" "node_modules" "vendor" ".idea" ".vscode" "stella_deploy" "secrets_in_source")
 
 # Patterns to detect secrets-- used by first screening pass
 SECRET_PATTERNS_FAST_EXPANDED=(
   "(PASS|PASSWORD|pass|password|KEY|SECRET|pwd)[:=][0-9a-zA-Z]+"
   "(PASS|PASSWORD|pass|password|KEY|SECRET|pwd)(:|=).*)"
-  "\b([A-Za-z0-9_]*PASS(WORD)?)\b[=:][\"\']?([^#\$\s\"\']+)"
-  "(PASSWORD|PASS|KEY|SECRET)\s[=:][\"\']?([^#\$\s\"\']+)"
+  "\b([A-Za-z0-9_]*PASS(WORD)?)\b[=:][\"']?([^#\$\\s\"']+)"
+  "(PASSWORD|PASS|KEY|SECRET)\s[=:][\"']?([^#\$\\s\"']+)"
   "private[ _-]?key.*-----BEGIN PRIVATE KEY-----"
-  "AWS[ _-]?(SECRET|ACCESS)[ _-]?(KEY)=[\"\']?([^#\$\s\"\']+)"
+  "AWS[ _-]? (SECRET|ACCESS)[ _-]?(KEY)=[\"']?([^#\$\\s\"']+)"
   "AZURE[ _-]?(CLIENT|STORAGE|SUBSCRIPTION)[ _-]?(SECRET|KEY|ID)[=:\s]\(([A-Za-z0-9]{32,})\)"
   "AWS_SECRET_ACCESS_KEY=[^[:space:]]+"  # Added pattern to match AWS_SECRET_ACCESS_KEY
 )
@@ -51,10 +54,10 @@ SECRET_PATTERNS_FAST_EXPANDED=(
 SECRET_PATTERNS_STRICT_EXPANDED=(
   "(PASS|PASSWORD|pass|password|KEY|SECRET|pwd)[:=][0-9a-zA-Z]+"
   "(PASS|PASSWORD|pass|password|KEY|SECRET|pwd)(:|=).*)"
-  "\b([A-Za-z0-9_]*PASS(WORD)?)\b[=:][\"\']?([^#\$\s\"\']+)"
-  "(PASSWORD|PASS|KEY|SECRET)\s[=:][\"\']?([^#\$\s\"\']+)"
+  "\b([A-Za-z0-9_]*PASS(WORD)?)\b[=:][\"']?([^#\$\\s\"']+)"
+  "(PASSWORD|PASS|KEY|SECRET)\s[=:][\"']?([^#\$\\s\"']+)"
   "private[ _-]?key.*-----BEGIN PRIVATE KEY-----"
-  "AWS[ _-]?(SECRET|ACCESS)[ _-]?(KEY)=[\"\']?([^#\$\s\"\']+)"
+  "AWS[ _-]?(SECRET|ACCESS)[ _-]?(KEY)=[\"']?([^#\$\\s\"']+)"
   "AZURE[ _-]?(CLIENT|STORAGE|SUBSCRIPTION)[ _-]?(SECRET|KEY|ID)[=:\s]\(([A-Za-z0-9]{32,})\)"
   ".*[_A-Z0-9]+PASS(WORD)\\s*=\\s*[^[:space:]\"']+.*"
   "[Pp]assword\\s*=\\s*[^[:space:]\"']+"
@@ -74,21 +77,21 @@ SECRET_PATTERNS_STRICT_EXPANDED=(
 
 EXCLUDE_PATTERNS_EXPANDED=(
   ':\s*\$\{[^}]+\}'
-  '\${[^}]+}'                               # Matches ${VAR_NAME}
+  '\$\{[^}]+\}'                               # Matches ${VAR_NAME}
   '(PASS|PASSWORD|pass|password|KEY|SECRET):\s*str\s*=\s*None\)\:' # FP01
   'password\s*=\s*"\$' # FP49 -- first attempt
   'password\s*=\s*"\$[A-Za-z_][A-Za-z_0-9]*"' # FP49   TODO: FIX BUGBUG
   'HIDDEN' # FP48
-  '\{\{[^{}]*\}\}|\{[^{}]*\}|\[\[[^\[\]]*\]\]|\[[^\[\]]*\]'  # FP41
+  '\{\{[^\{\}]*\}\}|\{[^\{\}]*\}|\[\[[^\[\]]*\]\]|\[[^\[\]]*\]'  # FP41
   '(KEY|PASS|PASSWORD|TOKEN|SECRET)\s*[:=]\s*\$' #FP22, FP27, FP28, FP44
-  '(pass|password|PASS|PASSWORD)\s*[:=]\s*(['"'"'"]{2})$'  # FP10, FP46
+  '(pass|password|PASS|PASSWORD)\s*[:=]\s*([\'"'\"]{2})$'  # FP10, FP46
   'PASS\s*:\s*A\s*[a-z]+\s*can\s*be' # FP02
   '(KEY\s*=\s*[a-z\[]*\s*)?\(Value:' # FP03, FP04
   'pwd\s*=\s*getpass\.getpass\(' # FP05
   'Settings\s+take\s+the\s+form\s+KEY=VALUE\.' # FP42
   'password\s*=\s*get_pwd\(\)' # FP50
   'getpass\(prompt="tl\s+password:\s*"\)' # FP51
-  'password\s*=\s*ENV\[\"' # FP52
+  'password\s*=\s*ENV\["'
   '(KEY|PASS|PASSWORD|TOKEN|SECRETpass|password).*getenv' # FP53  TODO: FIX BUGBUG
   '(pass|password|pwd|PWD|controller-client-secret)\=(REDISPW|REDIS_PW|REDIS_PASSWORD|CONTROLLER_PASSWORD)' # FP54
   'PASS\s*:\s*[A-Z][a-zA-Z]*\s+[a-zA-Z\s]{6,}' # FP57
@@ -127,11 +130,11 @@ while [[ "$#" -gt 0 ]]; do
         FILE_TYPES+=("*.$ext")
       done
       shift 2
-      ;;
+      ;; 
     *)
       echo "Unknown option: $1"
       exit 1
-      ;;
+      ;; 
   esac
 done
 
@@ -255,12 +258,12 @@ update_status() {
   # Only show progress bar if there are more than 20 directories
   if [ "$TOTAL_DIRS" -gt 20 ]; then
     percentage=$((dirs_processed * 100 / TOTAL_DIRS))
-    clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} \t Possible Secrets: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}\t ${elapsed_time}\t${RESET}|${DARK_GRAY} ${estimated_time}${RESET}\n"
+    clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} 	 Possible Secrets: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}	 ${elapsed_time}	${RESET}|${DARK_GRAY} ${estimated_time}${RESET}\n"
     printf "${CURSOR_HOME}${ERASE_LINE}Progress:    "
     draw_progress_bar "$percentage"
     printf "\n"
   else
-    clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} \t Secrets detected: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}\t ${elapsed_time}\t${RESET}|${DARK_GRAY} ${estimated_time}${RESET}\r\n"
+    clear && printf "${CURSOR_UP}${CURSOR_HOME}${ERASE_LINE}Directories: ${LIGHT_BLUE}${dirs_processed}/${TOTAL_DIRS}${RESET} 	 Secrets detected: ${BRIGHT_RED}${secrets_found}${RESET}${DARK_GRAY}	 ${elapsed_time}	${RESET}|${DARK_GRAY} ${estimated_time}${RESET}\r\n"
   fi
 }
 
@@ -285,7 +288,7 @@ scan_file() {
                     # TODO: REMOVE and re-simplify
                     extra_pass_regex='^\s*\{*\$|^o$' #'^\s*\{*\$' and catch the annoying os.getenv case [FP53] and baffling [FP54]  TODO: FIX BUGBUG
                     escaped_secret_value=$secret_value
-                    trimmed_secret_value=$(echo "$escaped_secret_value" | sed 's/^[[:space:]]*["'\''"]*//')
+                    trimmed_secret_value=$(echo "$escaped_secret_value" | sed 's/^[[:space:]]*["'\'"]*//')
                     test_for_invalid_secret=$(echo $trimmed_secret_value | grep -E $extra_pass_regex)
 
                     if [[ -z "$test_for_invalid_secret" ]]; then
@@ -300,7 +303,8 @@ scan_file() {
         fi
     done
 
-    if $secrets_found_in_file; then
+    if $secrets_found_in_file;
+    then
         log_info_red "SECRETS DETECTED IN $file!"
     fi
 }
@@ -327,7 +331,8 @@ export EXCLUDE_DIRS
 # Process files in the root search directory
 find_expr=$(construct_find_command)
 # For root directory scan:
-eval "find \"$TARGET_DIR\" -maxdepth 1 -type f \( $find_expr \) 2>/dev/null" | while read -r file; do
+eval "find \"$TARGET_DIR\" -maxdepth 1 -type f \( $find_expr \) 2>/dev/null" | while read -r file;
+do
   if [[ ! " ${EXCLUDE_DIRS[@]} " =~ " $(basename "$file") " ]]; then
     printf "\r${ERASE_LINE}Scanning: ${LIGHT_BLUE}$file${RESET}"
     scan_file "$file"
@@ -335,14 +340,16 @@ eval "find \"$TARGET_DIR\" -maxdepth 1 -type f \( $find_expr \) 2>/dev/null" | w
 done
 
 # Process subdirectories
-find -P "$TARGET_DIR" -maxdepth 1 -type d | while read -r dir; do
+find -P "$TARGET_DIR" -maxdepth 1 -type d | while read -r dir;
+do
     if [ "$dir" != "$TARGET_DIR" ] && [[ ! " ${EXCLUDE_DIRS[@]} " =~ " $(basename "$dir") " ]]; then
         dirs_processed=$(($(cat "$DIR_COUNT_FILE") + 1))
         echo "$dirs_processed" > "$DIR_COUNT_FILE"
         update_status
 
         find_expr=$(construct_find_command)
-        eval "find -P \"$dir\" -type f \( $find_expr \) 2>/dev/null" | while read -r file; do
+        eval "find -P \"$dir\" -type f \( $find_expr \) 2>/dev/null" | while read -r file;
+        do
             printf "\r${ERASE_LINE}Scanning: ${LIGHT_BLUE}$file${RESET}"
             scan_file "$file"
         done
@@ -373,7 +380,7 @@ if [ -s "$RESULTS_FILE" ]; then
   friendly_transcript_file_name="$(basename "$0")_$(date +%s).txt"
   friendly_transcript_path="$temp_dir/$friendly_transcript_file_name"
   mv "$temp_file" "$friendly_transcript_path"
-  printf "$0 results\nRun by: $(whoami)\nDate: $(date "+%A, %B %d, %Y")\n" >> "$friendly_transcript_path"
+  printf "$0 results\nRun by: $(whoami)\nDate: $(date \"+%A, %B %d, %Y\")\n" >> "$friendly_transcript_path"
   printf "Execution time: $runtime seconds\nTotal secrets: $total_secrets\n\n" >> "$friendly_transcript_path"
   cat $RESULTS_FILE >> "$friendly_transcript_path"
   log_info "Detailed findings:"
@@ -386,7 +393,7 @@ if [ -s "$RESULTS_FILE" ]; then
     printf "${LIGHT_BLUE}$file${DARK_GRAY}:$line_number${RESET}: $match_content\n"
   done < "$RESULTS_FILE"
   printf "\n\n\n${BRIGHT_RED}Transcript available: $friendly_transcript_path${RESET}"
-  printf "\n\n${DARK_GRAY}Suggestion: this will make the text more readable ${RESET}sed 's/\\x1b\\[[0-9;]*[mG]//g' $friendly_transcript_path > ./human_readable.txt"
+  printf "\n\n${DARK_GRAY}Suggestion: this will make the text more readable ${RESET}sed 's/\\x1b\[[0-9;]*[mG]//g' $friendly_transcript_path > ./human_readable.txt"
   printf "\n ${DARK_GRAY}Just don't leave it lying around, or it will get picked up in subsequent runs of the tool!${CLEAR}"
 elif [[ $total_secrets -eq 0 ]]; then
   log_info "No secrets detected in the specified directory."
