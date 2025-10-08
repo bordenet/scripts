@@ -44,7 +44,7 @@ brew cleanup -s
 echo "Upgrading Homebrew Casks..."
 brew upgrade --cask
 echo "Removing the homebrew/cask tap (no longer necessary)..."
-brew untap homebrew/cask
+brew untap homebrew/cas || true
 
 echo "Running Homebrew Doctor to check for issues..."
 brew doctor
