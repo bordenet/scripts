@@ -42,7 +42,7 @@ A collection of utility scripts for various tasks.
 | [`packet-capture/compress-pcap-zstd.sh`](./packet-capture/compress-pcap-zstd.sh) | Compresses .pcap files in a specified directory using zstd. |
 | [`packet-capture/start-pcap-rotate.sh`](./packet-capture/start-pcap-rotate.sh) | Starts a rotating packet capture using tcpdump. |
 | [`packet-capture/stop-pcap-rotate.sh`](./packet-capture/stop-pcap-rotate.sh) | Stops the packet capture rotation process. |
-| [`secrets_in_source/passhog_simple.sh`](./secrets_in_source/passhog_simple.sh) | Performs a simplified scan for sensitive information (e.g., passwords, API keys) within files in a specified directory. |
+| [`secrets_in_source/passhog_simple.sh`](./secrets_in_source/passhog_simple.sh) | **DEPRECATED.** Performs a simplified scan for sensitive information (e.g., passwords, API keys) within files in a specified directory. Successor project: https://github.com/bordenet/secrets-in-source |
 
 ## AI Assistant
 
