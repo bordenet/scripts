@@ -1,26 +1,46 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
 #
-# Status Check Script - Quick health check of the sandbox
+# Script Name: status.sh
 #
+# Description: This script performs a comprehensive health check of the malware
+#              inspection sandbox environment. It verifies dependencies,
+#              checks for required files (ISO, SSH key), reports the VM status,
+#              tests the SSH connection, and provides an overall summary of
+#              the sandbox's operational readiness.
+#
+# Usage: ./status.sh
+#
+# Dependencies: utmctl, nc (netcat), ssh, brew
+#
+# Author: Gemini
+#
+# Last Updated: 2025-10-08
+#
+# -----------------------------------------------------------------------------
 
+# Exit on error, undefined variable, or pipe failure
 set -euo pipefail
 
+# --- Script Setup ---
+start_time=$(date +%s)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VM_NAME="inspection-sandbox"
 SSH_KEY="${SCRIPT_DIR}/id_rsa"
 SSH_PORT=2222
 
-# Colors
+# Colors for output
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+# --- Main ---
 echo ""
-echo "========================================"
-echo "🔍 Sandbox Status Check"
-echo "========================================"
+echo "=========================================="
+echo "  🔍 Sandbox Status Check"
+echo "=========================================="
 echo ""
 
 # Check dependencies
@@ -84,7 +104,7 @@ if utmctl status "${VM_NAME}" 2>/dev/null | grep -q "started"; then
                 echo -n '  Uptime: '
                 uptime | awk '{print \$3, \$4}' | sed 's/,//'
                 echo -n '  Disk: '
-                df -h / | tail -1 | awk '{print \$3 \"/\" \$2 \" (\" \$5 \" used)\"}'
+                df -h / | tail -1 | awk '{print \$3 "/" \$2 " (" \$5 " used)"}'
                 echo -n '  Shared Mount: '
                 mount | grep -q '/media/shared' && echo '✅ Mounted' || echo '❌ Not mounted'
                 echo -n '  Analysis Tools: '
@@ -122,9 +142,13 @@ vm_running=false
 ssh_works=false
 
 utmctl status "${VM_NAME}" &>/dev/null && vm_exists=true
-utmctl status "${VM_NAME}" 2>/dev/null | grep -q "started" && vm_running=true
+if $vm_exists && utmctl status "${VM_NAME}" 2>/dev/null | grep -q "started"; then
+    vm_running=true
+fi
 if $vm_running; then
-    ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p ${SSH_PORT} root@localhost "exit" 2>/dev/null && ssh_works=true
+    if nc -z localhost ${SSH_PORT} 2>/dev/null; then
+        ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p ${SSH_PORT} root@localhost "exit" 2>/dev/null && ssh_works=true
+    fi
 fi
 
 echo ""
@@ -141,7 +165,8 @@ elif $vm_exists && ! $vm_running; then
 elif $vm_exists && $vm_running && ! $ssh_works; then
     echo -e "${YELLOW}⚠️  VM is running but SSH is not working${NC}"
     echo ""
-    echo "Try reprovisioning:"
+    echo "This could be a temporary issue while the VM is booting."
+    echo "If it persists, try reprovisioning:"
     echo "  ./provision-vm.sh"
 elif ! $vm_exists; then
     echo -e "${YELLOW}⚠️  VM not created yet${NC}"
@@ -157,3 +182,7 @@ else
 fi
 
 echo ""
+# --- Completion ---
+end_time=$(date +%s)
+execution_time=$((end_time - start_time))
+echo "Execution time: ${execution_time} seconds."

@@ -1,87 +1,118 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
 #
-# Script: get_dormant_repos.sh
-# Description: This script identifies and lists dormant GitHub repositories within a specified
-#              organization. A repository is considered dormant if it has NOT had a push
-#              within the last year. For each dormant repository, it reports its name,
-#              the last push timestamp, and the total lines of code.
+# Script Name: get_dormant_repos.sh
+#
+# Description: This script identifies and lists dormant GitHub repositories
+#              within a specified organization. A repository is considered
+#              dormant if it has NOT had a push within the last year. For each
+#              dormant repository, it reports its name, the last push
+#              timestamp, and the total lines of code.
+#
 # Usage: ./get_dormant_repos.sh
-# Configuration:
-#   Before running, update GITHUB_ORG, GITHUB_ORG_URL, GITHUB_API_URL, and GITHUB_TOKEN
-#   variables within the script. The GITHUB_TOKEN requires sufficient permissions to
-#   access the repositories in the specified GitHub organization.
-# Dependencies: curl, jq, git, date (GNU date for -v option on macOS, or equivalent)
 #
-#!/bin/bash
+# Configuration:
+#   Before running, update the GITHUB_ORG, GITHUB_API_URL, and GITHUB_TOKEN
+#   variables within this script. The GITHUB_TOKEN requires sufficient
+#   permissions to access the repositories in the specified GitHub
+#   organization.
+#
+# Dependencies: curl, jq, git, date
+#
+# Author: Gemini
+#
+# Last Updated: 2025-10-08
+#
+# -----------------------------------------------------------------------------
 
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
+# --- Configuration ---
+# !!! IMPORTANT !!!
+# UPDATE THESE VARIABLES BEFORE RUNNING THE SCRIPT
 GITHUB_ORG="ORG-NAME-HERE"
-GITHUB_ORG_URL="https://GHE-URL-HERE/$GITHUB_ORG/"
 GITHUB_API_URL="https://GHE-URL-HERE/api/v3"
 GITHUB_TOKEN="TOKEN_HERE"
 
-# Get the current date and the date one year ago
-CURRENT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-ONE_YEAR_AGO=$(date -u -v-1y +"%Y-%m-%dT%H:%M:%SZ")
+# --- Script Setup ---
+start_time=$(date +%s)
+TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
 
-# Function to count lines of code in a repository
-count_lines_of_code() {
-    repo=$1
-    git clone --quiet "https://ghe.exm-platform.com/Telepathy-Labs/"$repo temp_dormant_repo 2>/dev/null
-    cd temp_dormant_repo 2>/dev/null
-    lines_of_code=$(git ls-files 2>/dev/null | xargs wc -l 2>/dev/null | tail -n 1 | awk '{print $1}' 2>/dev/null)
-    cd .. 2>/dev/null
-    rm -rf temp_dormant_repo 2>/dev/null
-    echo $lines_of_code
-}
+# Calculate the date one year ago.
+ONE_YEAR_AGO=$(date -u -v-1y +'%Y-%m-%dT%H:%M:%SZ')
 
-# Function to check if a repository has changed in the past year
-check_repo_activity() {
-  local repo=$1
+echo "Finding dormant repositories in '$GITHUB_ORG' (no pushes since $ONE_YEAR_AGO)..."
 
-#  echo "Checking activity for repository: $repo"
-  local response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-    "$GITHUB_API_URL""/repos/""$GITHUB_ORG""/""$repo" || { echo "Failed to fetch data for $repo"; return; })
-#  echo "Response for $repo: $response"
+# --- Functions ---
 
-  local last_pushed=$(echo "$response" | jq -r '.pushed_at')
-#  echo "Last pushed date for $repo: $last_pushed"
+# Function to fetch all repositories for the organization, handling pagination.
+fetch_all_repos() {
+    local page=1
+    local all_repos=()
+    local repos_url="$GITHUB_API_URL/orgs/$GITHUB_ORG/repos"
 
-  if [[ "$last_pushed" < "$ONE_YEAR_AGO" ]]; then
-
-    # Fetch lines of code for the repository
-    local lines_of_code=$(count_lines_of_code $repo)
-    echo -e "$repo\t$last_pushed\t$lines_of_code"
-  fi
-}
-
-# Function to fetch all repositories with pagination
-fetch_repos() {
-    page=1
-    repos=()
-
-    orgs_url="$GITHUB_API_URL""/orgs/"$GITHUB_ORG"/repos"
-
+    echo "Fetching all repositories for organization: $GITHUB_ORG"
     while :; do
-        response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$orgs_url""?per_page=100&page=$page")
+        response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$repos_url?per_page=100&page=$page")
         repo_names=$(echo "$response" | jq -r '.[].name')
+
         if [ -z "$repo_names" ]; then
             break
         fi
-        repos+=($repo_names)
+        all_repos+=($repo_names)
         ((page++))
     done
-    echo "${repos[@]}"
+    echo "${all_repos[@]}"
 }
 
-echo "Repositories with no activity in the past year:"
+# Function to count lines of code in a repository.
+count_loc() {
+    local repo_name=$1
+    local repo_url="https://x-access-token:$GITHUB_TOKEN@GHE-URL-HERE/$GITHUB_ORG/$repo_name.git"
+    local clone_dir="$TEMP_DIR/$repo_name"
 
-# Get all repositories
-repos=$(fetch_repos)
+    echo "Cloning $repo_name to count lines of code..."
+    git clone --quiet "$repo_url" "$clone_dir"
+    
+    # Using git ls-files to respect .gitignore, then counting lines.
+    lines_of_code=$(cd "$clone_dir" && git ls-files | xargs wc -l | tail -n 1 | awk '{print $1}')
+    
+    echo "$lines_of_code"
+}
 
-# Check each repository for activity
-echo -e "Repo\tLast-Pushed\tLoC"
-for repo in $repos; do
-  check_repo_activity $repo
+# --- Main Script ---
+
+# Get all repositories.
+all_repos=$(fetch_all_repos)
+
+if [ -z "$all_repos" ]; then
+    echo "Error: No repositories found for organization '$GITHUB_ORG'. Check configuration and token permissions."
+    exit 1
+fi
+
+echo "Found $(echo "$all_repos" | wc -w | xargs) repositories. Checking for inactivity..."
+echo -e "\nRepo\tLast-Pushed\tLines-of-Code"
+
+# Check each repository for activity.
+for repo in $all_repos; do
+    echo "Checking activity for: $repo"
+    response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$GITHUB_API_URL/repos/$GITHUB_ORG/$repo")
+    last_pushed=$(echo "$response" | jq -r '.pushed_at')
+
+    if [[ "$last_pushed" < "$ONE_YEAR_AGO" ]]; then
+        echo "  -> Dormant. Last push: $last_pushed"
+        lines_of_code=$(count_loc "$repo")
+        echo -e "$repo\t$last_pushed\t$lines_of_code"
+    else
+        echo "  -> Active. Last push: $last_pushed"
+    fi
 done
 
-echo "Done!"
+echo -e "\nDone!"
+
+# --- Completion ---
+end_time=$(date +%s)
+execution_time=$((end_time - start_time))
+echo "Total execution time: ${execution_time} seconds"
