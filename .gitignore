@@ -7,3 +7,4 @@ git_reset.log
 
 #Ignore cursor AI rules
 .cursor/rules/codacy.mdc
+resume-at-0801.sh
