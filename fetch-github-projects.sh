@@ -47,7 +47,7 @@ for dir in */; do
         echo "---"
         echo "Updating repository: $dir"
         pushd "$dir" > /dev/null
-        git pull
+        git pull origin main || git pull origin master
         popd > /dev/null
     else
         echo "---"
