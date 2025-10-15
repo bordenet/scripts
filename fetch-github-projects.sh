@@ -34,12 +34,28 @@ for dir in */; do
             fi
         fi
 
-        # Run pull quietly, only showing actual changes or errors
+        # Check for local changes
+        if ! git diff --quiet || ! git diff --cached --quiet; then
+            echo "⚠️  Local changes detected in ${dir%/}."
+            echo -n "   Revert and sync? [y/N] (auto-No in 10s): "
+            
+            read -t 10 -r REPLY || REPLY="n"
+            if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                echo "   Reverting local changes..."
+                git reset --hard > /dev/null 2>&1
+                git clean -fd > /dev/null 2>&1
+            else
+                echo "   Skipping ${dir%/}."
+                popd > /dev/null
+                continue
+            fi
+        fi
+
+        # Pull quietly
         OUTPUT=$(git pull origin "$DEFAULT_BRANCH" 2>&1)
         STATUS=$?
 
         if [ $STATUS -eq 0 ]; then
-            # Only print repo name if something changed
             if ! grep -q "Already up to date" <<< "$OUTPUT"; then
                 echo "✅ ${dir%/}: updated ($DEFAULT_BRANCH)"
             else
