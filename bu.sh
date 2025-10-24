@@ -55,7 +55,7 @@ brew missing
 echo "Updating global npm packages..."
 npm update -g --force
 echo "Updating npm itself..."
-npm install -g npm --force
+npm install -g npm --force || true
 
 # --- Mac App Store Updates (mas) ---
 echo "Checking for Mac App Store updates..."
@@ -69,10 +69,11 @@ mas upgrade
 
 # --- Pip Updates ---
 echo "Upgrading pip for Python 2..."
-pip install --upgrade pip
+pip install --upgrade pip || true
 
 echo "Upgrading pip for Python 3..."
-pip3 install --upgrade pip
+#pip3 install --upgrade pip
+python3 -m pip install --upgrade pip --user || true
 
 # --- macOS Software Update ---
 echo "Checking for and installing macOS software updates..."
