@@ -91,6 +91,10 @@ setup_project_vars() {
             full_plist_path="$project_file_dir/$INFO_PLIST_PATH"
             # Resolve ".." and "." to get the canonical path
             INFO_PLIST=$(cd "$(dirname "$full_plist_path")" && pwd)/$(basename "$full_plist_path")
+
+            echo "DEBUG: PROJECT_FILE: $PROJECT_FILE"
+            echo "DEBUG: INFO_PLIST_PATH: $INFO_PLIST_PATH"
+            echo "DEBUG: INFO_PLIST: $INFO_PLIST"
         fi
     fi
 }
@@ -168,6 +172,9 @@ check_build_settings() {
     echo -e "\n${BLUE}=== Build Settings Checks ===${NC}"
     local build_settings
     build_settings=$(xcodebuild -project "$PROJECT_FILE" -showBuildSettings 2>/dev/null)
+
+    echo "DEBUG: Raw xcodebuild -showBuildSettings output:"
+    echo "$build_settings"
 
     if [ -z "$build_settings" ]; then
         echo -e "${RED}✗ Failed to get build settings. Make sure Xcode Command Line Tools are properly installed.${NC}"
