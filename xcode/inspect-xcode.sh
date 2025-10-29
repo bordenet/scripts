@@ -86,7 +86,11 @@ setup_project_vars() {
     if [ -n "$PROJECT_FILE" ]; then
         INFO_PLIST_PATH=$(xcodebuild -project "$PROJECT_FILE" -showBuildSettings 2>/dev/null | grep "INFOPLIST_FILE" | head -n 1 | awk -F "= " '{print $2}')
         if [ -n "$INFO_PLIST_PATH" ]; then
-            INFO_PLIST="$PROJECT_DIR/$INFO_PLIST_PATH"
+            # The path from xcodebuild is relative to the project file's directory.
+            project_file_dir=$(dirname "$PROJECT_FILE")
+            full_plist_path="$project_file_dir/$INFO_PLIST_PATH"
+            # Resolve ".." and "." to get the canonical path
+            INFO_PLIST=$(cd "$(dirname "$full_plist_path")" && pwd)/$(basename "$full_plist_path")
         fi
     fi
 }
