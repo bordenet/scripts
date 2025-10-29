@@ -83,20 +83,7 @@ setup_project_vars() {
         exit 1
     fi
 
-    if [ -n "$PROJECT_FILE" ]; then
-        INFO_PLIST_PATH=$(xcodebuild -project "$PROJECT_FILE" -showBuildSettings 2>/dev/null | grep "INFOPLIST_FILE" | head -n 1 | awk -F "= " '{print $2}')
-        if [ -n "$INFO_PLIST_PATH" ]; then
-            # The path from xcodebuild is relative to the project file's directory.
-            project_file_dir=$(dirname "$PROJECT_FILE")
-            full_plist_path="$project_file_dir/$INFO_PLIST_PATH"
-            # Resolve ".." and "." to get the canonical path
-            INFO_PLIST=$(cd "$(dirname "$full_plist_path")" && pwd)/$(basename "$full_plist_path")
-
-            echo "DEBUG: PROJECT_FILE: $PROJECT_FILE"
-            echo "DEBUG: INFO_PLIST_PATH: $INFO_PLIST_PATH"
-            echo "DEBUG: INFO_PLIST: $INFO_PLIST"
-        fi
-    fi
+    INFO_PLIST=$(find "$PROJECT_DIR" -name "Info.plist" | head -n 1)
 }
 
 # Function to check Xcode project structure
@@ -173,17 +160,9 @@ check_build_settings() {
     local build_settings
     build_settings=$(xcodebuild -project "$PROJECT_FILE" -showBuildSettings 2>/dev/null)
 
-    echo "DEBUG: Raw xcodebuild -showBuildSettings output:"
-    echo "$build_settings"
-
-    if [ -z "$build_settings" ]; then
-        echo -e "${RED}✗ Failed to get build settings. Make sure Xcode Command Line Tools are properly installed.${NC}"
-        return
-    fi
-
     local deployment_target
-    deployment_target=$(echo "$build_settings" | grep "IPHONEOS_DEPLOYMENT_TARGET" | head -n 1 | awk -F "= " '{print $2}')
-    if (( $(echo "$deployment_target < 12.0" | bc -l) )); then
+    deployment_target=$(echo "$build_settings" | grep -m 1 'IPHONEOS_DEPLOYMENT_TARGET' | awk -F '= ' '{print $2}')
+    if [[ "$deployment_target" =~ ^[0-9]+(\.[0-9]+)*$ ]] && (( $(echo "$deployment_target < 12.0" | bc -l) )); then
         echo -e "${YELLOW}⚠ Older deployment target: $deployment_target. Consider updating to a more recent iOS version for better performance and security.${NC}"
     else
         echo -e "${GREEN}✓ Modern deployment target: $deployment_target${NC}"
