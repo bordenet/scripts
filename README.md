@@ -44,6 +44,12 @@ A collection of utility scripts for various tasks.
 | [`packet-capture/stop-pcap-rotate.sh`](./packet-capture/stop-pcap-rotate.sh) | Stops the packet capture rotation process. |
 | [`secrets_in_source/passhog_simple.sh`](./secrets_in_source/passhog_simple.sh) | **DEPRECATED.** Performs a simplified scan for sensitive information (e.g., passwords, API keys) within files in a specified directory. Successor project: https://github.com/bordenet/secrets-in-source |
 
+## Xcode
+
+| Script | Description |
+|---|---|
+| [`xcode/inspect-xcode.sh`](./xcode/inspect-xcode.sh) | Analyzes an Xcode project for common issues. |
+
 ## AI Assistant
 
 | Script | Description |
