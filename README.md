@@ -51,11 +51,11 @@ A collection of utility scripts for various tasks.
 | [`resume_claude.sh`](./resume_claude.sh) | Automates the process of resuming an AI assistant session with "Claude" within VS Code. |
 | [`schedule_claude.sh`](./schedule_claude.sh) | Schedules the execution of the 'resume_claude.sh' script after a specified delay. |
 
-## 🚀 macOS Development Environment Setup
+## macOS Development Environment Setup
 
 **NEW**: Modular, component-based architecture for maintainable macOS setup scripts.
 
-See **[`macos-setup/`](./macos-setup/)** for a reusable template system that:
+See **[`macos-setup/`](./macos-setup/README.md)** for a reusable template system that:
 - ✅ Reduces setup script complexity by ~65%
 - ✅ Enables selective component reuse across projects
 - ✅ Provides consistent UI (verbose/compact modes)
@@ -68,4 +68,4 @@ cp -r macos-setup/lib your-project/scripts/
 cp -r macos-setup/setup-components your-project/scripts/
 cp macos-setup/setup-macos-template.sh your-project/scripts/setup-macos.sh
 
-# See macos-setup/README.md for customization guide
+# See ./macos-setup/README.md for detailed documentation and customization guide
