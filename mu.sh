@@ -201,7 +201,7 @@ if command -v pip3 &> /dev/null; then
             echo "$outdated" | xargs -n1 pip3 install --upgrade
         fi
     ) > "$LOG_DIR/mu_pip3_packages.log" 2>&1 &
-    local pid=$!
+    pid=$!
     spinner $pid
     wait $pid
     if [ $? -eq 0 ]; then
@@ -227,7 +227,7 @@ if command -v pip &> /dev/null && [[ $(pip --version) == *"python 2"* ]]; then
             echo "$outdated" | xargs -n1 pip install --upgrade
         fi
     ) > "$LOG_DIR/mu_pip_packages.log" 2>&1 &
-    local pid=$!
+    pid=$!
     spinner $pid
     wait $pid
     if [ $? -eq 0 ]; then
@@ -252,10 +252,10 @@ if grep -qi microsoft /proc/version 2>/dev/null; then
     # winget updates
     printf "%-30s" "winget upgrade..."
     powershell.exe -Command "winget upgrade --all --silent" > "$LOG_DIR/mu_winget.log" 2>&1 &
-    local pid=$!
+    pid=$!
     spinner $pid
     wait $pid
-    local winget_exit=$?
+    winget_exit=$?
 
     if [ $winget_exit -eq 0 ]; then
         echo "✓"
@@ -278,10 +278,10 @@ if grep -qi microsoft /proc/version 2>/dev/null; then
         # Run Windows Update
         Get-WindowsUpdate -AcceptAll -Install -AutoReboot:\$false
     " > "$LOG_DIR/mu_windows_update.log" 2>&1 &
-    local pid=$!
+    pid=$!
     spinner $pid
     wait $pid
-    local wu_exit=$?
+    wu_exit=$?
 
     if [ $wu_exit -eq 0 ]; then
         echo "✓"
