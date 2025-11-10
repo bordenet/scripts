@@ -19,7 +19,7 @@
 #
 # -----------------------------------------------------------------------------
 
-set -e  # Exit on error (but we'll handle errors explicitly)
+# Don't exit on error - we handle errors explicitly and continue
 set -o pipefail
 
 # -----------------------------------------------------------------------------
@@ -142,27 +142,27 @@ echo "--------------------------------------------------"
 
 # apt updates
 run_phase "apt update" "$LOG_DIR/mu_apt_update.log" \
-    sudo apt update
+    sudo apt update || true
 
 run_phase "apt upgrade" "$LOG_DIR/mu_apt_upgrade.log" \
-    sudo apt upgrade -y
+    sudo apt upgrade -y || true
 
 run_phase "apt autoremove" "$LOG_DIR/mu_apt_autoremove.log" \
-    sudo apt autoremove -y
+    sudo apt autoremove -y || true
 
 run_phase "apt autoclean" "$LOG_DIR/mu_apt_autoclean.log" \
-    sudo apt autoclean
+    sudo apt autoclean || true
 
 # Homebrew updates
 if command -v brew &> /dev/null; then
     run_phase "brew update" "$LOG_DIR/mu_brew_update.log" \
-        brew update
+        brew update || true
 
     run_phase "brew upgrade" "$LOG_DIR/mu_brew_upgrade.log" \
-        brew upgrade
+        brew upgrade || true
 
     run_phase "brew cleanup" "$LOG_DIR/mu_brew_cleanup.log" \
-        brew cleanup
+        brew cleanup || true
 
     # brew doctor - capture warnings but don't fail
     printf "%-30s" "brew doctor..."
@@ -179,10 +179,10 @@ fi
 # npm updates
 if command -v npm &> /dev/null; then
     run_phase "npm update -g" "$LOG_DIR/mu_npm_update.log" \
-        npm update -g
+        npm update -g || true
 
     run_phase "npm install -g npm" "$LOG_DIR/mu_npm_self.log" \
-        npm install -g npm
+        npm install -g npm || true
 else
     echo "⊘ npm not installed - skipping"
 fi
@@ -190,12 +190,17 @@ fi
 # pip3 updates
 if command -v pip3 &> /dev/null; then
     run_phase "pip3 upgrade" "$LOG_DIR/mu_pip3_upgrade.log" \
-        python3 -m pip install --upgrade pip
+        python3 -m pip install --upgrade pip || true
 
     # Update all installed pip3 packages
     printf "%-30s" "pip3 update packages..."
-    pip3 list --outdated --format=freeze 2>/dev/null | cut -d= -f1 | \
-        xargs -n1 pip3 install --upgrade > "$LOG_DIR/mu_pip3_packages.log" 2>&1 &
+    (
+        set +o pipefail  # Disable pipefail for this section
+        outdated=$(pip3 list --outdated --format=freeze 2>/dev/null | cut -d= -f1)
+        if [ -n "$outdated" ]; then
+            echo "$outdated" | xargs -n1 pip3 install --upgrade
+        fi
+    ) > "$LOG_DIR/mu_pip3_packages.log" 2>&1 &
     local pid=$!
     spinner $pid
     wait $pid
@@ -212,11 +217,16 @@ fi
 # pip (Python 2) updates if present
 if command -v pip &> /dev/null && [[ $(pip --version) == *"python 2"* ]]; then
     run_phase "pip upgrade" "$LOG_DIR/mu_pip_upgrade.log" \
-        python -m pip install --upgrade pip
+        python -m pip install --upgrade pip || true
 
     printf "%-30s" "pip update packages..."
-    pip list --outdated --format=freeze 2>/dev/null | cut -d= -f1 | \
-        xargs -n1 pip install --upgrade > "$LOG_DIR/mu_pip_packages.log" 2>&1 &
+    (
+        set +o pipefail  # Disable pipefail for this section
+        outdated=$(pip list --outdated --format=freeze 2>/dev/null | cut -d= -f1)
+        if [ -n "$outdated" ]; then
+            echo "$outdated" | xargs -n1 pip install --upgrade
+        fi
+    ) > "$LOG_DIR/mu_pip_packages.log" 2>&1 &
     local pid=$!
     spinner $pid
     wait $pid
