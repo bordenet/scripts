@@ -28,7 +28,7 @@ update_repo() {
     if ! git diff --quiet || ! git diff --cached --quiet; then
         echo "⚠️  Local changes detected in ${dir%/}."
         echo -n "   Revert and sync? [y/N] (auto-No in 10s): "
-        
+
         read -t 10 -r REPLY || REPLY="n"
         if [[ "$REPLY" =~ ^[Yy]$ ]]; then
             echo "   Reverting local changes..."
@@ -61,13 +61,18 @@ update_repo() {
 
 # --- Main Script ---
 
-TARGET_DIR="${1:-$HOME/GitHub}"
-MENU_MODE=false
+# Default to menu mode
+MENU_MODE=true
+TARGET_DIR="$HOME/GitHub"
 
-# Check for --menu option
-if [[ "$1" == "--menu" ]]; then
-    MENU_MODE=true
-    TARGET_DIR="${2:-$HOME/GitHub}"
+# Parse arguments
+if [ $# -gt 0 ]; then
+    if [[ "$1" == "--all" ]]; then
+        MENU_MODE=false
+        TARGET_DIR="${2:-$HOME/GitHub}"
+    else
+        TARGET_DIR="$1"
+    fi
 fi
 
 start_time=$(date +%s)
