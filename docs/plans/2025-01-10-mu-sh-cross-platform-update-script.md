@@ -208,14 +208,28 @@ No errors detected. All systems updated successfully!
 
 ### Error Handling Pattern
 
+**Critical implementation details:**
+- **No `set -e`**: Script must NOT use `set -e` to allow continuation through errors
+- **`set -o pipefail`**: Used to catch pipeline failures, but disabled in specific sections
+- **`|| true` on all commands**: Ensures no command causes script exit
+- **Subshells for pip operations**: Wrap pip list pipelines in `()` with `set +o pipefail`
+
 ```bash
 # Error collection array
 ERRORS=()
 
-# Capture pattern for each phase
-if ! apt upgrade -y &> /tmp/mu_apt.log; then
-    ERRORS+=("apt upgrade failed - check /tmp/mu_apt.log")
-fi
+# Capture pattern with run_phase function
+run_phase "apt upgrade" "$LOG_DIR/mu_apt_upgrade.log" \
+    sudo apt upgrade -y || true
+
+# For pip operations with pipelines
+(
+    set +o pipefail  # Disable pipefail for this section
+    outdated=$(pip3 list --outdated --format=freeze 2>/dev/null | cut -d= -f1)
+    if [ -n "$outdated" ]; then
+        echo "$outdated" | xargs -n1 pip3 install --upgrade
+    fi
+) > "$LOG_DIR/mu_pip3_packages.log" 2>&1 &
 
 # Continue execution even after failures
 # Report all errors at end
