@@ -157,6 +157,12 @@ run_phase "apt autoclean" "$LOG_DIR/mu_apt_autoclean.log" \
 
 # Homebrew updates
 if command -v brew &> /dev/null; then
+    # Warn on ARM64 about limited support
+    if [ "$(uname -m)" = "aarch64" ]; then
+        echo "⚠ Homebrew on ARM64 Linux - limited package support"
+        echo "  Consider using nvm, rbenv, rustup for language runtimes"
+    fi
+
     run_phase "brew update" "$LOG_DIR/mu_brew_update.log" \
         brew update || true
 
