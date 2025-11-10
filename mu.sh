@@ -4,14 +4,16 @@
 # Script Name: mu.sh (Matt's Update)
 #
 # Description: Comprehensive system update script for WSL + Windows environments.
-#              Updates apt, Homebrew, npm, pip in WSL, then triggers winget and
-#              Windows Update via PowerShell interop. Designed for daily manual
-#              execution with compact console output and actionable error reporting.
+#              Updates apt, version managers (nvm, rbenv, rustup), Homebrew (optional),
+#              npm, pip in WSL, then triggers winget and Windows Update via PowerShell
+#              interop. Optimized for ARM64 architecture with native tools. Designed
+#              for daily manual execution with compact console output and actionable
+#              error reporting.
 #
 # Usage: ./mu.sh
 #
 # Dependencies:
-#   WSL: apt, Homebrew, npm, pip
+#   WSL: apt, nvm (optional), rbenv (optional), rustup (optional), Homebrew (optional), npm, pip
 #   Windows: PowerShell, winget, PSWindowsUpdate module
 #
 # Author: Claude Code
@@ -176,7 +178,52 @@ else
     echo "⊘ Homebrew not installed - skipping"
 fi
 
-# npm updates
+# nvm (Node Version Manager) updates
+if [ -d "$HOME/.nvm" ]; then
+    printf "%-30s" "nvm update..."
+    (
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+        # Update nvm itself
+        cd "$NVM_DIR" && git fetch --tags origin && git checkout `git describe --abbrev=0 --tags --match "v[0-9]*" $(git rev-list --tags --max-count=1)` && \. "$NVM_DIR/nvm.sh"
+    ) > "$LOG_DIR/mu_nvm.log" 2>&1 &
+    pid=$!
+    spinner $pid
+    wait $pid
+    if [ $? -eq 0 ]; then
+        echo "✓"
+    else
+        echo "✗"
+        ERRORS+=("nvm update failed - see $LOG_DIR/mu_nvm.log")
+    fi
+else
+    echo "⊘ nvm not installed - skipping"
+fi
+
+# rbenv (Ruby Version Manager) updates
+if command -v rbenv &> /dev/null; then
+    run_phase "rbenv update" "$LOG_DIR/mu_rbenv.log" \
+        bash -c "cd ~/.rbenv && git pull" || true
+
+    # Update ruby-build plugin
+    if [ -d "$HOME/.rbenv/plugins/ruby-build" ]; then
+        run_phase "ruby-build update" "$LOG_DIR/mu_ruby_build.log" \
+            bash -c "cd ~/.rbenv/plugins/ruby-build && git pull" || true
+    fi
+else
+    echo "⊘ rbenv not installed - skipping"
+fi
+
+# rustup updates
+if command -v rustup &> /dev/null; then
+    run_phase "rustup update" "$LOG_DIR/mu_rustup.log" \
+        rustup update || true
+else
+    echo "⊘ rustup not installed - skipping"
+fi
+
+# npm updates (global packages)
 if command -v npm &> /dev/null; then
     run_phase "npm update -g" "$LOG_DIR/mu_npm_update.log" \
         npm update -g || true
