@@ -6,7 +6,7 @@
 
 **Name:** `mu.sh` (Matt's Update script)
 
-**Target Environment:** Microsoft Surface running WSL (primary) + Windows 11 with PowerShell
+**Target Environment:** Microsoft Surface (ARM64/aarch64) running WSL (primary) + Windows 11 with PowerShell
 
 **Design Philosophy:**
 - Single command execution from WSL terminal
@@ -14,6 +14,7 @@
 - Comprehensive error reporting at end
 - No aggressive flags (no --force)
 - Daily use pattern
+- ARM64-optimized with native version managers
 
 ---
 
@@ -33,9 +34,12 @@
 
 **Phase 1: WSL Updates**
 1. apt (system packages)
-2. Homebrew (dev tools and language runtimes)
-3. npm (global packages)
-4. pip/pip3 (Python package manager and packages)
+2. nvm (Node Version Manager) - ARM64 optimized
+3. rbenv (Ruby Version Manager) - ARM64 optimized
+4. rustup (Rust toolchain manager) - ARM64 optimized
+5. Homebrew (optional, for tools with good ARM64 Linux support)
+6. npm (global packages)
+7. pip/pip3 (Python package manager and packages)
 
 **Phase 2: Windows Updates (via PowerShell interop)**
 1. winget (Windows package manager)
@@ -43,11 +47,23 @@
 
 ### Package Manager Strategy
 
-**WSL:**
-- **apt:** System utilities and base packages
-- **Homebrew:** Language runtimes and dev tools (node, ruby, go, rust, etc.)
-- Provides consistency with macOS bu.sh workflow
-- Fresh versions compared to Ubuntu default repos
+**ARM64 Hybrid Approach:**
+
+**WSL (Primary - Native Version Managers):**
+- **apt:** System utilities and base packages (excellent ARM64 support)
+- **nvm:** Node.js version management (better ARM64 support than Homebrew)
+- **rbenv:** Ruby version management (native ARM64 builds)
+- **rustup:** Rust toolchain (official ARM64 support)
+- **Homebrew (optional):** For dev tools with good ARM64 Linux support
+  - Only used where packages are available and stable
+  - Falls back gracefully if not installed
+  - Provides some consistency with macOS bu.sh workflow
+
+**Rationale for ARM64:**
+- Homebrew on ARM64 Linux has limited package support
+- Many formulae lack ARM64 Linux bottles
+- Native version managers (nvm, rbenv, rustup) provide better ARM64 compatibility
+- Reduces compilation failures and dependency issues
 
 **Windows:**
 - **winget:** Primary package manager (native to Windows 11, Homebrew-like)
@@ -72,13 +88,46 @@ sudo apt autoremove -y   # Remove unused packages
 sudo apt autoclean       # Clear old package files
 ```
 
-**Homebrew updates:**
+**nvm updates:**
+```bash
+# Update nvm itself via git
+cd ~/.nvm && git fetch --tags origin
+git checkout `git describe --abbrev=0 --tags --match "v[0-9]*" $(git rev-list --tags --max-count=1)`
+```
+- Only runs if `~/.nvm` directory exists
+- Updates to latest stable version
+- ARM64 compatible
+
+**rbenv updates:**
+```bash
+# Update rbenv itself
+cd ~/.rbenv && git pull
+
+# Update ruby-build plugin
+cd ~/.rbenv/plugins/ruby-build && git pull
+```
+- Only runs if `rbenv` command exists
+- Updates both rbenv and ruby-build plugin
+- Ensures access to latest Ruby versions with ARM64 support
+
+**rustup updates:**
+```bash
+rustup update            # Update Rust toolchain
+```
+- Only runs if `rustup` command exists
+- Updates all installed toolchains
+- Official ARM64 support
+
+**Homebrew updates (optional):**
 ```bash
 brew update              # Update Homebrew itself
 brew upgrade             # Upgrade all packages (no --force)
 brew cleanup             # Remove old versions
 brew doctor              # Check for issues (warnings → error report)
 ```
+- Only runs if `brew` command exists
+- Provides some consistency with macOS workflow
+- Limited ARM64 Linux support, use cautiously
 
 **npm updates:**
 ```bash
@@ -312,11 +361,16 @@ spin() {
 
 ## Dependencies
 
-**WSL (must be installed):**
-- Homebrew for Linux
-- npm (via Homebrew node or direct install)
-- Python 3 with pip
+**WSL (Required):**
 - apt (built-in to Ubuntu/Debian WSL)
+- Python 3 with pip
+- npm (via nvm or direct install)
+
+**WSL (Optional - Installed = Auto-updated):**
+- nvm (Node Version Manager) - Recommended for ARM64
+- rbenv (Ruby Version Manager) - Recommended for ARM64
+- rustup (Rust toolchain) - Recommended for ARM64
+- Homebrew for Linux - Optional, limited ARM64 support
 
 **Windows (must be accessible from WSL):**
 - PowerShell (built into Windows 11)
@@ -330,5 +384,8 @@ spin() {
 - Script designed for managed corporate PC (aggressive updates acceptable)
 - Daily execution pattern over morning coffee
 - User controls restart timing (no auto-reboot)
-- Homebrew in WSL provides consistency with user's 4 macOS machines
+- **ARM64 optimized:** Uses native version managers (nvm, rbenv, rustup) for better compatibility
+- Homebrew optional in WSL (limited ARM64 support, use cautiously)
+- Provides some consistency with user's 4 macOS machines via optional Homebrew
 - No --force flags to avoid breaking dependencies
+- All package managers gracefully skipped if not installed
