@@ -1,4 +1,5 @@
 #!/bin/bash
+[[ "$(uname -s)" != "Darwin" ]] && { echo "Error: This script requires macOS" >&2; exit 1; }
 # -----------------------------------------------------------------------------
 #
 # Script Name: bu.sh
@@ -7,6 +8,8 @@
 #              for a macOS environment. It updates Homebrew, npm, mas (Mac App
 #              Store), and pip. It also cleans up Homebrew installations and
 #              triggers a macOS software update.
+#
+# Platform:    macOS only
 #
 # Usage: ./bu.sh
 #
