@@ -196,15 +196,15 @@ echo ""
 # Start timer
 start_time=$(date +%s)
 
-# Request sudo upfront (with timeout to avoid hanging)
+# Request sudo upfront
 echo "Requesting sudo privileges..."
-if timeout 30 sudo -v; then
+if sudo -v; then
     echo "✓ Sudo privileges granted"
-    # Keep sudo alive in background
-    (while true; do sudo -n true; sleep 50; done 2>/dev/null) &
+    # Keep sudo alive in background - exit if parent dies
+    (while true; do sudo -n true; sleep 50; kill -0 $$ 2>/dev/null || exit; done 2>/dev/null) &
     SUDO_KEEPER_PID=$!
 else
-    echo "⚠ Sudo authentication failed or timed out - some operations may require manual password entry"
+    echo "⚠ Sudo authentication failed - some operations may require manual password entry"
 fi
 echo ""
 
