@@ -1,9 +1,11 @@
 #!/bin/bash
+[[ "$(uname -s)" != "Darwin" ]] && { echo "Error: This script requires macOS" >&2; exit 1; }
 
 # ┌────────────────────────────────────────────────────────────┐
 # │                  Homebrew Environment Cloner               │
 # │     Export and import brew packages + casks for macOS      │
 # │     Author: Matt Bordenet | Version: 1.0                   │
+# │     Platform: macOS only                                   │
 # └────────────────────────────────────────────────────────────┘
 
 MANIFEST_FILE="brew-manifest.txt"
