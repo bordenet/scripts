@@ -506,7 +506,7 @@ Before you commit, verify you completed ALL of these:
 | Script | Target Platform | Status | Notes |
 |--------|----------------|--------|-------|
 | mu.sh | WSL/Windows | ⚠️ Needs Review | Has WSL check at line 411, needs check at top + banner update |
-| bu.sh | macOS | ❌ Needs Check | Uses brew, mas, softwareupdate |
+| bu.sh | macOS | ✅ Done | Added check at line 2, updated banner |
 | flush-dns-cache.sh | Cross-platform | ✅ Done | Updated 2025-01-11: supports macOS/WSL/Linux |
 | clone-brew.sh | macOS | ❌ Needs Check | Uses Homebrew |
 | start-ollama.sh | macOS | ❌ Needs Check | Needs review - check if macOS-specific |
