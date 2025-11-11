@@ -100,6 +100,19 @@ run_phase() {
 
     printf "%-30s" "$phase_name..."
 
+    # Ensure log file is writable by creating it first
+    # This handles cases where the command uses sudo but redirection doesn't
+    touch "$log_file" 2>/dev/null || {
+        # If touch fails, try with sudo
+        sudo touch "$log_file" 2>/dev/null || {
+            echo "✗"
+            ERRORS+=("$phase_name failed - cannot create log file $log_file")
+            return 1
+        }
+        # Make it writable by current user
+        sudo chmod 666 "$log_file" 2>/dev/null
+    }
+
     # Run command in background
     "${cmd[@]}" > "$log_file" 2>&1 &
     local pid=$!
@@ -325,9 +338,25 @@ fi
 
 # pip3 updates - skip on externally-managed environments
 if command -v pip3 &> /dev/null; then
-    # Check if this is an externally-managed environment by looking for the marker file
+    # Check if this is an externally-managed environment
+    # 1. Check for Linux EXTERNALLY-MANAGED marker file
+    # 2. Check if pip3 install fails with externally-managed error (Homebrew on macOS)
+    is_externally_managed=false
+
     if [ -f "/usr/lib/python$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')/EXTERNALLY-MANAGED" ]; then
-        echo "⊘ pip3 externally-managed - use apt/pipx instead"
+        is_externally_managed=true
+    elif python3 -m pip install --help 2>&1 | grep -q "externally-managed-environment" 2>/dev/null; then
+        # Quick check without actually attempting an install
+        is_externally_managed=true
+    elif ! python3 -m pip install --dry-run --upgrade pip >/dev/null 2>&1; then
+        # Last resort: test if pip upgrade would fail
+        if python3 -m pip install --dry-run --upgrade pip 2>&1 | grep -q "externally-managed"; then
+            is_externally_managed=true
+        fi
+    fi
+
+    if [ "$is_externally_managed" = true ]; then
+        echo "⊘ pip3 externally-managed - use apt/pipx/brew instead"
     else
         run_phase "pip3 upgrade" "$LOG_DIR/mu_pip3_upgrade.log" \
             python3 -m pip install --upgrade pip || true
@@ -414,6 +443,11 @@ echo "--------------------------------------------------"
 if grep -qi microsoft /proc/version 2>/dev/null; then
     # winget updates
     printf "%-30s" "winget upgrade..."
+
+    # Ensure log file is writable
+    touch "$LOG_DIR/mu_winget.log" 2>/dev/null || sudo touch "$LOG_DIR/mu_winget.log" 2>/dev/null
+    [ -f "$LOG_DIR/mu_winget.log" ] && sudo chmod 666 "$LOG_DIR/mu_winget.log" 2>/dev/null
+
     # Note: winget may require UAC elevation for package installs
     # Use --accept-package-agreements, --accept-source-agreements, and --disable-interactivity
     # to minimize prompts, but UAC may still block automation
