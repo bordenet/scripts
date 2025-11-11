@@ -2,6 +2,8 @@
 #
 # FILENAME: scrub-git-history.sh
 #
+# PLATFORM: Cross-platform
+#
 # DESCRIPTION:
 # This script uses 'git-filter-repo' to rewrite the Git repository history,
 # permanently removing specified files or directories from all commits. It uses

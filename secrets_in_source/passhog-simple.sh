@@ -1,10 +1,11 @@
 #!/bin/bash
 #
-# Script: passhog_simple.sh
+# Script: passhog-simple.sh
 # Description: This script performs a simplified scan for sensitive information
 #              (e.g., passwords, API keys) within files in a specified directory.
 #              It uses 'grep' with predefined patterns to identify potential secrets.
-# Usage: ./passhog_simple.sh <directory> [--dry-run]
+# Platform: Cross-platform
+# Usage: ./passhog-simple.sh <directory> [--dry-run]
 # Arguments:
 #   <directory>: The path to the directory to scan for secrets.
 #   --dry-run: Optional. Perform a dry run without taking any action,

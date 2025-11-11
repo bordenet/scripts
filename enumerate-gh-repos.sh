@@ -1,14 +1,16 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------
 #
-# Script Name: enumerate_gh_repos.sh
+# Script Name: enumerate-gh-repos.sh
 #
 # Description: This script enumerates repositories within a specified GitHub
 #              Enterprise instance and organization. For each repository, it
 #              clones the repository, counts the lines of code, and retrieves
 #              the last push timestamp. The results are logged to a file.
 #
-# Usage: ./enumerate_gh_repos.sh <GitHub_API_Token>
+# Platform: Cross-platform
+#
+# Usage: ./enumerate-gh-repos.sh <GitHub_API_Token>
 #
 # Arguments:
 #   <GitHub_API_Token>: A personal access token with sufficient permissions to
