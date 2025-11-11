@@ -367,22 +367,26 @@ echo "--------------------------------------------------"
 if grep -qi microsoft /proc/version 2>/dev/null; then
     # winget updates
     printf "%-30s" "winget upgrade..."
-    powershell.exe -Command "winget upgrade --all --silent" > "$LOG_DIR/mu_winget.log" 2>&1 &
+    # Note: winget may require UAC elevation for package installs
+    # Use --accept-package-agreements, --accept-source-agreements, and --disable-interactivity
+    # to minimize prompts, but UAC may still block automation
+    powershell.exe -Command "winget upgrade --all --accept-package-agreements --accept-source-agreements --disable-interactivity 2>&1 | Out-String" > "$LOG_DIR/mu_winget.log" 2>&1 &
     pid=$!
     spinner $pid 600
     spinner_exit=$?
 
     if [ $spinner_exit -eq 124 ]; then
         echo "⏱ TIMEOUT"
-        ERRORS+=("winget upgrade timed out after 600s - see $LOG_DIR/mu_winget.log")
+        ERRORS+=("winget upgrade timed out after 600s - likely waiting for UAC prompt - see $LOG_DIR/mu_winget.log")
     else
         wait $pid 2>/dev/null
         winget_exit=$?
         if [ $winget_exit -eq 0 ]; then
             echo "✓"
         else
-            echo "✗"
-            ERRORS+=("winget upgrade failed - see $LOG_DIR/mu_winget.log")
+            echo "⚠"
+            # Don't treat as hard error - may need manual UAC approval
+            ERRORS+=("winget upgrade incomplete (exit: $winget_exit) - may need UAC approval - see $LOG_DIR/mu_winget.log")
         fi
     fi
 
