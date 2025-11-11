@@ -5,16 +5,19 @@
 #
 # Description: Comprehensive system update script for WSL + Windows environments.
 #              Updates apt, version managers (nvm, rbenv, rustup), Homebrew (optional),
-#              npm, pip in WSL, then triggers winget and Windows Update via PowerShell
-#              interop. Optimized for ARM64 architecture with native tools. Designed
-#              for daily manual execution with compact console output and actionable
-#              error reporting.
+#              npm, pip/pipx in WSL, then triggers winget and Windows Update via PowerShell
+#              interop with UAC elevation. Optimized for ARM64 architecture with native
+#              tools. Designed for daily manual execution with compact console output and
+#              actionable error reporting.
 #
-# Usage: ./mu.sh
+# Usage: ./mu.sh [--skip-windows-update]
+#
+# Options:
+#   --skip-windows-update    Skip Windows Update (winget will still run)
 #
 # Dependencies:
-#   WSL: apt, nvm (optional), rbenv (optional), rustup (optional), Homebrew (optional), npm, pip
-#   Windows: PowerShell, winget, PSWindowsUpdate module
+#   WSL: apt, nvm (optional), rbenv (optional), rustup (optional), Homebrew (optional), npm, pip, pipx (optional)
+#   Windows: PowerShell with UAC elevation, winget, PSWindowsUpdate module
 #
 # Author: Claude Code
 # Last Updated: 2025-01-10
@@ -31,6 +34,30 @@ set -o pipefail
 LOG_DIR="/tmp"
 LOG_RETENTION_HOURS=24
 ERRORS=()
+SKIP_WINDOWS_UPDATE=false
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --skip-windows-update)
+            SKIP_WINDOWS_UPDATE=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [--skip-windows-update]"
+            echo ""
+            echo "Options:"
+            echo "  --skip-windows-update    Skip Windows Update (winget will still run)"
+            echo "  -h, --help              Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
 
 # -----------------------------------------------------------------------------
 # Helper Functions
@@ -169,9 +196,13 @@ echo ""
 # Start timer
 start_time=$(date +%s)
 
-# Request sudo upfront
+# Request sudo upfront (with timeout to avoid hanging)
 echo "Requesting sudo privileges..."
-sudo -v
+if timeout 2 sudo -v 2>/dev/null; then
+    echo "✓ Sudo privileges granted"
+else
+    echo "⚠ Sudo authentication failed or timed out - some operations may require manual password entry"
+fi
 echo ""
 
 # Clean up old logs
@@ -289,38 +320,51 @@ else
     echo "⊘ npm not installed - skipping"
 fi
 
-# pip3 updates
+# pip3 updates - skip on externally-managed environments
 if command -v pip3 &> /dev/null; then
-    run_phase "pip3 upgrade" "$LOG_DIR/mu_pip3_upgrade.log" \
-        python3 -m pip install --upgrade pip || true
-
-    # Update all installed pip3 packages
-    printf "%-30s" "pip3 update packages..."
-    (
-        set +o pipefail  # Disable pipefail for this section
-        outdated=$(pip3 list --outdated --format=freeze 2>/dev/null | cut -d= -f1)
-        if [ -n "$outdated" ]; then
-            echo "$outdated" | xargs -n1 pip3 install --upgrade
-        fi
-    ) > "$LOG_DIR/mu_pip3_packages.log" 2>&1 &
-    pid=$!
-    spinner $pid 600
-    spinner_exit=$?
-
-    if [ $spinner_exit -eq 124 ]; then
-        echo "⏱ TIMEOUT"
-        ERRORS+=("pip3 package updates timed out after 600s - see $LOG_DIR/mu_pip3_packages.log")
+    # Check if this is an externally-managed environment by looking for the marker file
+    if [ -f "/usr/lib/python$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')/EXTERNALLY-MANAGED" ]; then
+        echo "⊘ pip3 externally-managed - use apt/pipx instead"
     else
-        wait $pid 2>/dev/null
-        if [ $? -eq 0 ]; then
-            echo "✓"
+        run_phase "pip3 upgrade" "$LOG_DIR/mu_pip3_upgrade.log" \
+            python3 -m pip install --upgrade pip || true
+
+        # Update all installed pip3 packages
+        printf "%-30s" "pip3 update packages..."
+        (
+            set +o pipefail  # Disable pipefail for this section
+            outdated=$(pip3 list --outdated --format=freeze 2>/dev/null | cut -d= -f1)
+            if [ -n "$outdated" ]; then
+                echo "$outdated" | xargs -n1 pip3 install --upgrade
+            fi
+        ) > "$LOG_DIR/mu_pip3_packages.log" 2>&1 &
+        pid=$!
+        spinner $pid 600
+        spinner_exit=$?
+
+        if [ $spinner_exit -eq 124 ]; then
+            echo "⏱ TIMEOUT"
+            ERRORS+=("pip3 package updates timed out after 600s - see $LOG_DIR/mu_pip3_packages.log")
         else
-            echo "✗"
-            ERRORS+=("pip3 package updates failed - see $LOG_DIR/mu_pip3_packages.log")
+            wait $pid 2>/dev/null
+            if [ $? -eq 0 ]; then
+                echo "✓"
+            else
+                echo "✗"
+                ERRORS+=("pip3 package updates failed - see $LOG_DIR/mu_pip3_packages.log")
+            fi
         fi
     fi
 else
     echo "⊘ pip3 not installed - skipping"
+fi
+
+# pipx updates (for externally-managed Python environments)
+if command -v pipx &> /dev/null; then
+    run_phase "pipx upgrade-all" "$LOG_DIR/mu_pipx_upgrade.log" \
+        pipx upgrade-all || true
+else
+    echo "⊘ pipx not installed - skipping"
 fi
 
 # pip (Python 2) updates if present
@@ -390,35 +434,83 @@ if grep -qi microsoft /proc/version 2>/dev/null; then
         fi
     fi
 
-    # Windows Update
-    printf "%-30s" "Windows Update..."
-    powershell.exe -Command "
-        # Install PSWindowsUpdate if not present
-        if (!(Get-Module -ListAvailable -Name PSWindowsUpdate)) {
-            Install-Module PSWindowsUpdate -Force -Scope CurrentUser -ErrorAction SilentlyContinue
-        }
-
-        # Import module
-        Import-Module PSWindowsUpdate -ErrorAction SilentlyContinue
-
-        # Run Windows Update
-        Get-WindowsUpdate -AcceptAll -Install -AutoReboot:\$false
-    " > "$LOG_DIR/mu_windows_update.log" 2>&1 &
-    pid=$!
-    spinner $pid 600
-    spinner_exit=$?
-
-    if [ $spinner_exit -eq 124 ]; then
-        echo "⏱ TIMEOUT"
-        ERRORS+=("Windows Update timed out after 600s - see $LOG_DIR/mu_windows_update.log")
+    # Windows Update (requires elevation)
+    if [ "$SKIP_WINDOWS_UPDATE" = true ]; then
+        echo "⊘ Windows Update skipped (--skip-windows-update)"
     else
-        wait $pid 2>/dev/null
-        wu_exit=$?
-        if [ $wu_exit -eq 0 ]; then
-            echo "✓"
+        printf "%-30s" "Windows Update..."
+
+        # Create a temporary PowerShell script
+        temp_ps_script=$(mktemp --suffix=.ps1)
+        win_ps_script=$(wslpath -w "$temp_ps_script")
+        win_log_file=$(wslpath -w "$LOG_DIR/mu_windows_update.log")
+
+        # Write the PowerShell script that will run elevated
+        cat > "$temp_ps_script" << 'PSEOF'
+param($LogFile)
+$ErrorActionPreference = "Continue"
+$output = @()
+
+try {
+    # Install PSWindowsUpdate if not present
+    if (!(Get-Module -ListAvailable -Name PSWindowsUpdate)) {
+        $output += "Installing PSWindowsUpdate module..."
+        Install-Module PSWindowsUpdate -Force -Scope CurrentUser
+    }
+
+    # Import module
+    Import-Module PSWindowsUpdate
+
+    # Run Windows Update
+    $updates = Get-WindowsUpdate -AcceptAll -Install -AutoReboot:$false
+    $output += $updates | Format-List | Out-String
+
+    if (!$updates) {
+        $output += "No updates available."
+    }
+}
+catch {
+    $output += "Error: $_"
+    $output += $_.ScriptStackTrace
+}
+
+$output | Out-File -FilePath $LogFile -Encoding UTF8
+PSEOF
+
+        # Use Start-Process with -Verb RunAs to elevate
+        # The outer powershell.exe launches the elevated one
+        powershell.exe -NoProfile -Command "
+            Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '$win_ps_script', '$win_log_file' -Verb RunAs -Wait -WindowStyle Normal
+        " > /dev/null 2>&1 &
+        pid=$!
+        spinner $pid 600
+        spinner_exit=$?
+
+        # Clean up
+        rm -f "$temp_ps_script"
+
+        if [ $spinner_exit -eq 124 ]; then
+            echo "⏱ TIMEOUT"
+            ERRORS+=("Windows Update timed out after 600s - see $LOG_DIR/mu_windows_update.log")
         else
-            echo "✗"
-            ERRORS+=("Windows Update failed - see $LOG_DIR/mu_windows_update.log")
+            wait $pid 2>/dev/null
+            wu_exit=$?
+
+            # Check the result
+            if [ $wu_exit -eq 0 ] && [ -f "$LOG_DIR/mu_windows_update.log" ]; then
+                if grep -qi "PermissionDenied\|AccessDenied\|elevated" "$LOG_DIR/mu_windows_update.log" 2>/dev/null; then
+                    echo "✗"
+                    ERRORS+=("Windows Update requires elevation - UAC prompt may have been dismissed - see $LOG_DIR/mu_windows_update.log")
+                elif grep -qi "Error:" "$LOG_DIR/mu_windows_update.log" 2>/dev/null; then
+                    echo "⚠"
+                    ERRORS+=("Windows Update completed with errors - see $LOG_DIR/mu_windows_update.log")
+                else
+                    echo "✓"
+                fi
+            else
+                echo "✗"
+                ERRORS+=("Windows Update failed - see $LOG_DIR/mu_windows_update.log")
+            fi
         fi
     fi
 else
