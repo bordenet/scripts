@@ -1,9 +1,11 @@
 #!/bin/bash
+[[ "$(uname -s)" != "Darwin" ]] && { echo "Error: This script requires macOS" >&2; exit 1; }
 
 # ┌───────────────────────────────────────────────┐
 # │         Ollama LAN Server Bootstrap          │
 # │     Auto-detects LAN IP and starts Ollama     │
 # │     Author: Matt Bordenet | macOS only        │
+# │     Platform: macOS only                      │
 # └───────────────────────────────────────────────┘
 
 # Show help message
