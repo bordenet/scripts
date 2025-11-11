@@ -512,7 +512,7 @@ Before you commit, verify you completed ALL of these:
 | start-ollama.sh | macOS | ✅ Done | Added check at line 2, updated banner |
 | setup-podman-for-terraform.sh | macOS | ✅ Done | Added check at line 2, updated banner |
 | cleanup-npm-global.sh | Cross-platform | N/A | Only uses npm commands |
-| resume-claude.sh | macOS | ❌ Needs Check | Needs review - likely uses macOS tools |
+| resume-claude.sh | macOS | ✅ Done | Added check at line 2, updated banner |
 | schedule-claude.sh | macOS | ❌ Needs Check | Needs review - likely uses macOS tools |
 | resume-at-0801.sh | macOS | ❌ Needs Check | Needs review - likely uses macOS tools |
 | squash-last-n.sh | Cross-platform | ✅ Done | Updated 2025-01-11: added --what-if default behavior |
