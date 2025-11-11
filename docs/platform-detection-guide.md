@@ -510,7 +510,7 @@ Before you commit, verify you completed ALL of these:
 | flush-dns-cache.sh | Cross-platform | ✅ Done | Updated 2025-01-11: supports macOS/WSL/Linux |
 | clone-brew.sh | macOS | ✅ Done | Added check at line 2, updated banner |
 | start-ollama.sh | macOS | ✅ Done | Added check at line 2, updated banner |
-| setup-podman-for-terraform.sh | macOS | ❌ Needs Check | Uses Homebrew (line 15) |
+| setup-podman-for-terraform.sh | macOS | ✅ Done | Added check at line 2, updated banner |
 | cleanup-npm-global.sh | Cross-platform | N/A | Only uses npm commands |
 | resume-claude.sh | macOS | ❌ Needs Check | Needs review - likely uses macOS tools |
 | schedule-claude.sh | macOS | ❌ Needs Check | Needs review - likely uses macOS tools |
