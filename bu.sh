@@ -70,14 +70,6 @@ mas outdated
 echo "Upgrading all outdated Mac App Store apps..."
 mas upgrade
 
-# --- Pip Updates ---
-echo "Upgrading pip for Python 2..."
-pip install --upgrade pip || true
-
-echo "Upgrading pip for Python 3..."
-#pip3 install --upgrade pip
-python3 -m pip install --upgrade pip --user || true
-
 # --- macOS Software Update ---
 echo "Checking for and installing macOS software updates..."
 sudo softwareupdate --all --install --force -R
