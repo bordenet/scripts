@@ -1,7 +1,7 @@
 #!/bin/sh
 # -----------------------------------------------------------------------------
 #
-# Script Name: setup_alpine.sh
+# Script Name: setup-alpine.sh
 #
 # Description: This script is executed INSIDE the Alpine Linux VM to perform
 #              an unattended installation. It partitions the disk, creates

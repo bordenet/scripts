@@ -22,16 +22,18 @@
 #   --suggest        - Analyze commit history and suggest logical ranges to squash.
 #   --message <msg>  - Optional. The message for the new squashed commit.
 #                      Defaults to "Squash of commits <START>-<END>".
-#   --repo <url>     - Optional. If provided, clones the repo into a temporary 
+#   --repo <url>     - Optional. If provided, clones the repo into a temporary
 #                      directory to operate on.
-#   --dry-run        - Optional. If provided, the script will only print the
-#                      actions it would take without performing the rebase.
-#   --force          - Bypass the interactive confirmation prompt.
+#   --what-if        - DEFAULT BEHAVIOR. Show what would happen without executing.
+#   --force          - Execute the rebase without prompting. REQUIRED to actually perform changes.
 #   --verbose        - Enable verbose logging, printing each command as it executes.
 #   --help           - Show the help message.
 #
 # Example:
-#   # Squash commits 2 through 50 into a single commit in the current repo
+#   # Preview what would happen (default --what-if behavior)
+#   ./squash_commits.sh 2 50
+#
+#   # Actually perform the squash (requires --force)
 #   ./squash_commits.sh 2 50 --force
 #
 #   # Get suggestions for squashing from a remote repository
@@ -77,10 +79,12 @@ usage() {
   --suggest        Analyze commit history and suggest logical ranges to squash.
   --message <msg>  Optional message for the squashed commit.
   --repo <url>     Optional. If provided, clones the repo into a temporary directory.
-  --dry-run        Preview actions without executing rebase.
-  --force          Bypass the interactive confirmation prompt.
+  --what-if        DEFAULT. Preview actions without executing (can be explicit).
+  --force          REQUIRED to actually execute the rebase.
   --verbose        Enable verbose logging.
   --help           Show this help message."
+  echo
+  echo "IMPORTANT: This script defaults to --what-if mode. Use --force to actually execute."
 }
 
 abort() {
@@ -94,7 +98,7 @@ main() {
   ACTION="squash"
   COMMIT_MSG=""
   REPO_URL_PARAM=""
-  DRY_RUN=""
+  WHAT_IF="true"  # DEFAULT to what-if mode
   FORCE=""
   VERBOSE=""
   START=""
@@ -108,15 +112,15 @@ main() {
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --suggest) ACTION="suggest"; shift ;; 
-      --message) COMMIT_MSG="$2"; shift 2 ;; 
-      --repo) REPO_URL_PARAM="$2"; shift 2 ;; 
-      --dry-run) DRY_RUN="--dry-run"; shift ;; 
-      --force) FORCE="true"; shift ;; 
-      --verbose) VERBOSE="true"; shift ;; 
-      --help) usage; exit 0 ;; 
-      -*) echo "Unknown option: $1"; usage; exit 1 ;; 
-      *) POSITIONAL_ARGS+=("$1"); shift ;; 
+      --suggest) ACTION="suggest"; shift ;;
+      --message) COMMIT_MSG="$2"; shift 2 ;;
+      --repo) REPO_URL_PARAM="$2"; shift 2 ;;
+      --what-if) WHAT_IF="true"; shift ;;  # Explicit what-if (already default)
+      --force) WHAT_IF=""; FORCE="true"; shift ;;  # Disable what-if when --force is used
+      --verbose) VERBOSE="true"; shift ;;
+      --help) usage; exit 0 ;;
+      -*) echo "Unknown option: $1"; usage; exit 1 ;;
+      *) POSITIONAL_ARGS+=("$1"); shift ;;
     esac
   done
 
@@ -179,23 +183,29 @@ main() {
     abort "START ($START) must be less than END ($END)."
   fi
 
-  if [ "$DRY_RUN" = "--dry-run" ]; then
-    echo "🔎 DRY RUN MODE"
+  if [ "$WHAT_IF" = "true" ]; then
+    echo "🔎 WHAT-IF MODE (default behavior)"
+    echo ""
     echo "Would squash commits $START..$END into a single commit."
     echo "New commit message would be: \"$COMMIT_MSG\""
+    echo "Current commit count: $TOTAL_COMMITS"
     echo "Resulting commit count would be: $(( TOTAL_COMMITS - (END - START) ))"
-    echo "No changes made."
+    echo ""
+    echo "📋 Commits that would be squashed:"
+    git log --oneline --reverse HEAD~$END..HEAD~$((START-1))
+    echo ""
+    echo "⚠️  No changes made. Use --force to actually execute the rebase."
     exit 0
   fi
 
-  if [ -z "$FORCE" ]; then
-    echo "⚠️  You are about to squash commits $START..$END into one commit."
-    echo "This will rewrite history on branch '$BRANCH'."
-    read -rp "Proceed? [y/N] " CONFIRM
-    if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-      echo "Aborted."
-      exit 0
-    fi
+  # At this point, --force was specified
+  echo "⚠️  EXECUTING REBASE (--force mode)"
+  echo "You are about to squash commits $START..$END into one commit."
+  echo "This will rewrite history on branch '$BRANCH'."
+  read -rp "Final confirmation - Proceed? [y/N] " CONFIRM
+  if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+    echo "Aborted."
+    exit 0
   fi
 
   git rebase -i --root --quiet || true
