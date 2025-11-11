@@ -18,7 +18,7 @@
 
 # --- Configuration ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RESUME_SCRIPT="$SCRIPT_DIR/resume_claude.sh"
+RESUME_SCRIPT="$SCRIPT_DIR/resume-claude.sh"
 DRY_RUN=false
 PROMPT=""
 HOURS=0
