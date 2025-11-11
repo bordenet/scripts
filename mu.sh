@@ -198,8 +198,11 @@ start_time=$(date +%s)
 
 # Request sudo upfront (with timeout to avoid hanging)
 echo "Requesting sudo privileges..."
-if timeout 2 sudo -v 2>/dev/null; then
+if timeout 30 sudo -v; then
     echo "✓ Sudo privileges granted"
+    # Keep sudo alive in background
+    (while true; do sudo -n true; sleep 50; done 2>/dev/null) &
+    SUDO_KEEPER_PID=$!
 else
     echo "⚠ Sudo authentication failed or timed out - some operations may require manual password entry"
 fi
@@ -522,6 +525,11 @@ echo ""
 # -----------------------------------------------------------------------------
 # Summary
 # -----------------------------------------------------------------------------
+
+# Kill sudo keeper process if it exists
+if [ -n "$SUDO_KEEPER_PID" ]; then
+    kill $SUDO_KEEPER_PID 2>/dev/null || true
+fi
 
 # Calculate execution time
 end_time=$(date +%s)
