@@ -1,6 +1,7 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------
 # Quiet GitHub fetcher — updates all repos in a directory with minimal output
+# Platform: Cross-platform
 # -----------------------------------------------------------------------------
 
 set -euo pipefail

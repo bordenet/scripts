@@ -1,14 +1,16 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------
 #
-# Script Name: npm-global-cleanup.sh
+# Script Name: cleanup-npm-global.sh
 #
 # Description: This script helps manage and clean up globally installed npm
 #              packages. It lists all global packages, checks for known
 #              deprecated modules, and provides interactive prompts to
 #              uninstall packages and reinstall a core set of tools.
 #
-# Usage: ./npm-global-cleanup.sh
+# Platform: Cross-platform
+#
+# Usage: ./cleanup-npm-global.sh
 #
 # Dependencies: npm
 #

@@ -1,7 +1,7 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------
 #
-# Script Name: get_active_repos.sh
+# Script Name: get-active-repos.sh
 #
 # Description: This script identifies and lists active GitHub repositories
 #              within a specified organization. A repository is considered
@@ -9,7 +9,9 @@
 #              active repository, it reports its name, the last push
 #              timestamp, and the total lines of code.
 #
-# Usage: ./get_active_repos.sh
+# Platform: Cross-platform
+#
+# Usage: ./get-active-repos.sh
 #
 # Configuration:
 #   Before running, update the GITHUB_ORG, GITHUB_API_URL, and GITHUB_TOKEN
