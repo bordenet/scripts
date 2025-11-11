@@ -1,12 +1,14 @@
 #!/bin/bash
+[[ "$(uname -s)" != "Darwin" ]] && { echo "Error: This script requires macOS" >&2; exit 1; }
 #
-# Script: setup_podman_for_terraform.sh
+# Script: setup-podman-for-terraform.sh
 # Description: This script automates the setup and configuration of Podman
 #              to be used as a Docker-compatible environment for Terraform.
 #              It installs Podman (if necessary), initializes and starts the
 #              Podman virtual machine, and sets the DOCKER_HOST environment
 #              variable to enable Terraform's Docker provider to connect to Podman.
-# Usage: ./setup_podman_for_terraform.sh
+# Platform: macOS only
+# Usage: ./setup-podman-for-terraform.sh
 # Dependencies: Homebrew (macOS), Podman, Terraform (for usage context)
 #
 #!/bin/bash
