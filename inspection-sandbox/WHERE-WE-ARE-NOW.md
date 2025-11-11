@@ -37,7 +37,7 @@ id_rsa.pub        ✅ Gitignored (temporary runtime file)
 ```
 
 ### 3. ✅ Updated Setup Script
-`setup_sandbox.sh` now:
+`setup-sandbox.sh` now:
 - Creates `.env` from template if missing
 - Checks for keys in `.env`
 - Generates new keys if not found
@@ -57,7 +57,7 @@ Created:
 ### For Repository Cloners:
 ```bash
 cd inspection-sandbox
-./setup_sandbox.sh
+./setup-sandbox.sh
 ```
 
 **What happens:**
@@ -100,7 +100,7 @@ cd inspection-sandbox
 - `.env` - Runtime configuration (gitignored, auto-created)
 
 ### Updated Files:
-- `setup_sandbox.sh` - Key management, alpine-virt support
+- `setup-sandbox.sh` - Key management, alpine-virt support
 - `.gitignore` - Protects `.env`, PKI files
 - `../,gitignore` - Root-level protection
 
@@ -116,9 +116,9 @@ cd inspection-sandbox
 
 Setup tested successfully:
 ```bash
-./setup_sandbox.sh burn   # Clean slate
+./setup-sandbox.sh burn   # Clean slate
 rm -f .env id_rsa*         # Remove existing
-./setup_sandbox.sh         # Fresh setup
+./setup-sandbox.sh         # Fresh setup
 
 ✅ .env created
 ✅ SSH keys generated
@@ -168,7 +168,7 @@ From the October 1 debugging nightmare:
 1. ✅ Using alpine-virt (has 9p support)
 2. ✅ PKI security fixed (keys in `.env`)
 3. ✅ Clear documentation (SETUP-GUIDE.md)
-4. ✅ Automated key management (setup_sandbox.sh)
+4. ✅ Automated key management (setup-sandbox.sh)
 5. ✅ Test-before-lock approach (instructions updated)
 
 ## Summary

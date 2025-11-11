@@ -56,7 +56,7 @@ echo "✅ Running."
 echo -n "Checking for SSH public key... "
 if [ ! -f "$SSH_PUB_KEY" ]; then
     echo "❌ Not found at ${SSH_PUB_KEY}."
-    echo "Please run './setup_sandbox.sh' to generate the key pair."
+    echo "Please run './setup-sandbox.sh' to generate the key pair."
     exit 1
 fi
 echo "✅ Found."

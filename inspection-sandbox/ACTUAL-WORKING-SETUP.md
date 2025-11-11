@@ -12,7 +12,7 @@ brew install --cask utm
 
 ```bash
 cd ~/GitHub/scripts/inspection-sandbox
-./setup_sandbox.sh
+./setup-sandbox.sh
 ```
 
 This downloads Alpine ISO and generates SSH keys.

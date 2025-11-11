@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# squash_commits.sh
+# squash-commits.sh
 #
 # Interactively squash a range of commits in a Git repository.
 # This script can also analyze the history to suggest logical squash ranges.
@@ -11,8 +11,8 @@
 # prompts for confirmation before rewriting history.
 #
 # Usage:
-#   ./squash_commits.sh <START> <END> [options]
-#   ./squash_commits.sh --suggest [options]
+#   ./squash-commits.sh <START> <END> [options]
+#   ./squash-commits.sh --suggest [options]
 #
 # Arguments:
 #   <START>          - The starting commit index to squash (e.g., 2).
@@ -31,13 +31,13 @@
 #
 # Example:
 #   # Preview what would happen (default --what-if behavior)
-#   ./squash_commits.sh 2 50
+#   ./squash-commits.sh 2 50
 #
 #   # Actually perform the squash (requires --force)
-#   ./squash_commits.sh 2 50 --force
+#   ./squash-commits.sh 2 50 --force
 #
 #   # Get suggestions for squashing from a remote repository
-#   ./squash_commits.sh --suggest --repo https://github.com/bordenet/RecipeArchive
+#   ./squash-commits.sh --suggest --repo https://github.com/bordenet/RecipeArchive
 #
 # Note:
 # This script performs a history-rewriting operation. Be very careful when

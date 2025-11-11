@@ -36,7 +36,7 @@ echo "========================================"
 echo -n "Checking for existing VM named '${VM_NAME}'... "
 if utmctl status "${VM_NAME}" &>/dev/null; then
     echo "❌ Found."
-    echo "A VM with this name already exists. To recreate it, please delete the existing VM in UTM first, or run './setup_sandbox.sh burn'."
+    echo "A VM with this name already exists. To recreate it, please delete the existing VM in UTM first, or run './setup-sandbox.sh burn'."
     exit 1
 fi
 echo "✅ Not found."
@@ -44,7 +44,7 @@ echo "✅ Not found."
 echo -n "Checking for Alpine Linux ISO... "
 if [ ! -f "${ISO_PATH}" ]; then
     echo "❌ Not found at: ${ISO_PATH}"
-    echo "Please run './setup_sandbox.sh' first to download it."
+    echo "Please run './setup-sandbox.sh' first to download it."
     exit 1
 fi
 echo "✅ Found."

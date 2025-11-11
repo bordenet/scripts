@@ -1,7 +1,7 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------
 #
-# Script Name: reset_all_repos.sh
+# Script Name: reset-all-repos.sh
 #
 # Description: This script automates the process of resetting multiple Git
 #              repositories to match their remote main/master branch. It scans
@@ -9,7 +9,7 @@
 #              reset, discarding all local changes. Features include
 #              interactive confirmation, a progress bar, and time estimation.
 #
-# Usage: ./reset_all_repos.sh [options] [directory_path]
+# Usage: ./reset-all-repos.sh [options] [directory_path]
 #
 # Arguments:
 #   directory_path:   Target directory to search for repositories.

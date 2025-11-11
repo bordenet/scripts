@@ -64,7 +64,7 @@ if [ -f "${SCRIPT_DIR}/alpine.iso" ]; then
     size=$(ls -lh "${SCRIPT_DIR}/alpine.iso" | awk '{print $5}')
     echo -e "${GREEN}✅ Downloaded (${size})${NC}"
 else
-    echo -e "${RED}❌ Not found${NC} - Run: ./setup_sandbox.sh"
+    echo -e "${RED}❌ Not found${NC} - Run: ./setup-sandbox.sh"
 fi
 
 # Check for SSH key
@@ -72,7 +72,7 @@ echo -n "SSH Key: "
 if [ -f "${SSH_KEY}" ]; then
     echo -e "${GREEN}✅ Generated${NC}"
 else
-    echo -e "${RED}❌ Not found${NC} - Run: ./setup_sandbox.sh"
+    echo -e "${RED}❌ Not found${NC} - Run: ./setup-sandbox.sh"
 fi
 
 # Check for VM
@@ -172,7 +172,7 @@ elif ! $vm_exists; then
     echo -e "${YELLOW}⚠️  VM not created yet${NC}"
     echo ""
     echo "Next steps:"
-    echo "  1. ./setup_sandbox.sh (if not done)"
+    echo "  1. ./setup-sandbox.sh (if not done)"
     echo "  2. ./create-vm.sh"
     echo "  3. ./provision-vm.sh"
 else

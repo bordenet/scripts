@@ -89,8 +89,8 @@
 
 2. **Recreate VM from scratch:**
    ```bash
-   ./setup_sandbox.sh burn
-   ./setup_sandbox.sh
+   ./setup-sandbox.sh burn
+   ./setup-sandbox.sh
    # Then recreate VM in UTM with alpine-virt ISO
    ```
 
@@ -151,7 +151,7 @@ docker run -it --rm -v $(pwd)/shared:/shared:ro alpine:latest sh
 
 All setup scripts assume things work that don't:
 
-1. **setup_sandbox.sh** - Works fine
+1. **setup-sandbox.sh** - Works fine
 2. **create-vm.sh** - Needs Alpine virt ISO recommendation
 3. **provision-vm.sh** - Needs debugging steps for broken SSH
 4. **inspect.sh** - Can't work until SSH works

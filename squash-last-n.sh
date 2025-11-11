@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# squash_last_n.sh
+# squash-last-n.sh
 #
 # Squashes the last <N> commits into a single new commit using git reset --soft.
 # This method is non-interactive and avoids merge conflicts by taking the
 # final state of the code from the newest commit in the range.
 #
 # Usage:
-#   ./squash_last_n.sh <N> ["commit message"] [--force]
+#   ./squash-last-n.sh <N> ["commit message"] [--force]
 #
 # Arguments:
 #   <N>              - The number of recent commits to squash.
@@ -20,10 +20,10 @@
 #
 # Example:
 #   # Preview what would happen (default --what-if behavior)
-#   ./squash_last_n.sh 5
+#   ./squash-last-n.sh 5
 #
 #   # Actually perform the squash (requires --force)
-#   ./squash_last_n.sh 5 "Feat: Implement the new login flow" --force
+#   ./squash-last-n.sh 5 "Feat: Implement the new login flow" --force
 #
 
 set -euo pipefail
