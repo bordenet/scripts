@@ -28,13 +28,13 @@ curl -L -o alpine.iso "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_
 
 ```bash
 # Burn down the broken VM
-./setup_sandbox.sh burn
+./setup-sandbox.sh burn
 
 # Confirm it's gone
 utmctl list
 
 # Run setup again (downloads ISO, generates keys)
-./setup_sandbox.sh
+./setup-sandbox.sh
 ```
 
 ### Step 3: Create VM in UTM (Same as Before)

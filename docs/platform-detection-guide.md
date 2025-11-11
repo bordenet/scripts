@@ -106,7 +106,7 @@ grep -qi microsoft /proc/version 2>/dev/null || { echo "Error: This script requi
 
 **No check needed** - script should work on all platforms.
 
-**Example:** Git utility scripts like [squash_last_n.sh](../squash_last_n.sh) that only use git commands.
+**Example:** Git utility scripts like [squash-last-n.sh](../squash-last-n.sh) that only use git commands.
 
 ---
 

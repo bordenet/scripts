@@ -36,7 +36,7 @@ brew install --cask utm
 Run the setup script to download Alpine Linux and create SSH keys:
 
 ```bash
-./setup_sandbox.sh
+./setup-sandbox.sh
 ```
 
 This will:
@@ -147,7 +147,7 @@ The script will:
 
 ```
 inspection-sandbox/
-├── setup_sandbox.sh      # Initial setup (downloads ISO, generates keys)
+├── setup-sandbox.sh      # Initial setup (downloads ISO, generates keys)
 ├── create-vm.sh          # Instructions for creating the VM in UTM
 ├── provision-vm.sh       # Automates Alpine Linux configuration
 ├── inspect.sh            # Easy wrapper to analyze files
@@ -245,7 +245,7 @@ ssh -i id_rsa -p 2222 root@localhost
 utmctl status inspection-sandbox
 
 # Destroy everything and start over
-./setup_sandbox.sh burn
+./setup-sandbox.sh burn
 ```
 
 ## 🔥 Burn It All Down
@@ -253,7 +253,7 @@ utmctl status inspection-sandbox
 To completely destroy the sandbox and start fresh:
 
 ```bash
-./setup_sandbox.sh burn
+./setup-sandbox.sh burn
 ```
 
 This will:

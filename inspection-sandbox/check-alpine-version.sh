@@ -32,11 +32,11 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 # Get the currently configured version from the setup script.
-if [ -f "setup_sandbox.sh" ]; then
-    CURRENT_VERSION=$(grep "^ALPINE_VERSION=" setup_sandbox.sh | cut -d'"' -f2 | head -1)
-    echo "Current version configured in setup_sandbox.sh: $CURRENT_VERSION"
+if [ -f "setup-sandbox.sh" ]; then
+    CURRENT_VERSION=$(grep "^ALPINE_VERSION=" setup-sandbox.sh | cut -d'"' -f2 | head -1)
+    echo "Current version configured in setup-sandbox.sh: $CURRENT_VERSION"
 else
-    echo "Error: setup_sandbox.sh not found. Cannot determine current version."
+    echo "Error: setup-sandbox.sh not found. Cannot determine current version."
     exit 1
 fi
 
@@ -67,16 +67,16 @@ if [ -f "alpine.iso" ]; then
     LOCAL_SIZE=$(ls -lh alpine.iso | awk '{print $5}')
     echo "✅ Local alpine.iso exists ($LOCAL_SIZE)"
 else
-    echo "❌ No alpine.iso found - run ./setup_sandbox.sh to download"
+    echo "❌ No alpine.iso found - run ./setup-sandbox.sh to download"
 fi
 
 echo ""
 echo "📝 To update to a new version:"
-echo "   1. Edit setup_sandbox.sh"
+echo "   1. Edit setup-sandbox.sh"
 # The following line has been corrected to properly escape the double quote within the string.
 echo "   2. Change ALPINE_VERSION=\"$CURRENT_VERSION\" to the new version"
 echo "   3. Remove alpine.iso: rm alpine.iso"
-echo "   4. Run ./setup_sandbox.sh to download the new version"
+echo "   4. Run ./setup-sandbox.sh to download the new version"
 
 echo ""
 echo "🔗 Manual check: https://alpinelinux.org/downloads/"

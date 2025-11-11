@@ -4,7 +4,7 @@
 
 ```bash
 # 1. Run initial setup
-./setup_sandbox.sh
+./setup-sandbox.sh
 
 # 2. Create the VM (follow on-screen instructions)
 ./create-vm.sh
@@ -42,7 +42,7 @@ utmctl stop inspection-sandbox
 ssh -i id_rsa -p 2222 root@localhost
 
 # Destroy and start over
-./setup_sandbox.sh burn
+./setup-sandbox.sh burn
 ```
 
 ## ⚠️ First VM Setup Steps (Inside UTM)

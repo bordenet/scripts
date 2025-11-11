@@ -1,7 +1,7 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------
 #
-# Script Name: get-dormant-repos.sh
+# Script Name: list-dormant-repos.sh
 #
 # Description: This script identifies and lists dormant GitHub repositories
 #              within a specified organization. A repository is considered
@@ -11,7 +11,7 @@
 #
 # Platform: Cross-platform
 #
-# Usage: ./get-dormant-repos.sh
+# Usage: ./list-dormant-repos.sh
 #
 # Configuration:
 #   Before running, update the GITHUB_ORG, GITHUB_API_URL, and GITHUB_TOKEN

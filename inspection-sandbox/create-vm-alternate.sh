@@ -39,7 +39,7 @@ echo "======================================================"
 echo -n "Checking for Alpine ISO... "
 if [ ! -f "${ISO_PATH}" ]; then
     echo "❌ Not found at: ${ISO_PATH}"
-    echo "Please run './setup_sandbox.sh' first to download it."
+    echo "Please run './setup-sandbox.sh' first to download it."
     exit 1
 fi
 echo "✅ Found."

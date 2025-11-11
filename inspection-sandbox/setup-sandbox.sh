@@ -1,7 +1,7 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------
 #
-# Script Name: setup_sandbox.sh
+# Script Name: setup-sandbox.sh
 #
 # Description: This script sets up a secure sandbox environment for inspecting
 #              potentially malicious files. It handles dependency checking,
@@ -9,10 +9,10 @@
 #              generating and managing SSH keys via a .env file.
 #
 # Usage:
-#   ./setup_sandbox.sh        - Run the default setup process.
-#   ./setup_sandbox.sh burn   - Destroy the entire sandbox environment.
-#   ./setup_sandbox.sh test   - Run a test of the sandbox environment.
-#   ./setup_sandbox.sh start  - Start the sandbox VM.
+#   ./setup-sandbox.sh        - Run the default setup process.
+#   ./setup-sandbox.sh burn   - Destroy the entire sandbox environment.
+#   ./setup-sandbox.sh test   - Run a test of the sandbox environment.
+#   ./setup-sandbox.sh start  - Start the sandbox VM.
 #
 # Author: Gemini
 #

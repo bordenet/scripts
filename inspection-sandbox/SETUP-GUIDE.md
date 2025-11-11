@@ -31,7 +31,7 @@ Previous attempts failed because:
 
 ```bash
 cd ~/GitHub/scripts/inspection-sandbox
-./setup_sandbox.sh
+./setup-sandbox.sh
 ```
 
 This created:
@@ -318,8 +318,8 @@ ssh -i id_rsa root@192.168.64.2
 
 ## Scripts Reference
 
-- `./setup_sandbox.sh` - Initial setup (downloads ISO, generates keys)
-- `./setup_sandbox.sh burn` - Destroys VM and cleans up
+- `./setup-sandbox.sh` - Initial setup (downloads ISO, generates keys)
+- `./setup-sandbox.sh burn` - Destroys VM and cleans up
 - `./status.sh` - Shows VM and SSH status
 - `./inspect.sh <file>` - Analyzes a file in the sandbox
 - `./provision-vm.sh` - Installs analysis tools in the VM (run once after setup)

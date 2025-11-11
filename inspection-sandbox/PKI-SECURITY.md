@@ -36,7 +36,7 @@ id_rsa.pub        # Temporary runtime file (extracted from .env)
 
 1. **Initial Setup:**
    ```bash
-   ./setup_sandbox.sh
+   ./setup-sandbox.sh
    ```
    - Creates `.env` from `.env.example` template
    - Generates fresh SSH key pair
@@ -46,7 +46,7 @@ id_rsa.pub        # Temporary runtime file (extracted from .env)
 
 2. **Subsequent Runs:**
    ```bash
-   ./setup_sandbox.sh
+   ./setup-sandbox.sh
    ```
    - Checks if keys exist in `.env`
    - If found: extracts to temporary files
@@ -65,7 +65,7 @@ When you clone this repo:
 1. **Run setup:**
    ```bash
    cd inspection-sandbox
-   ./setup_sandbox.sh
+   ./setup-sandbox.sh
    ```
 
 2. **What happens:**
@@ -142,7 +142,7 @@ Before committing:
 3. **Regenerate if corrupted:**
    ```bash
    rm .env id_rsa id_rsa.pub
-   ./setup_sandbox.sh
+   ./setup-sandbox.sh
    ```
 
 ### Accidentally Committed Keys?
@@ -156,7 +156,7 @@ Before committing:
 2. **Rotate keys:**
    ```bash
    rm .env id_rsa id_rsa.pub
-   ./setup_sandbox.sh
+   ./setup-sandbox.sh
    ```
 
 3. **Update VM:**
@@ -170,7 +170,7 @@ Before committing:
 Repository (git)
 ├── .env.example          ✅ Committed (template only)
 ├── .gitignore            ✅ Committed (protects secrets)
-├── setup_sandbox.sh      ✅ Committed (key generation logic)
+├── setup-sandbox.sh      ✅ Committed (key generation logic)
 └── [other files]         ✅ Committed
 
 Local Directory (gitignored)
