@@ -9,15 +9,19 @@
 #              reset, discarding all local changes. Features include
 #              interactive confirmation, a progress bar, and time estimation.
 #
-# Usage: ./reset_all_repos.sh [-f|--force] [directory_path]
+# Usage: ./reset_all_repos.sh [options] [directory_path]
 #
 # Arguments:
-#   -f, --force:      Skip confirmation prompt and execute immediately.
 #   directory_path:   Target directory to search for repositories.
 #                     Defaults to the current directory.
 #
+# Options:
+#   --what-if:        DEFAULT BEHAVIOR. Show what would happen without executing.
+#   --force:          REQUIRED to actually execute the reset.
+#   --help:           Show this help message.
+#
 # WARNING: This script performs a hard reset and will discard ALL local
-#          changes in the repositories it processes. Use with caution.
+#          changes in the repositories it processes. Use with EXTREME caution.
 #
 # Author: Gemini
 #
@@ -29,14 +33,40 @@
 start_time=$(date +%s)
 
 # Parse command line arguments
+WHAT_IF="true"  # DEFAULT to what-if mode
 FORCE=false
 SEARCH_DIR="."
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --what-if)
+      WHAT_IF="true"
+      shift
+      ;;
     -f|--force)
+      WHAT_IF=""
       FORCE=true
       shift
+      ;;
+    --help)
+      echo "Usage: $0 [options] [directory_path]"
+      echo ""
+      echo "Arguments:"
+      echo "  directory_path    Target directory to search for repositories (default: current directory)"
+      echo ""
+      echo "Options:"
+      echo "  --what-if         DEFAULT. Preview actions without executing."
+      echo "  --force           REQUIRED to actually execute the reset."
+      echo "  --help            Show this help message."
+      echo ""
+      echo "IMPORTANT: This script defaults to --what-if mode. Use --force to actually execute."
+      echo "WARNING: --force will perform a hard reset and discard ALL local changes!"
+      exit 0
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      echo "Use --help for usage information"
+      exit 1
       ;;
     *)
       SEARCH_DIR="$1"
@@ -125,19 +155,48 @@ display_gas_gauge() {
 
 log_message "Starting git reset script in directory: $SEARCH_DIR"
 
-# Prompt for confirmation if not in force mode.
-if [ "$FORCE" = false ]; then
-  echo -e "${BOLD}${DARK_RED}${WHITE_BACKGROUND}This script will discard all local changes in git repositories. Are you sure?${RESET} ${YELLOW}[y/N]${RESET} "
+# Find and count git repositories.
+repo_list=$(find "$SEARCH_DIR" -type d -name ".git")
+repo_count=$(echo "$repo_list" | wc -l)
+
+# What-if mode (default)
+if [ "$WHAT_IF" = "true" ]; then
+  echo "🔎 WHAT-IF MODE (default behavior)"
+  echo ""
+  echo "Would reset $repo_count git repositories in: $SEARCH_DIR"
+  echo ""
+  echo "📋 Repositories that would be affected:"
+  while read -r git_dir; do
+    repo_dir=$(dirname "$git_dir")
+    echo "  - $repo_dir"
+
+    # Show status if possible
+    if pushd "$repo_dir" > /dev/null 2>&1; then
+      branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/origin/||' || echo "main")
+      uncommitted=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+      if [ "$uncommitted" -gt 0 ]; then
+        echo "    ⚠️  Has $uncommitted uncommitted change(s)"
+      fi
+      popd > /dev/null
+    fi
+  done <<< "$repo_list"
+  echo ""
+  echo "⚠️  No changes made. Use --force to actually execute the reset."
+  echo "⚠️  WARNING: --force will DISCARD ALL LOCAL CHANGES!"
+  exit 0
+fi
+
+# Force mode - prompt for final confirmation
+if [ "$FORCE" = true ]; then
+  echo -e "${BOLD}${DARK_RED}${WHITE_BACKGROUND}⚠️  EXECUTING HARD RESET (--force mode) ⚠️${RESET}"
+  echo -e "${BOLD}${BRIGHT_RED}This will discard all local changes in $repo_count git repositories.${RESET}"
+  echo -e "${YELLOW}Final confirmation - Are you absolutely sure? [y/N]${RESET} "
   read -r response
   if [[ ! "$response" =~ ^[Yy]$ ]]; then
       echo "Operation cancelled."
       exit 0
   fi
 fi
-
-# Find and count git repositories.
-repo_list=$(find "$SEARCH_DIR" -type d -name ".git")
-repo_count=$(echo "$repo_list" | wc -l)
 
 # Display the total count before starting.
 printf "\033[2J"  # Clear the screen
