@@ -36,25 +36,38 @@ ERRORS=()
 # Helper Functions
 # -----------------------------------------------------------------------------
 
-# Spinner function for visual feedback
+# Spinner function for visual feedback with timeout
 spinner() {
     local pid=$1
+    local timeout_seconds=${2:-600}  # Default 10 minutes
     local delay=0.1
     local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local elapsed=0
+
     while ps -p "$pid" > /dev/null 2>&1; do
         local temp=${spinstr#?}
         printf " %c  " "$spinstr"
         spinstr=$temp${spinstr%"$temp"}
         sleep $delay
         printf "\b\b\b\b"
+
+        elapsed=$((elapsed + 1))
+        # Check timeout (elapsed * delay = seconds)
+        if [ $elapsed -gt $((timeout_seconds * 10)) ]; then
+            kill -9 $pid 2>/dev/null
+            printf "    \b\b\b\b"
+            return 124  # Timeout exit code
+        fi
     done
     printf "    \b\b\b\b"
+    return 0
 }
 
-# Run command with spinner and error capture
+# Run command with spinner, timeout, and error capture
 run_phase() {
     local phase_name=$1
     local log_file=$2
+    local timeout_seconds=600  # 10 minutes default
     shift 2
     local cmd=("$@")
 
@@ -64,11 +77,19 @@ run_phase() {
     "${cmd[@]}" > "$log_file" 2>&1 &
     local pid=$!
 
-    # Show spinner
-    spinner $pid
+    # Show spinner with timeout
+    spinner $pid $timeout_seconds
+    local spinner_exit=$?
+
+    # Check if timed out
+    if [ $spinner_exit -eq 124 ]; then
+        echo "⏱ TIMEOUT"
+        ERRORS+=("$phase_name timed out after ${timeout_seconds}s - see $log_file")
+        return 124
+    fi
 
     # Check exit status
-    wait $pid
+    wait $pid 2>/dev/null
     local exit_code=$?
 
     if [ $exit_code -eq 0 ]; then
@@ -79,6 +100,27 @@ run_phase() {
         ERRORS+=("$phase_name failed (exit code: $exit_code) - see $log_file")
         return 1
     fi
+}
+
+# Wait for PID with timeout
+wait_with_timeout() {
+    local pid=$1
+    local timeout_seconds=${2:-600}  # Default 10 minutes
+    local elapsed=0
+    local delay=0.1
+
+    while ps -p "$pid" > /dev/null 2>&1; do
+        sleep $delay
+        elapsed=$((elapsed + 1))
+        # Check timeout (elapsed * delay = seconds)
+        if [ $elapsed -gt $((timeout_seconds * 10)) ]; then
+            kill -9 $pid 2>/dev/null
+            return 124  # Timeout exit code
+        fi
+    done
+
+    wait $pid 2>/dev/null
+    return $?
 }
 
 # Clean up old logs
@@ -195,13 +237,20 @@ if [ -d "$HOME/.nvm" ]; then
         cd "$NVM_DIR" && git fetch --tags origin && git checkout `git describe --abbrev=0 --tags --match "v[0-9]*" $(git rev-list --tags --max-count=1)` && \. "$NVM_DIR/nvm.sh"
     ) > "$LOG_DIR/mu_nvm.log" 2>&1 &
     pid=$!
-    spinner $pid
-    wait $pid
-    if [ $? -eq 0 ]; then
-        echo "✓"
+    spinner $pid 600
+    spinner_exit=$?
+
+    if [ $spinner_exit -eq 124 ]; then
+        echo "⏱ TIMEOUT"
+        ERRORS+=("nvm update timed out after 600s - see $LOG_DIR/mu_nvm.log")
     else
-        echo "✗"
-        ERRORS+=("nvm update failed - see $LOG_DIR/mu_nvm.log")
+        wait $pid 2>/dev/null
+        if [ $? -eq 0 ]; then
+            echo "✓"
+        else
+            echo "✗"
+            ERRORS+=("nvm update failed - see $LOG_DIR/mu_nvm.log")
+        fi
     fi
 else
     echo "⊘ nvm not installed - skipping"
@@ -255,13 +304,20 @@ if command -v pip3 &> /dev/null; then
         fi
     ) > "$LOG_DIR/mu_pip3_packages.log" 2>&1 &
     pid=$!
-    spinner $pid
-    wait $pid
-    if [ $? -eq 0 ]; then
-        echo "✓"
+    spinner $pid 600
+    spinner_exit=$?
+
+    if [ $spinner_exit -eq 124 ]; then
+        echo "⏱ TIMEOUT"
+        ERRORS+=("pip3 package updates timed out after 600s - see $LOG_DIR/mu_pip3_packages.log")
     else
-        echo "✗"
-        ERRORS+=("pip3 package updates failed - see $LOG_DIR/mu_pip3_packages.log")
+        wait $pid 2>/dev/null
+        if [ $? -eq 0 ]; then
+            echo "✓"
+        else
+            echo "✗"
+            ERRORS+=("pip3 package updates failed - see $LOG_DIR/mu_pip3_packages.log")
+        fi
     fi
 else
     echo "⊘ pip3 not installed - skipping"
@@ -281,13 +337,20 @@ if command -v pip &> /dev/null && [[ $(pip --version) == *"python 2"* ]]; then
         fi
     ) > "$LOG_DIR/mu_pip_packages.log" 2>&1 &
     pid=$!
-    spinner $pid
-    wait $pid
-    if [ $? -eq 0 ]; then
-        echo "✓"
+    spinner $pid 600
+    spinner_exit=$?
+
+    if [ $spinner_exit -eq 124 ]; then
+        echo "⏱ TIMEOUT"
+        ERRORS+=("pip package updates timed out after 600s - see $LOG_DIR/mu_pip_packages.log")
     else
-        echo "✗"
-        ERRORS+=("pip package updates failed - see $LOG_DIR/mu_pip_packages.log")
+        wait $pid 2>/dev/null
+        if [ $? -eq 0 ]; then
+            echo "✓"
+        else
+            echo "✗"
+            ERRORS+=("pip package updates failed - see $LOG_DIR/mu_pip_packages.log")
+        fi
     fi
 fi
 
@@ -306,15 +369,21 @@ if grep -qi microsoft /proc/version 2>/dev/null; then
     printf "%-30s" "winget upgrade..."
     powershell.exe -Command "winget upgrade --all --silent" > "$LOG_DIR/mu_winget.log" 2>&1 &
     pid=$!
-    spinner $pid
-    wait $pid
-    winget_exit=$?
+    spinner $pid 600
+    spinner_exit=$?
 
-    if [ $winget_exit -eq 0 ]; then
-        echo "✓"
+    if [ $spinner_exit -eq 124 ]; then
+        echo "⏱ TIMEOUT"
+        ERRORS+=("winget upgrade timed out after 600s - see $LOG_DIR/mu_winget.log")
     else
-        echo "✗"
-        ERRORS+=("winget upgrade failed - see $LOG_DIR/mu_winget.log")
+        wait $pid 2>/dev/null
+        winget_exit=$?
+        if [ $winget_exit -eq 0 ]; then
+            echo "✓"
+        else
+            echo "✗"
+            ERRORS+=("winget upgrade failed - see $LOG_DIR/mu_winget.log")
+        fi
     fi
 
     # Windows Update
@@ -332,15 +401,21 @@ if grep -qi microsoft /proc/version 2>/dev/null; then
         Get-WindowsUpdate -AcceptAll -Install -AutoReboot:\$false
     " > "$LOG_DIR/mu_windows_update.log" 2>&1 &
     pid=$!
-    spinner $pid
-    wait $pid
-    wu_exit=$?
+    spinner $pid 600
+    spinner_exit=$?
 
-    if [ $wu_exit -eq 0 ]; then
-        echo "✓"
+    if [ $spinner_exit -eq 124 ]; then
+        echo "⏱ TIMEOUT"
+        ERRORS+=("Windows Update timed out after 600s - see $LOG_DIR/mu_windows_update.log")
     else
-        echo "✗"
-        ERRORS+=("Windows Update failed - see $LOG_DIR/mu_windows_update.log")
+        wait $pid 2>/dev/null
+        wu_exit=$?
+        if [ $wu_exit -eq 0 ]; then
+            echo "✓"
+        else
+            echo "✗"
+            ERRORS+=("Windows Update failed - see $LOG_DIR/mu_windows_update.log")
+        fi
     fi
 else
     echo "⊘ Not running in WSL - skipping Windows updates"
