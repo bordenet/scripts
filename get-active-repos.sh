@@ -30,6 +30,68 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
+# --- Help Function ---
+show_help() {
+    cat << EOF
+NAME
+    get-active-repos.sh - Identify and list active GitHub repositories
+
+SYNOPSIS
+    get-active-repos.sh [OPTIONS]
+
+DESCRIPTION
+    Identifies and lists active GitHub repositories within a specified organization.
+    A repository is considered active if it has had a push within the last year.
+    For each active repository, reports its name, last push timestamp, and total
+    lines of code.
+
+OPTIONS
+    -h, --help
+        Display this help message and exit.
+
+PLATFORM
+    Cross-platform (macOS, Linux, WSL)
+
+CONFIGURATION
+    Before running, update these variables within the script:
+    • GITHUB_ORG - GitHub organization name
+    • GITHUB_API_URL - GitHub API URL (for GitHub Enterprise)
+    • GITHUB_TOKEN - Personal access token with repository read permissions
+
+DEPENDENCIES
+    • curl - For API requests
+    • jq - For JSON parsing
+    • git - For cloning repositories
+    • date - For date calculations
+
+EXAMPLES
+    # List all active repositories
+    ./get-active-repos.sh
+
+OUTPUT FORMAT
+    Repo    Last-Pushed    Lines-of-Code
+
+NOTES
+    This script clones each active repository to count lines of code, which may
+    take considerable time for organizations with many repositories.
+
+AUTHOR
+    Gemini
+
+SEE ALSO
+    list-dormant-repos.sh, enumerate-gh-repos.sh
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+case "${1:-}" in
+    -h|--help)
+        show_help
+        ;;
+esac
+
 # --- Configuration ---
 # !!! IMPORTANT !!!
 # UPDATE THESE VARIABLES BEFORE RUNNING THE SCRIPT

@@ -6,6 +6,61 @@
 
 set -euo pipefail
 
+# --- Help Function ---
+show_help() {
+    cat << EOF
+NAME
+    fetch-github-projects.sh - Update Git repositories with minimal output
+
+SYNOPSIS
+    fetch-github-projects.sh [OPTIONS] [DIRECTORY]
+    fetch-github-projects.sh --all [DIRECTORY]
+
+DESCRIPTION
+    Updates all Git repositories in a directory with minimal output. By default,
+    presents an interactive menu to select which repository to update. Can also
+    update all repositories automatically.
+
+    Checks if the script's own repository needs updating before processing other
+    repos to prevent running outdated versions.
+
+OPTIONS
+    --all
+        Skip interactive menu and update all repositories automatically.
+
+    -h, --help
+        Display this help message and exit.
+
+ARGUMENTS
+    DIRECTORY
+        Target directory containing Git repositories. Default: ~/GitHub
+
+PLATFORM
+    Cross-platform (macOS, Linux, WSL)
+
+EXAMPLES
+    # Interactive menu mode (default)
+    ./fetch-github-projects.sh
+
+    # Update all repos in default directory
+    ./fetch-github-projects.sh --all
+
+    # Update all repos in custom directory
+    ./fetch-github-projects.sh --all /path/to/repos
+
+    # Interactive menu for custom directory
+    ./fetch-github-projects.sh /path/to/repos
+
+AUTHOR
+    Claude Code
+
+SEE ALSO
+    git-pull(1), git-fetch(1)
+
+EOF
+    exit 0
+}
+
 # --- Helper Functions ---
 
 # Updates a single repository
@@ -68,15 +123,46 @@ TARGET_DIR="$HOME/GitHub"
 
 # Parse arguments
 if [ $# -gt 0 ]; then
-    if [[ "$1" == "--all" ]]; then
-        MENU_MODE=false
-        TARGET_DIR="${2:-$HOME/GitHub}"
-    else
-        TARGET_DIR="$1"
-    fi
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        --all)
+            MENU_MODE=false
+            TARGET_DIR="${2:-$HOME/GitHub}"
+            ;;
+        *)
+            TARGET_DIR="$1"
+            ;;
+    esac
 fi
 
 start_time=$(date +%s)
+
+# --- Self-Update Check ---
+# Check if this script's own repo needs updating
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -d "$SCRIPT_DIR/.git" ]; then
+    pushd "$SCRIPT_DIR" > /dev/null
+    git fetch origin > /dev/null 2>&1
+    LOCAL=$(git rev-parse @)
+    REMOTE=$(git rev-parse @{u} 2>/dev/null)
+
+    if [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
+        echo "⚠️  WARNING: The scripts repository itself has updates available!"
+        echo "   This script may be out of date. Consider updating it first:"
+        echo "   cd $SCRIPT_DIR && git pull origin main"
+        echo
+        read -t 15 -p "   Continue anyway? [y/N] (auto-No in 15s): " REPLY || REPLY="n"
+        if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+            echo "   Exiting. Please update the scripts repo first."
+            popd > /dev/null
+            exit 0
+        fi
+        echo
+    fi
+    popd > /dev/null
+fi
 
 echo "Updating Git repositories in: $TARGET_DIR"
 echo

@@ -59,6 +59,79 @@
 
 set -euo pipefail
 
+# --- Help Function ---
+show_help() {
+    cat << EOF
+NAME
+    backup-wsl-config.sh - Comprehensive WSL configuration backup utility
+
+SYNOPSIS
+    backup-wsl-config.sh [OPTIONS] [BACKUP_DIRECTORY]
+
+DESCRIPTION
+    Backs up important WSL configuration files and settings into a timestamped
+    zip archive. Includes system configs, user configs, shell configurations,
+    and package lists. Creates an interactive restore script inside the archive.
+
+OPTIONS
+    -h, --help
+        Display this help message and exit.
+
+ARGUMENTS
+    BACKUP_DIRECTORY
+        Custom backup location. Default: ~/wsl-backups/
+
+PLATFORM
+    WSL (Windows Subsystem for Linux) only
+
+WHAT IT BACKS UP
+    • System configs: /etc/wsl.conf, sudoers, hosts, fstab, hostname, DNS
+    • Shell configs: .bashrc, .zshrc, .bash_profile, .profile, .bash_aliases
+    • Git configuration: .gitconfig, .gitignore_global
+    • SSH configuration: config, known_hosts (keys excluded for security)
+    • Editor configs: vim, neovim, tmux
+    • Dev environments: nvm, rbenv, Python, Rust, Docker configs
+    • Package lists: APT, npm, pip, cargo, Homebrew, Snap, Flatpak
+    • System info: PATH, environment variables, OS details
+
+THE ARCHIVE CONTAINS
+    1. All backed up files in organized directories
+    2. restore.sh - Interactive menu-driven restoration script
+    3. README.md - Complete documentation
+
+RESTORATION
+    1. Extract archive: unzip wsl-backup-YYYYMMDD_HHMMSS.zip
+    2. Change directory: cd wsl-backup-YYYYMMDD_HHMMSS
+    3. Run restore script: ./restore.sh
+
+EXAMPLES
+    # Backup to default location
+    ./backup-wsl-config.sh
+
+    # Backup to custom directory
+    ./backup-wsl-config.sh /mnt/d/backups
+
+NOTES
+    SSH private keys are NOT included for security reasons.
+    Existing files are automatically backed up before overwriting during restore.
+
+AUTHOR
+    Claude Code
+
+SEE ALSO
+    wsl.conf(5), rsync(1), zip(1)
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+case "${1:-}" in
+    -h|--help)
+        show_help
+        ;;
+esac
+
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
