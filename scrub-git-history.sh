@@ -88,6 +88,9 @@ PATHS=()
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
+    -h|--help)
+      usage
+      ;;
     --file)
       [[ "$#" -lt 2 ]] && { echo "Error: Missing argument for --file." >&2; usage; }
       FILE="$2"

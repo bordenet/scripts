@@ -23,6 +23,55 @@
 # Exit on error, undefined variable, or pipe failure
 set -euo pipefail
 
+# --- Help Function ---
+show_help() {
+    cat << EOF
+NAME
+    cleanup-npm-global.sh - Manage and clean up globally installed npm packages
+
+SYNOPSIS
+    cleanup-npm-global.sh [OPTIONS]
+
+DESCRIPTION
+    Helps manage and clean up globally installed npm packages. Lists all global
+    packages, checks for known deprecated modules, and provides interactive prompts
+    to uninstall packages and reinstall a core set of tools.
+
+OPTIONS
+    -h, --help
+        Display this help message and exit.
+
+PLATFORM
+    Cross-platform (macOS, Linux, WSL)
+
+DEPENDENCIES
+    • npm - Node.js package manager
+
+EXAMPLES
+    # Run interactive cleanup
+    ./cleanup-npm-global.sh
+
+NOTES
+    This script provides interactive prompts before making any changes.
+    A log file is created at /tmp/npm-global-cleanup-YYYYMMDD-HHMMSS.log
+
+AUTHOR
+    Gemini
+
+SEE ALSO
+    npm(1), npm-list(1), npm-uninstall(1)
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+case "${1:-}" in
+    -h|--help)
+        show_help
+        ;;
+esac
+
 # --- Script Setup ---
 start_time=$(date +%s)
 LOG_FILE="/tmp/npm-global-cleanup-$(date +%Y%m%d-%H%M%S).log"

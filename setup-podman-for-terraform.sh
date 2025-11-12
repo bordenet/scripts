@@ -11,7 +11,54 @@
 # Usage: ./setup-podman-for-terraform.sh
 # Dependencies: Homebrew (macOS), Podman, Terraform (for usage context)
 #
-#!/bin/bash
+
+# --- Help Function ---
+show_help() {
+    cat << EOF
+NAME
+    setup-podman-for-terraform.sh - Configure Podman as Docker alternative for Terraform
+
+SYNOPSIS
+    setup-podman-for-terraform.sh [OPTIONS]
+
+DESCRIPTION
+    Automates the setup and configuration of Podman to be used as a Docker-compatible
+    environment for Terraform. Installs Podman (if necessary), initializes and starts
+    the Podman virtual machine, and sets the DOCKER_HOST environment variable.
+
+OPTIONS
+    -h, --help
+        Display this help message and exit.
+
+PLATFORM
+    macOS only - Script will exit with error on other platforms
+
+DEPENDENCIES
+    • Homebrew - Package manager
+    • Podman - Docker alternative
+    • Terraform - For usage context
+
+EXAMPLES
+    # Setup Podman for Terraform
+    ./setup-podman-for-terraform.sh
+
+NOTES
+    Sets DOCKER_HOST environment variable to enable Terraform's Docker provider
+    to connect to Podman.
+
+SEE ALSO
+    podman(1), terraform(1), brew(1)
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+case "${1:-}" in
+    -h|--help)
+        show_help
+        ;;
+esac
 
 echo "🔧 Checking for Homebrew..."
 if ! command -v brew >/dev/null 2>&1; then

@@ -19,6 +19,61 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
+# --- Help Function ---
+show_help() {
+    cat << EOF
+NAME
+    flush-dns-cache.sh - Flush DNS cache across multiple platforms
+
+SYNOPSIS
+    flush-dns-cache.sh [OPTIONS]
+
+DESCRIPTION
+    Flushes the DNS cache on macOS, Windows/WSL, and Linux. Automatically detects
+    the platform and uses the appropriate method for that system.
+
+OPTIONS
+    -h, --help
+        Display this help message and exit.
+
+PLATFORM
+    Cross-platform (macOS, Windows/WSL, Linux)
+
+EXAMPLES
+    # Flush DNS cache
+    ./flush-dns-cache.sh
+
+PLATFORM-SPECIFIC METHODS
+    macOS:
+        Uses dscacheutil and mDNSResponder
+
+    Windows/WSL:
+        Flushes both Windows DNS cache via PowerShell and WSL systemd-resolved
+
+    Linux:
+        Attempts multiple methods: systemd-resolved, nscd, dnsmasq
+
+NOTES
+    May require sudo privileges on some platforms.
+    On Windows, may require Administrator privileges.
+
+AUTHOR
+    Gemini (updated by Claude Code)
+
+SEE ALSO
+    dscacheutil(1), resolvectl(1), nscd(8), systemd-resolved(8)
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+case "${1:-}" in
+    -h|--help)
+        show_help
+        ;;
+esac
+
 # Start timer
 start_time=$(date +%s)
 

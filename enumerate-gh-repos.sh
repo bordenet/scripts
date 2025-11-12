@@ -32,6 +32,76 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
+# --- Help Function ---
+show_help() {
+    cat << EOF
+NAME
+    enumerate-gh-repos.sh - Enumerate and analyze GitHub repositories
+
+SYNOPSIS
+    enumerate-gh-repos.sh [OPTIONS] <GITHUB_API_TOKEN>
+
+DESCRIPTION
+    Enumerates repositories within a specified GitHub Enterprise instance and
+    organization. For each repository, clones it, counts the lines of code, and
+    retrieves the last push timestamp. Results are logged to a file.
+
+OPTIONS
+    -h, --help
+        Display this help message and exit.
+
+ARGUMENTS
+    GITHUB_API_TOKEN
+        A personal access token with sufficient permissions to access the
+        repositories in the specified GitHub Enterprise instance.
+
+PLATFORM
+    Cross-platform (macOS, Linux, WSL)
+
+CONFIGURATION
+    Before running, update these variables within the script:
+    • GITHUB_URL - GitHub Enterprise URL (e.g., https://github.example.com)
+    • GITHUB_ORG - GitHub organization name
+
+DEPENDENCIES
+    • curl - For API requests
+    • jq - For JSON parsing
+    • git - For cloning repositories
+    • mktemp - For temporary directory creation
+
+OUTPUT
+    Results are written to: github_enum.log
+    Format: repo    lines-of-code    last-push
+
+EXAMPLES
+    # Enumerate all repositories
+    ./enumerate-gh-repos.sh ghp_abc123xyz789
+
+    # Display help
+    ./enumerate-gh-repos.sh --help
+
+NOTES
+    This script clones each repository to count lines of code, which may take
+    considerable time for organizations with many repositories. A temporary
+    directory is created and cleaned up automatically on exit.
+
+AUTHOR
+    Matt Bordenet (Original), Gemini (Enhancements)
+
+SEE ALSO
+    get-active-repos.sh, list-dormant-repos.sh
+
+EOF
+    exit 0
+}
+
+# Parse arguments for help
+case "${1:-}" in
+    -h|--help)
+        show_help
+        ;;
+esac
+
 # --- Configuration ---
 # !!! IMPORTANT !!!
 # UPDATE THESE VARIABLES BEFORE RUNNING THE SCRIPT
@@ -45,6 +115,7 @@ LOG_FILE="github_enum.log"
 usage() {
     echo "Usage: $0 <GitHub API Token>"
     echo "Please provide a GitHub API token as an argument."
+    echo "Use --help for more information."
     exit 1
 }
 

@@ -29,6 +29,88 @@
 #
 # -----------------------------------------------------------------------------
 
+# --- Help Function ---
+show_help() {
+    cat << EOF
+NAME
+    reset-all-repos.sh - Reset multiple Git repositories to remote state
+
+SYNOPSIS
+    reset-all-repos.sh [OPTIONS] [DIRECTORY]
+
+DESCRIPTION
+    Automates the process of resetting multiple Git repositories to match their
+    remote main/master branch. Scans a specified directory for Git repositories
+    and performs a hard reset, discarding all local changes. Features include
+    interactive confirmation, a progress bar, and time estimation.
+
+    WARNING: This script performs a hard reset and will discard ALL local
+             changes in the repositories it processes. Use with EXTREME caution.
+
+OPTIONS
+    --what-if
+        DEFAULT BEHAVIOR. Show what would happen without executing.
+
+    -f, --force
+        REQUIRED to actually execute the reset. Includes final confirmation prompt.
+
+    -h, --help
+        Display this help message and exit.
+
+ARGUMENTS
+    DIRECTORY
+        Target directory to search for repositories. Default: current directory
+
+PLATFORM
+    Cross-platform (macOS, Linux, WSL)
+
+DEPENDENCIES
+    • git - For repository operations
+    • find - For locating repositories
+    • date - For timing calculations
+
+EXAMPLES
+    # Preview what would be reset (default behavior)
+    ./reset-all-repos.sh
+
+    # Preview with specific directory
+    ./reset-all-repos.sh ~/GitHub
+
+    # Actually execute the reset (requires confirmation)
+    ./reset-all-repos.sh --force
+
+    # Reset specific directory
+    ./reset-all-repos.sh --force ~/GitHub
+
+BEHAVIOR
+    Default Mode (--what-if):
+        • Shows all repositories that would be affected
+        • Displays uncommitted changes count
+        • No modifications made
+
+    Force Mode (--force):
+        • Requires final confirmation
+        • Performs git fetch origin
+        • Executes git reset --hard origin/[main|master]
+        • Runs git clean -fdx (removes untracked files)
+
+OUTPUT
+    Creates a log file: ./git_reset.log
+
+NOTES
+    This script defaults to --what-if mode to prevent accidental data loss.
+    You must explicitly use --force to execute the reset operations.
+
+AUTHOR
+    Gemini
+
+SEE ALSO
+    git-reset(1), git-clean(1), git-fetch(1)
+
+EOF
+    exit 0
+}
+
 # --- Script Setup ---
 start_time=$(date +%s)
 
@@ -48,20 +130,8 @@ while [[ $# -gt 0 ]]; do
       FORCE=true
       shift
       ;;
-    --help)
-      echo "Usage: $0 [options] [directory_path]"
-      echo ""
-      echo "Arguments:"
-      echo "  directory_path    Target directory to search for repositories (default: current directory)"
-      echo ""
-      echo "Options:"
-      echo "  --what-if         DEFAULT. Preview actions without executing."
-      echo "  --force           REQUIRED to actually execute the reset."
-      echo "  --help            Show this help message."
-      echo ""
-      echo "IMPORTANT: This script defaults to --what-if mode. Use --force to actually execute."
-      echo "WARNING: --force will perform a hard reset and discard ALL local changes!"
-      exit 0
+    -h|--help)
+      show_help
       ;;
     -*)
       echo "Unknown option: $1"

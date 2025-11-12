@@ -28,6 +28,57 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
+# --- Help Function ---
+show_help() {
+    cat << EOF
+NAME
+    bu.sh - Comprehensive macOS system update and cleanup
+
+SYNOPSIS
+    bu.sh [OPTIONS]
+
+DESCRIPTION
+    Performs a comprehensive system update and cleanup for macOS. Updates Homebrew,
+    npm, mas (Mac App Store), and pip packages. Cleans up Homebrew installations
+    and triggers macOS software updates.
+
+OPTIONS
+    -h, --help
+        Display this help message and exit.
+
+PLATFORM
+    macOS only - Script will exit with error on other platforms
+
+DEPENDENCIES
+    • Homebrew - Package manager
+    • npm - Node.js package manager
+    • mas - Mac App Store CLI
+    • pip - Python package manager
+
+EXAMPLES
+    # Run full system update
+    ./bu.sh
+
+NOTES
+    This script requires sudo privileges and will request them at startup.
+
+AUTHOR
+    Gemini
+
+SEE ALSO
+    brew(1), npm(1), mas(1), pip(1), softwareupdate(8)
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+case "${1:-}" in
+    -h|--help)
+        show_help
+        ;;
+esac
+
 # Start timer
 start_time=$(date +%s)
 
