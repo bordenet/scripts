@@ -1,5 +1,6 @@
 """Web interface for Codebase Reviewer."""
 
+import json
 import os
 import tempfile
 
@@ -124,6 +125,74 @@ def analyze():
 
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/prompts")
+def get_prompts():
+    """Get prompts by phase for display."""
+    repo_path = request.args.get("repo")
+
+    if not repo_path or repo_path not in analysis_cache:
+        return jsonify({"error": "No analysis found for this repository"}), 404
+
+    analysis = analysis_cache[repo_path]
+    if not analysis.prompts:
+        return jsonify({"error": "No prompts generated"}), 404
+
+    phase_names = {
+        0: "Documentation Review",
+        1: "Architecture Analysis",
+        2: "Implementation Deep-Dive",
+        3: "Development Workflow",
+        4: "Interactive Remediation",
+    }
+
+    # Build response with prompts by phase
+    phases = []
+    for phase_num in range(5):
+        phase_prompts = getattr(analysis.prompts, f"phase{phase_num}")
+        if not phase_prompts:
+            continue
+
+        prompts_data = []
+        for prompt in phase_prompts:
+            # Format as markdown for easy copy-paste
+            md_lines = [
+                f"# {prompt.title}\n",
+                f"\n**Objective:** {prompt.objective}\n",
+                "\n**Tasks:**\n",
+            ]
+            for task in prompt.tasks:
+                md_lines.append(f"- {task}\n")
+
+            md_lines.append(f"\n**Deliverable:** {prompt.deliverable}\n")
+
+            if prompt.dependencies:
+                md_lines.append(
+                    f"\n**Dependencies:** {', '.join(prompt.dependencies)}\n"
+                )
+
+            md_lines.append("\n**Context:**\n```json\n")
+            md_lines.append(json.dumps(prompt.context, indent=2))
+            md_lines.append("\n```\n")
+
+            prompts_data.append(
+                {
+                    "id": prompt.prompt_id,
+                    "title": prompt.title,
+                    "markdown": "".join(md_lines),
+                }
+            )
+
+        phases.append(
+            {
+                "phase_number": phase_num,
+                "phase_name": phase_names[phase_num],
+                "prompts": prompts_data,
+            }
+        )
+
+    return jsonify({"phases": phases})
 
 
 @app.route("/api/download-prompts")
