@@ -22,6 +22,7 @@ A collection of utility scripts for various tasks.
 | [`bu.sh`](./bu.sh) | Performs a comprehensive system update and cleanup for a macOS environment. |
 | [`flush-dns-cache.sh`](./flush-dns-cache.sh) | Flushes the DNS cache on macOS. |
 | [`cleanup-npm-global.sh`](./cleanup-npm-global.sh) | Helps manage and clean up globally installed npm packages. |
+| [`purge-identity.sh`](./purge-identity.sh) | Comprehensive macOS identity purge tool that discovers and permanently removes all traces of specified email identities from the system (keychain, browsers, Mail.app, SSH keys, cloud storage). |
 | [`setup-podman-for-terraform.sh`](./setup-podman-for-terraform.sh) | Automates the setup and configuration of Podman to be used as a Docker-compatible environment for Terraform. |
 
 ## Security & Analysis
