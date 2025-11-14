@@ -238,14 +238,7 @@
     <script>
         let currentAnalysis = null;
 
-        // Restore saved path on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            const savedPath = localStorage.getItem('lastRepoPath');
-            if (savedPath) {
-                document.getElementById('repoPath').value = savedPath;
-            }
-        });
-
+        // Define handleAnalyze FIRST so inline onclick/onkeypress can find it
         async function handleAnalyze() {
             const repoPathInput = document.getElementById('repoPath');
             const repoPath = repoPathInput.value.trim();
@@ -394,3 +387,19 @@
             const a = document.createElement('a');
             a.href = url;
             a.download = 'analysis.json';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+
+        // Restore saved path on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedPath = localStorage.getItem('lastRepoPath');
+            if (savedPath) {
+                document.getElementById('repoPath').value = savedPath;
+            }
+        });
+    </script>
+</body>
+</html>
