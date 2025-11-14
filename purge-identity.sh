@@ -1388,54 +1388,115 @@ process_identity() {
 delete_keychain_items() {
     local identity="$1"
     local deleted_count=0
+    local failed_count=0
 
     log "INFO" "Deleting keychain items for: $identity"
-
-    # Find all keychain items containing the identity
-    # Using security find-generic-password and find-internet-password
-
-    # Find internet passwords
-    local internet_items=$(security dump-keychain ~/Library/Keychains/login.keychain-db 2>/dev/null | \
-                          grep -B 4 "$identity" | grep "0x00000007" -A 3)
-
-    # Find and delete all matching keychain items
-    # Note: This is simplified - a full implementation would parse security dump-keychain output more carefully
-
-    # For safety, we'll use security delete-generic-password with specific matching
-    # This requires the service and account name
-
-    # Alternative approach: Use security dump-keychain and parse the output
-    # Then delete each item individually
-
     echo "  Scanning keychain for items matching: $identity"
 
-    # Try to delete generic passwords (apps, services)
-    local services=$(security dump-keychain ~/Library/Keychains/login.keychain-db 2>/dev/null | \
-                    grep -B 1 "\"acct\"<blob>=\"$identity\"" | \
-                    grep "\"svce\"" | \
-                    sed -E 's/.*"svce"<blob>="([^"]+)".*/\1/')
+    # Delete generic passwords (apps, services)
+    echo "    Searching for generic passwords..."
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
 
-    while IFS= read -r service; do
-        [[ -z "$service" ]] && continue
+        local service=$(echo "$line" | awk '{print $1}')
+        local account=$(echo "$line" | awk '{print $2}')
 
-        if security delete-generic-password -s "$service" -a "$identity" 2>/dev/null; then
-            log "INFO" "Deleted keychain item: $service ($identity)"
-            echo "    ✓ Deleted: $service"
+        if security delete-generic-password -s "$service" -a "$account" 2>/dev/null; then
+            log "INFO" "Deleted generic password: $service ($account)"
+            echo "      ✓ Deleted: $service"
             ((deleted_count++))
+        else
+            ((failed_count++))
+            log "WARN" "Failed to delete generic password: $service ($account)"
         fi
-    done <<< "$services"
+    done < <(security dump-keychain 2>/dev/null | \
+             awk -v email="$identity" '
+                 /^keychain:/ { keychain=$0 }
+                 /"acct"<blob>=/ {
+                     if ($0 ~ email) {
+                         acct=$0
+                         getline
+                         while (getline && !/^keychain:/ && !/^attributes:/) {
+                             if (/"svce"<blob>=/) {
+                                 gsub(/.*"svce"<blob>="/, "")
+                                 gsub(/".*/, "")
+                                 svce=$0
+                                 gsub(/.*"acct"<blob>="/, "", acct)
+                                 gsub(/".*/, "", acct)
+                                 print svce, acct
+                             }
+                         }
+                     }
+                 }
+             ')
 
-    # Try to delete internet passwords (websites)
-    # This is more complex as we need server name, account, etc.
-    # For now, report that manual cleanup may be needed
+    # Delete internet passwords (websites, email accounts)
+    echo "    Searching for internet passwords..."
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
 
+        local server=$(echo "$line" | awk '{print $1}')
+        local account=$(echo "$line" | awk '{print $2}')
+
+        if security delete-internet-password -s "$server" -a "$account" 2>/dev/null; then
+            log "INFO" "Deleted internet password: $server ($account)"
+            echo "      ✓ Deleted: $server"
+            ((deleted_count++))
+        else
+            ((failed_count++))
+            log "WARN" "Failed to delete internet password: $server ($account)"
+        fi
+    done < <(security dump-keychain 2>/dev/null | \
+             awk -v email="$identity" '
+                 /"acct"<blob>=/ {
+                     if ($0 ~ email) {
+                         acct=$0
+                         gsub(/.*"acct"<blob>="/, "", acct)
+                         gsub(/".*/, "", acct)
+                         found=1
+                     }
+                 }
+                 found && /"srvr"<blob>=/ {
+                     gsub(/.*"srvr"<blob>="/, "")
+                     gsub(/".*/, "")
+                     print $0, acct
+                     found=0
+                 }
+             ')
+
+    # Delete certificates matching the email
+    echo "    Searching for certificates..."
+    while IFS= read -r cert_hash; do
+        [[ -z "$cert_hash" ]] && continue
+
+        if security delete-certificate -Z "$cert_hash" 2>/dev/null; then
+            log "INFO" "Deleted certificate: $cert_hash"
+            echo "      ✓ Deleted certificate: ${cert_hash:0:16}..."
+            ((deleted_count++))
+        else
+            ((failed_count++))
+            log "WARN" "Failed to delete certificate: $cert_hash"
+        fi
+    done < <(security find-certificate -a -e "$identity" -Z 2>/dev/null | \
+             grep "^SHA-256 hash:" | awk '{print $3}')
+
+    echo
     if [[ $deleted_count -eq 0 ]]; then
-        echo "    No keychain items deleted automatically"
-        echo "    ${YELLOW}Note: Some keychain items may require manual deletion via Keychain Access.app${NC}"
-        add_error "Keychain items for $identity may require manual cleanup" \
-                  "Open Keychain Access.app and search for: $identity"
+        if [[ $failed_count -gt 0 ]]; then
+            echo "    ${YELLOW}⚠ Could not delete $failed_count keychain items (may require user interaction)${NC}"
+            add_error "Keychain items for $identity require manual cleanup" \
+                      "Open Keychain Access.app and search for: $identity"
+        else
+            echo "    ${GREEN}✓ No keychain items found for $identity${NC}"
+        fi
     else
-        log_success "Deleted $deleted_count keychain items"
+        echo "    ${GREEN}✓ Deleted $deleted_count keychain items${NC}"
+        if [[ $failed_count -gt 0 ]]; then
+            echo "    ${YELLOW}⚠ $failed_count items require manual deletion${NC}"
+            add_error "Some keychain items for $identity require manual cleanup" \
+                      "Open Keychain Access.app and search for: $identity"
+        fi
+        log "INFO" "Deleted $deleted_count keychain items, $failed_count failed"
     fi
 
     return 0
