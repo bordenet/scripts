@@ -1,5 +1,21 @@
 #!/bin/bash
 [[ "$(uname -s)" != "Darwin" ]] && { echo "Error: This script requires macOS" >&2; exit 1; }
+
+# Check bash version (need 4.0+ for associative arrays)
+if ((BASH_VERSINFO[0] < 4)); then
+    cat >&2 <<EOF
+Error: This script requires Bash 4.0 or later (found ${BASH_VERSION})
+
+macOS ships with Bash 3.2. Install Bash 4+ via Homebrew:
+  brew install bash
+
+Then run this script with the newer bash:
+  /usr/local/bin/bash purge-identity.sh
+
+Or add to your PATH and restart your shell.
+EOF
+    exit 1
+fi
 # -----------------------------------------------------------------------------
 #
 # Script Name: purge-identity.sh
@@ -45,7 +61,6 @@ set -o pipefail
 VERSION="1.0.0"
 LOG_DIR="/tmp"
 LOG_FILE=""
-START_TIME
 START_TIME=$(date +%s)
 TIMER_PID=""
 
@@ -355,7 +370,7 @@ LOGGING
     Logs are automatically cleaned up after 24 hours.
 
 EXAMPLES OF IDENTITIES
-    • Former employer accounts (matt.bordenet@oldcompany.com)
+    • Former employer accounts (user@oldcompany.com)
     • Deleted service accounts (user@deletedservice.com)
     • Deprecated personal emails (old.email@provider.com)
 
