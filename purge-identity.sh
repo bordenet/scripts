@@ -3,16 +3,27 @@
 
 # Check bash version (need 4.0+ for associative arrays)
 if ((BASH_VERSINFO[0] < 4)); then
+    # Try to find and re-exec with newer bash
+    for bash_path in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+        if [[ -x "$bash_path" ]]; then
+            exec "$bash_path" "$0" "$@"
+        fi
+    done
+
+    # If we get here, no newer bash was found
     cat >&2 <<EOF
 Error: This script requires Bash 4.0 or later (found ${BASH_VERSION})
 
 macOS ships with Bash 3.2. Install Bash 4+ via Homebrew:
   brew install bash
 
-Then run this script with the newer bash:
-  /usr/local/bin/bash purge-identity.sh
+Then either:
+  1. Add Homebrew bash to your PATH, OR
+  2. Run directly: \$(brew --prefix)/bin/bash $0
 
-Or add to your PATH and restart your shell.
+Homebrew installs bash to:
+  - Apple Silicon: /opt/homebrew/bin/bash
+  - Intel:         /usr/local/bin/bash
 EOF
     exit 1
 fi
@@ -398,10 +409,20 @@ EOF
 # -----------------------------------------------------------------------------
 
 parse_arguments() {
-    # First argument must be the email address
-    if [[ $# -eq 0 ]] || [[ "$1" == -* ]]; then
+    # No arguments? Show help
+    if [[ $# -eq 0 ]]; then
+        show_help
+    fi
+
+    # First argument must be the email address (not a flag)
+    if [[ "$1" == -* ]]; then
+        # Check if it's the help flag
+        if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+            show_help
+        fi
+
         cat >&2 << 'EOF'
-Error: Email address required
+Error: Email address required as first argument
 
 Usage: purge-identity.sh EMAIL [OPTIONS]
 

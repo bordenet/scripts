@@ -2,6 +2,12 @@
 
 This document contains project-specific guidelines and lessons learned for Claude Code when working in this repository.
 
+## User Environment
+
+- **All hardware is Apple Silicon** (ARM64 architecture)
+- Homebrew paths: `/opt/homebrew/` (not `/usr/local/`)
+- When suggesting paths, always use Apple Silicon defaults first
+
 
 ## Quality Standards for Code Delivery
 
