@@ -186,7 +186,7 @@
                 extracts testable claims, and validates them against actual implementation.
             </div>
 
-            <form id="analyzeForm">
+            <form id="analyzeForm" onsubmit="return false;">
                 <div class="form-group">
                     <label for="repoPath">Repository Path (absolute path)</label>
                     <input
@@ -198,7 +198,7 @@
                     >
                 </div>
 
-                <button type="submit" id="analyzeBtn">🚀 Analyze Repository</button>
+                <button type="button" id="analyzeBtn" onclick="handleAnalyze()">🚀 Analyze Repository</button>
             </form>
 
             <div class="progress" id="progress">
@@ -245,10 +245,7 @@
             }
         });
 
-        document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
+        async function handleAnalyze() {
             const repoPathInput = document.getElementById('repoPath');
             const repoPath = repoPathInput.value.trim();
 
@@ -309,9 +306,7 @@
                 repoPathInput.value = repoPath;
             }
 
-            // Prevent any form reset
-            return false;
-        });
+        }
 
         function displayResults(data) {
             const results = document.getElementById('results');
