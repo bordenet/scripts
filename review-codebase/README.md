@@ -42,16 +42,16 @@ Generates AI prompts in 5 progressive phases:
 cd review-codebase
 
 # Show help
-./setup-and-run.sh --help
+./setup.sh --help
 
 # Start web UI (opens at http://localhost:5000)
-./setup-and-run.sh
+./setup.sh
 
 # Analyze a repository via CLI
-./setup-and-run.sh /path/to/repository
+./setup.sh /path/to/repository
 
 # Force rebuild of environment
-./setup-and-run.sh --force-setup
+./setup.sh --force-setup
 ```
 
 The script automatically:
@@ -88,7 +88,7 @@ pip install -e .
 #### Basic Analysis
 ```bash
 # Using the automated script (recommended)
-./setup-and-run.sh /path/to/repo
+./setup.sh /path/to/repo
 
 # Or manually (if venv is activated)
 python -m codebase_reviewer analyze /path/to/repo
@@ -116,7 +116,7 @@ python -m codebase_reviewer prompts /path/to/repo --phase 0
 #### Start Web Server
 ```bash
 # Using the automated script (recommended)
-./setup-and-run.sh
+./setup.sh
 
 # Or manually (if venv is activated)
 python -m codebase_reviewer web
