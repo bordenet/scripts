@@ -34,7 +34,37 @@ Generates AI prompts in 5 progressive phases:
 - Architecture pattern detection and validation
 - Setup instruction validation
 
-## Installation
+## Quick Start (Recommended)
+
+**For non-Python engineers or one-time use**, use the automated setup script that handles all dependencies:
+
+```bash
+cd review-codebase
+
+# Show help
+./setup-and-run.sh --help
+
+# Start web UI (opens at http://localhost:5000)
+./setup-and-run.sh
+
+# Analyze a repository via CLI
+./setup-and-run.sh /path/to/repository
+
+# Force rebuild of environment
+./setup-and-run.sh --force-setup
+```
+
+The script automatically:
+- Detects and uses Python 3.9+
+- Creates and manages a virtual environment in `.venv/`
+- Installs all dependencies
+- Runs the tool in your chosen mode
+
+**No need to manually manage virtual environments!** The script handles everything for you.
+
+## Manual Installation (For Development)
+
+If you're developing or want manual control:
 
 ```bash
 # Clone the repository
@@ -57,7 +87,10 @@ pip install -e .
 
 #### Basic Analysis
 ```bash
-# Analyze a repository
+# Using the automated script (recommended)
+./setup-and-run.sh /path/to/repo
+
+# Or manually (if venv is activated)
 python -m codebase_reviewer analyze /path/to/repo
 
 # Analyze with output files
@@ -82,7 +115,10 @@ python -m codebase_reviewer prompts /path/to/repo --phase 0
 
 #### Start Web Server
 ```bash
-# Start web interface on default port (5000)
+# Using the automated script (recommended)
+./setup-and-run.sh
+
+# Or manually (if venv is activated)
 python -m codebase_reviewer web
 
 # Specify custom host and port
