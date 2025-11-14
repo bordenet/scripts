@@ -192,8 +192,9 @@
                     <input
                         type="text"
                         id="repoPath"
+                        name="repoPath"
                         placeholder="e.g., /home/user/my-project"
-                        required
+                        autocomplete="off"
                     >
                 </div>
 
@@ -246,6 +247,7 @@
 
         document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            e.stopPropagation();
 
             const repoPathInput = document.getElementById('repoPath');
             const repoPath = repoPathInput.value.trim();
@@ -253,7 +255,7 @@
             // Validate path is not empty
             if (!repoPath) {
                 alert('Please enter a repository path');
-                return;
+                return false;
             }
 
             // Save the path for persistence
@@ -306,6 +308,9 @@
                 // Ensure the input value is preserved
                 repoPathInput.value = repoPath;
             }
+
+            // Prevent any form reset
+            return false;
         });
 
         function displayResults(data) {
