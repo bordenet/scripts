@@ -44,8 +44,8 @@ set -o pipefail
 
 VERSION="1.0.0"
 LOG_DIR="/tmp"
-LOG_RETENTION_HOURS=24
 LOG_FILE=""
+START_TIME
 START_TIME=$(date +%s)
 TIMER_PID=""
 
@@ -68,7 +68,6 @@ declare -A IDENTITY_LOCATIONS     # email -> "location1,location2,..."
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'  # No Color
 BOLD='\033[1m'
@@ -77,7 +76,6 @@ BOLD='\033[1m'
 SAVE_CURSOR='\033[s'
 RESTORE_CURSOR='\033[u'
 MOVE_TO_TOP_RIGHT='\033[1;55H'
-CLEAR_LINE='\033[2K'
 
 # Preserved file patterns (NEVER delete these)
 PRESERVED_PATTERNS=(
@@ -92,7 +90,11 @@ PRESERVED_PATTERNS=(
 
 # Initialize logging system
 init_logging() {
-    local timestamp=$(date +%Y%m%d-%H%M%S)
+    local timestamp
+    timestamp=$(date +%Y%m%d-%H%M%S) || {
+        echo "ERROR: Failed to get timestamp" >&2
+        exit 1
+    }
     LOG_FILE="${LOG_DIR}/purge-identity-${timestamp}.log"
 
     # Create log file
@@ -117,9 +119,10 @@ init_logging() {
 log() {
     local level="$1"
     local message="$2"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
 
-    echo "[${timestamp}] [${level}] ${message}" >> "$LOG_FILE"
+    echo "[${timestamp}] [${level}] ${message}" >> "$LOG_FILE" 2>/dev/null || true
 
     # Also echo to console if verbose mode
     if [[ "$VERBOSE_MODE" == true ]]; then
@@ -170,7 +173,8 @@ start_timer() {
 
 # Update timer display in top-right corner
 update_timer_display() {
-    local current_time=$(date +%s)
+    local current_time
+    current_time=$(date +%s)
     local elapsed=$((current_time - START_TIME))
     local hours=$((elapsed / 3600))
     local minutes=$(((elapsed % 3600) / 60))
@@ -194,7 +198,8 @@ stop_timer() {
 
 # Get formatted elapsed time
 get_elapsed_time() {
-    local current_time=$(date +%s)
+    local current_time
+    current_time=$(date +%s)
     local elapsed=$((current_time - START_TIME))
     local hours=$((elapsed / 3600))
     local minutes=$(((elapsed % 3600) / 60))
@@ -532,6 +537,15 @@ add_discovered_identity() {
     # Skip empty emails
     [[ -z "$email" ]] && return
 
+    # Validate email format (basic sanitation - prevent command injection)
+    if [[ ! "$email" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        log "WARN" "Invalid email format detected, skipping: $email"
+        return
+    fi
+
+    # Sanitize email (remove any shell metacharacters just in case)
+    email="${email//[;<>\`\$\(\)]/}"
+
     # Increment total count
     if [[ -n "${DISCOVERED_IDENTITIES[$email]}" ]]; then
         DISCOVERED_IDENTITIES[$email]=$((DISCOVERED_IDENTITIES[$email] + 1))
@@ -812,7 +826,7 @@ scan_application_support() {
         log "DEBUG" "Scanning ${app}..."
 
         # Search for emails in plist, json, and text files (limited depth)
-        find "$app_dir" -maxdepth 3 -type f \( -name "*.plist" -o -name "*.json" -o -name "*.txt" \) 2>/dev/null | while read -r file; do
+        while IFS= read -r -d '' file; do
             # Skip preserved files
             is_preserved_file "$file" && continue
 
@@ -821,7 +835,7 @@ scan_application_support() {
             while IFS= read -r email; do
                 [[ -n "$email" ]] && add_discovered_identity "$email" "app_support:$app"
             done <<< "$emails"
-        done
+        done < <(find "$app_dir" -maxdepth 3 -type f \( -name "*.plist" -o -name "*.json" -o -name "*.txt" \) -print0 2>/dev/null)
     done
 
     log "INFO" "Application Support scan complete"
@@ -835,13 +849,13 @@ scan_ssh() {
     [[ ! -d "$ssh_dir" ]] && { log "DEBUG" "SSH directory not found"; return 0; }
 
     # Scan public keys for email comments
-    find "$ssh_dir" -name "*.pub" -type f 2>/dev/null | while read -r pubkey; do
+    while IFS= read -r -d '' pubkey; do
         # Public keys often end with email as comment
         local comment=$(tail -c 200 "$pubkey" 2>/dev/null | grep -oE "$EMAIL_PATTERN")
         if [[ -n "$comment" ]]; then
             add_discovered_identity "$comment" "ssh_key:$(basename "$pubkey")"
         fi
-    done
+    done < <(find "$ssh_dir" -name "*.pub" -type f -print0 2>/dev/null)
 
     # Check SSH config for potential identity hints
     local ssh_config="${ssh_dir}/config"
@@ -898,12 +912,12 @@ scan_cloud_storage() {
     # Google Drive (if installed)
     local gdrive_prefs="$HOME/Library/Application Support/Google/Drive"
     if [[ -d "$gdrive_prefs" ]]; then
-        find "$gdrive_prefs" -name "*.json" -o -name "*.db" 2>/dev/null | while read -r file; do
+        while IFS= read -r -d '' file; do
             local emails=$(strings "$file" 2>/dev/null | grep -oE "$EMAIL_PATTERN" | sort -u)
             while IFS= read -r email; do
                 [[ -n "$email" ]] && add_discovered_identity "$email" "google_drive_config"
             done <<< "$emails"
-        done
+        done < <(find "$gdrive_prefs" \( -name "*.json" -o -name "*.db" \) -print0 2>/dev/null)
     fi
 
     log "INFO" "Cloud storage scan complete"
@@ -1569,7 +1583,7 @@ delete_ssh_data() {
     local deleted_count=0
 
     # Find public keys with this identity as comment
-    find "$ssh_dir" -name "*.pub" -type f 2>/dev/null | while read -r pubkey; do
+    while IFS= read -r -d '' pubkey; do
         if grep -q "$identity" "$pubkey" 2>/dev/null; then
             local privkey="${pubkey%.pub}"
 
@@ -1588,7 +1602,7 @@ delete_ssh_data() {
                 log "INFO" "Skipped SSH key: $pubkey"
             fi
         fi
-    done
+    done < <(find "$ssh_dir" -name "*.pub" -type f -print0 2>/dev/null)
 
     # Remove entries from SSH config
     local ssh_config="${ssh_dir}/config"
