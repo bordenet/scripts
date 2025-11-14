@@ -122,7 +122,7 @@ Homebrew can run on macOS or Linux. If the script **requires** macOS-specific co
 
 UTM is a macOS virtualization tool → macOS-only
 
-**Example:** [inspect.sh](../inspection-sandbox/inspect.sh) uses `utmctl` → macOS-only
+**Example:** [inspect.sh](../analyze-malware-sandbox/inspect.sh) uses `utmctl` → macOS-only
 
 ---
 
@@ -553,39 +553,39 @@ Before you commit, verify you completed ALL of these:
 
 ---
 
-### inspection-sandbox/ Directory
+### analyze-malware-sandbox/ Directory
 
 | Script | Target Platform | Status | Notes |
 |--------|----------------|--------|-------|
-| inspection-sandbox/inspect.sh | macOS | ❌ Needs Check | Uses utmctl (line 100) |
-| inspection-sandbox/status.sh | macOS | ❌ Needs Check | Uses utmctl |
-| inspection-sandbox/create-vm.sh | macOS | ❌ Needs Check | Uses utmctl |
-| inspection-sandbox/create-vm-alternate.sh | macOS | ❌ Needs Check | Uses utmctl |
-| inspection-sandbox/setup-sandbox.sh | macOS | ❌ Needs Check | Uses utmctl |
-| inspection-sandbox/provision-vm.sh | macOS | ❌ Needs Check | SSH to VM |
-| inspection-sandbox/setup-alpine.sh | Linux | ❌ Needs Check | Runs inside Alpine VM |
-| inspection-sandbox/check-alpine-version.sh | Cross-platform | N/A | Only checks files |
-| inspection-sandbox/shared/analyze.sh | Linux | ❌ Needs Check | Runs inside Alpine VM, uses Alpine tools |
+| analyze-malware-sandbox/inspect.sh | macOS | ❌ Needs Check | Uses utmctl (line 100) |
+| analyze-malware-sandbox/status.sh | macOS | ❌ Needs Check | Uses utmctl |
+| analyze-malware-sandbox/create-vm.sh | macOS | ❌ Needs Check | Uses utmctl |
+| analyze-malware-sandbox/create-vm-alternate.sh | macOS | ❌ Needs Check | Uses utmctl |
+| analyze-malware-sandbox/setup-sandbox.sh | macOS | ❌ Needs Check | Uses utmctl |
+| analyze-malware-sandbox/provision-vm.sh | macOS | ❌ Needs Check | SSH to VM |
+| analyze-malware-sandbox/setup-alpine.sh | Linux | ❌ Needs Check | Runs inside Alpine VM |
+| analyze-malware-sandbox/check-alpine-version.sh | Cross-platform | N/A | Only checks files |
+| analyze-malware-sandbox/shared/analyze.sh | Linux | ❌ Needs Check | Runs inside Alpine VM, uses Alpine tools |
 
 ---
 
-### packet-capture/ Directory
+### capture-packets/ Directory
 
 | Script | Target Platform | Status | Notes |
 |--------|----------------|--------|-------|
-| packet-capture/capture.sh | macOS | ❌ Needs Check | Uses tcpdump - needs review if macOS-specific |
-| packet-capture/start-pcap-rotate.sh | macOS | ❌ Needs Check | Uses tcpdump - needs review |
-| packet-capture/stop-pcap-rotate.sh | macOS | ❌ Needs Check | Needs review |
-| packet-capture/compress-pcap-gzip.sh | Cross-platform | N/A | Only uses gzip |
-| packet-capture/compress-pcap-zstd.sh | Cross-platform | N/A | Only uses zstd |
+| capture-packets/capture.sh | macOS | ❌ Needs Check | Uses tcpdump - needs review if macOS-specific |
+| capture-packets/start-pcap-rotate.sh | macOS | ❌ Needs Check | Uses tcpdump - needs review |
+| capture-packets/stop-pcap-rotate.sh | macOS | ❌ Needs Check | Needs review |
+| capture-packets/compress-pcap-gzip.sh | Cross-platform | N/A | Only uses gzip |
+| capture-packets/compress-pcap-zstd.sh | Cross-platform | N/A | Only uses zstd |
 
 ---
 
-### secrets_in_source/ Directory
+### find-secrets-in-source--OLD/ Directory
 
 | Script | Target Platform | Status | Notes |
 |--------|----------------|--------|-------|
-| secrets_in_source/passhog-simple.sh | Cross-platform | N/A | Only uses git and grep |
+| find-secrets-in-source--OLD/passhog-simple.sh | Cross-platform | N/A | Only uses git and grep |
 
 ---
 
@@ -604,7 +604,7 @@ Before you commit, verify you completed ALL of these:
 - ✅ reset-all-repos.sh: Added --what-if default behavior, requires --force to execute
 - 🔄 Renamed all scripts from snake_case to kebab-case for consistency (bu.sh and mu.sh kept as-is)
 
-**Next Priority:** Start with remaining root directory scripts (bu.sh, clone-brew.sh) and inspection-sandbox scripts.
+**Next Priority:** Start with remaining root directory scripts (bu.sh, clone-brew.sh) and analyze-malware-sandbox scripts.
 
 ---
 

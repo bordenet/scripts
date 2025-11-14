@@ -751,9 +751,9 @@ analysis:
   strict_validation: false  # If true, fail on major drift
 
 storage:
-  cache_dir: ~/.codebase-reviewer/cache
-  results_dir: ~/.codebase-reviewer/results
-  db_path: ~/.codebase-reviewer/repositories.db
+  cache_dir: ~/.review-codebase/cache
+  results_dir: ~/.review-codebase/results
+  db_path: ~/.review-codebase/repositories.db
 
 web:
   host: 127.0.0.1
