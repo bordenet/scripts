@@ -656,14 +656,10 @@ scan_keychain() {
     # This matches what delete_keychain_items does
     local emails
     emails=$(echo "$keychain_dump" | \
-             awk -v pattern="$EMAIL_PATTERN" '
-                 /"acct"<blob>=/ {
-                     match($0, /"acct"<blob>="([^"]+)"/, arr)
-                     if (arr[1] ~ pattern) {
-                         print arr[1]
-                     }
-                 }
-             ' | sort -u)
+             grep '"acct"<blob>=' | \
+             sed -E 's/.*"acct"<blob>="([^"]+)".*/\1/' | \
+             grep -E "$EMAIL_PATTERN" | \
+             sort -u)
 
     # Also check certificates (deletable via security delete-certificate)
     local cert_emails
