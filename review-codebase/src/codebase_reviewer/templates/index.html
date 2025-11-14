@@ -146,6 +146,96 @@
             color: #666;
             font-size: 0.95em;
         }
+        .accordion {
+            margin-top: 20px;
+        }
+        .accordion-item {
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .accordion-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+        .accordion-header:hover {
+            background: #e9ecef;
+        }
+        .accordion-header.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .accordion-icon {
+            transition: transform 0.3s;
+        }
+        .accordion-icon.rotated {
+            transform: rotate(180deg);
+        }
+        .accordion-content {
+            display: none;
+            padding: 20px;
+            background: white;
+        }
+        .accordion-content.active {
+            display: block;
+        }
+        .prompt-item {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #667eea;
+        }
+        .prompt-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .prompt-item-title {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #333;
+        }
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .copy-btn:hover {
+            background: #218838;
+        }
+        .copy-btn.copied {
+            background: #6c757d;
+        }
+        .prompt-textarea {
+            width: 100%;
+            min-height: 400px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            font-size: 13px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+        .prompt-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
         .download-btn {
             background: #28a745;
             margin-right: 10px;
@@ -302,7 +392,7 @@
 
         }
 
-        function displayResults(data) {
+        async function displayResults(data) {
             const results = document.getElementById('results');
             const metrics = document.getElementById('metrics');
             const prompts = document.getElementById('prompts');
@@ -335,32 +425,54 @@
                 </div>
             `;
 
-            // Display prompts by phase
-            let promptsHTML = '<h3 style="margin-top: 30px; margin-bottom: 20px;">Generated AI Prompts</h3>';
+            // Fetch and display prompts
+            if (data.prompts.total_count > 0) {
+                try {
+                    const promptsResponse = await fetch(`/api/prompts?repo=${encodeURIComponent(data.repository_path)}`);
+                    const promptsData = await promptsResponse.json();
 
-            const phaseNames = {
-                phase0: 'Documentation Review',
-                phase1: 'Architecture Analysis',
-                phase2: 'Implementation Deep-Dive',
-                phase3: 'Development Workflow',
-                phase4: 'Interactive Remediation'
-            };
+                    let promptsHTML = '<h3 style="margin-top: 30px; margin-bottom: 20px;">Generated AI Prompts</h3>';
+                    promptsHTML += '<p style="color: #666; margin-bottom: 20px;">Click on each phase to view and copy prompts. Follow the phases in order for best results.</p>';
+                    promptsHTML += '<div class="accordion">';
 
-            for (const [phaseKey, phaseName] of Object.entries(phaseNames)) {
-                const count = data.prompts.by_phase[phaseKey];
-                if (count > 0) {
-                    promptsHTML += `
-                        <div class="phase-section">
-                            <div class="phase-title">${phaseName} (${count} prompts)</div>
-                            <p style="color: #666; margin-bottom: 15px;">
-                                Click "Download Prompts" above to get detailed prompts for your AI assistant.
-                            </p>
-                        </div>
-                    `;
+                    promptsData.phases.forEach((phase, index) => {
+                        const isFirst = index === 0;
+                        promptsHTML += `
+                            <div class="accordion-item">
+                                <div class="accordion-header ${isFirst ? 'active' : ''}" onclick="toggleAccordion(${phase.phase_number})">
+                                    <span>Phase ${phase.phase_number}: ${phase.phase_name} (${phase.prompts.length} prompts)</span>
+                                    <span class="accordion-icon ${isFirst ? 'rotated' : ''}">▼</span>
+                                </div>
+                                <div class="accordion-content ${isFirst ? 'active' : ''}" id="phase-${phase.phase_number}">
+                        `;
+
+                        phase.prompts.forEach(prompt => {
+                            promptsHTML += `
+                                <div class="prompt-item">
+                                    <div class="prompt-item-header">
+                                        <div class="prompt-item-title">${prompt.title}</div>
+                                        <button class="copy-btn" onclick="copyPrompt('${prompt.id}')">📋 Copy</button>
+                                    </div>
+                                    <textarea class="prompt-textarea" id="prompt-${prompt.id}" readonly>${prompt.markdown}</textarea>
+                                </div>
+                            `;
+                        });
+
+                        promptsHTML += `
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    promptsHTML += '</div>';
+                    prompts.innerHTML = promptsHTML;
+                } catch (err) {
+                    prompts.innerHTML = '<p style="color: #721c24;">Error loading prompts. Please try downloading instead.</p>';
                 }
+            } else {
+                prompts.innerHTML = '<p style="color: #666;">No prompts generated.</p>';
             }
 
-            prompts.innerHTML = promptsHTML;
             results.style.display = 'block';
         }
 
@@ -391,6 +503,58 @@
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
+        }
+
+        function toggleAccordion(phaseNumber) {
+            const content = document.getElementById(`phase-${phaseNumber}`);
+            const header = content.previousElementSibling;
+            const icon = header.querySelector('.accordion-icon');
+
+            // Close all other accordion items
+            document.querySelectorAll('.accordion-content').forEach(item => {
+                if (item.id !== `phase-${phaseNumber}`) {
+                    item.classList.remove('active');
+                    item.previousElementSibling.classList.remove('active');
+                    item.previousElementSibling.querySelector('.accordion-icon').classList.remove('rotated');
+                }
+            });
+
+            // Toggle current item
+            content.classList.toggle('active');
+            header.classList.toggle('active');
+            icon.classList.toggle('rotated');
+        }
+
+        async function copyPrompt(promptId) {
+            const textarea = document.getElementById(`prompt-${promptId}`);
+            const button = event.target;
+
+            try {
+                await navigator.clipboard.writeText(textarea.value);
+
+                // Visual feedback
+                const originalText = button.textContent;
+                button.textContent = '✓ Copied!';
+                button.classList.add('copied');
+
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            } catch (err) {
+                // Fallback for older browsers
+                textarea.select();
+                document.execCommand('copy');
+
+                const originalText = button.textContent;
+                button.textContent = '✓ Copied!';
+                button.classList.add('copied');
+
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            }
         }
 
         // Restore saved path on page load
