@@ -1,5 +1,21 @@
 #!/bin/bash
 [[ "$(uname -s)" != "Darwin" ]] && { echo "Error: This script requires macOS" >&2; exit 1; }
+
+# Check bash version (need 4.0+ for associative arrays)
+if ((BASH_VERSINFO[0] < 4)); then
+    cat >&2 <<EOF
+Error: This script requires Bash 4.0 or later (found ${BASH_VERSION})
+
+macOS ships with Bash 3.2. Install Bash 4+ via Homebrew:
+  brew install bash
+
+Then run this script with the newer bash:
+  /usr/local/bin/bash purge-identity.sh
+
+Or add to your PATH and restart your shell.
+EOF
+    exit 1
+fi
 # -----------------------------------------------------------------------------
 #
 # Script Name: purge-identity.sh
@@ -45,13 +61,13 @@ set -o pipefail
 VERSION="1.0.0"
 LOG_DIR="/tmp"
 LOG_FILE=""
-START_TIME
 START_TIME=$(date +%s)
 TIMER_PID=""
 
 # Mode flags
 WHAT_IF_MODE=false
 VERBOSE_MODE=false
+TARGET_EMAIL=""  # The email to purge (required argument)
 
 # Email pattern for discovery
 EMAIL_PATTERN='[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
@@ -253,11 +269,14 @@ NAME
     purge-identity.sh - Comprehensive macOS identity purge tool
 
 SYNOPSIS
-    purge-identity.sh [OPTIONS]
+    purge-identity.sh EMAIL [OPTIONS]
 
 DESCRIPTION
-    Discovers and permanently removes all traces of specified email identities
-    from macOS. Targets authentication credentials, cached data, and configuration
+    Permanently removes all traces of a SPECIFIED email identity from macOS.
+    You must explicitly provide the email address to purge - there is no
+    auto-discovery menu to prevent accidental deletions.
+
+    Targets authentication credentials, cached data, and configuration
     references while preserving actual user data files.
 
     The tool provides comprehensive discovery across:
@@ -276,10 +295,15 @@ DESCRIPTION
       • Comprehensive logging of all operations
       • Preserves .psafe3, .git, and user data files
 
+ARGUMENTS
+    EMAIL
+        The email address to purge. This is REQUIRED - the script will not
+        run without an explicitly specified email address.
+
 OPTIONS
     --what-if
-        Dry-run mode. Perform discovery and display menu without executing
-        any deletions. Use this to safely preview what would be found.
+        Dry-run mode. Discover where the email exists and show what would
+        be deleted without actually deleting anything.
 
     --verbose
         Enable verbose debug logging to console. All operations are always
@@ -289,34 +313,34 @@ OPTIONS
         Display this help message and exit.
 
 WORKFLOW
-    1. Discovery Phase
-       - Comprehensive scan of all identity storage locations
-       - Automatic deduplication and counting
+    1. Email Validation
+       - Validates the provided email format
+       - Ensures explicit user intent
 
-    2. Interactive Selection
-       - Numbered menu of discovered identities
-       - Multi-select support (e.g., "1,3,5" or "1-4" or "all")
-       - Option to manually add identities not auto-discovered
+    2. Discovery Phase
+       - Scans system for the specified email only
+       - Reports all locations where found
 
-    3. Per-Identity Processing
+    3. Preview & Confirmation
        - Detailed preview of what will be deleted
-       - Individual confirmation for each selected identity
+       - Explicit confirmation required
        - Warnings for risky operations (data loss, system impact)
 
-    4. Exit Report
-       - Summary of all deletions performed
+    4. Deletion & Exit Report
+       - Performs deletions only after confirmation
+       - Summary of all operations performed
        - Comprehensive error listing with remediation steps
        - Log file location for detailed review
 
 EXAMPLES
-    # Safe preview: see what identities exist without deleting
-    ./purge-identity.sh --what-if
+    # Safe preview: see where an email exists without deleting
+    ./purge-identity.sh user@oldcompany.com --what-if
 
-    # Full interactive execution
-    ./purge-identity.sh
+    # Delete all traces of a specific email
+    ./purge-identity.sh user@oldcompany.com
 
     # Verbose mode for debugging
-    ./purge-identity.sh --verbose
+    ./purge-identity.sh user@oldcompany.com --verbose
 
 WARNINGS
     This tool performs PERMANENT DELETIONS. Deleted data cannot be recovered.
@@ -355,7 +379,7 @@ LOGGING
     Logs are automatically cleaned up after 24 hours.
 
 EXAMPLES OF IDENTITIES
-    • Former employer accounts (matt.bordenet@oldcompany.com)
+    • Former employer accounts (user@oldcompany.com)
     • Deleted service accounts (user@deletedservice.com)
     • Deprecated personal emails (old.email@provider.com)
 
@@ -374,6 +398,32 @@ EOF
 # -----------------------------------------------------------------------------
 
 parse_arguments() {
+    # First argument must be the email address
+    if [[ $# -eq 0 ]] || [[ "$1" == -* ]]; then
+        cat >&2 << 'EOF'
+Error: Email address required
+
+Usage: purge-identity.sh EMAIL [OPTIONS]
+
+Example:
+  ./purge-identity.sh user@oldcompany.com
+  ./purge-identity.sh user@oldcompany.com --what-if
+
+Use --help for full documentation
+EOF
+        exit 1
+    fi
+
+    TARGET_EMAIL="$1"
+    shift
+
+    # Validate email format
+    if [[ ! "$TARGET_EMAIL" =~ ^${EMAIL_PATTERN}$ ]]; then
+        echo "Error: Invalid email format: $TARGET_EMAIL" >&2
+        exit 1
+    fi
+
+    # Parse remaining options
     while [[ $# -gt 0 ]]; do
         case $1 in
             --what-if)
@@ -388,8 +438,8 @@ parse_arguments() {
                 show_help
                 ;;
             *)
-                echo "Unknown option: $1"
-                echo "Use --help for usage information"
+                echo "Unknown option: $1" >&2
+                echo "Use --help for usage information" >&2
                 exit 1
                 ;;
         esac
@@ -536,6 +586,11 @@ add_discovered_identity() {
 
     # Skip empty emails
     [[ -z "$email" ]] && return
+
+    # If TARGET_EMAIL is set, only process that specific email
+    if [[ -n "$TARGET_EMAIL" ]] && [[ "$email" != "$TARGET_EMAIL" ]]; then
+        return
+    fi
 
     # Validate email format (basic sanitation - prevent command injection)
     if [[ ! "$email" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
@@ -923,7 +978,38 @@ scan_cloud_storage() {
     log "INFO" "Cloud storage scan complete"
 }
 
-# Orchestrate all discovery scans
+# Discover a single specific identity
+discover_single_identity() {
+    local target="$1"
+
+    # Initialize/reset global arrays
+    DISCOVERED_IDENTITIES=()
+    IDENTITY_LOCATIONS=()
+
+    # Run all scan functions (add_discovered_identity will filter for target)
+    scan_keychain
+    scan_safari
+    scan_chrome
+    scan_edge
+    scan_firefox
+    scan_mail
+    scan_application_support
+    scan_ssh
+    scan_internet_accounts
+    scan_cloud_storage
+
+    # Report findings
+    local count=${DISCOVERED_IDENTITIES[$target]:-0}
+    if [[ $count -gt 0 ]]; then
+        echo -e "${GREEN}✓ Found $count occurrences of ${target}${NC}"
+        echo
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Orchestrate all discovery scans (unused in new single-email mode, kept for reference)
 discover_all_identities() {
     display_section_header "Discovering Identities"
 
@@ -1759,7 +1845,7 @@ display_exit_report() {
 # -----------------------------------------------------------------------------
 
 main() {
-    # Parse command-line arguments
+    # Parse command-line arguments (includes email validation)
     parse_arguments "$@"
 
     # Initialize logging
@@ -1775,52 +1861,30 @@ main() {
     display_header
     start_timer
 
-    log_info "Initialization complete"
+    log "INFO" "Target email: $TARGET_EMAIL"
+    echo
+    echo -e "${BOLD}Target Identity: ${CYAN}${TARGET_EMAIL}${NC}"
+    echo
 
-    # PHASE 1: Discovery
-    if ! discover_all_identities; then
-        # No identities found
-        display_exit_report
-        exit 0
-    fi
+    # PHASE 1: Discovery for specific email
+    echo "▶ Discovering locations of ${TARGET_EMAIL}..."
+    echo
+    discover_single_identity "$TARGET_EMAIL"
 
-    # PHASE 2: Menu Display
-    display_menu
-
-    # Exit here if what-if mode
-    if [[ "$WHAT_IF_MODE" == true ]]; then
-        echo -e "${YELLOW}What-if mode complete. No changes made.${NC}"
+    # Check if anything was found
+    if [[ ${DISCOVERED_IDENTITIES[$TARGET_EMAIL]:-0} -eq 0 ]]; then
+        echo -e "${YELLOW}No traces of ${TARGET_EMAIL} found on this system${NC}"
         echo
         display_exit_report
         exit 0
     fi
 
-    # PHASE 3: Get User Selection
-    local selected_identities=$(get_user_selection)
+    log "INFO" "Found ${DISCOVERED_IDENTITIES[$TARGET_EMAIL]} occurrences"
 
-    if [[ -z "$selected_identities" ]]; then
-        log_error "No identities selected. Exiting."
-        display_exit_report
-        exit 2
-    fi
+    # PHASE 2: Process the identity (preview, confirm, delete)
+    process_identity "$TARGET_EMAIL" 1 1
 
-    # Convert to array
-    local -a identity_array
-    while IFS= read -r identity; do
-        [[ -n "$identity" ]] && identity_array+=("$identity")
-    done <<< "$selected_identities"
-
-    local total_selected=${#identity_array[@]}
-    log "INFO" "User selected $total_selected identities for purge"
-
-    # PHASE 4: Process Each Selected Identity
-    local index=1
-    for identity in "${identity_array[@]}"; do
-        process_identity "$identity" "$index" "$total_selected"
-        ((index++))
-    done
-
-    # PHASE 5: Exit Report
+    # PHASE 3: Exit Report
     display_exit_report
 
     # Exit code based on errors
