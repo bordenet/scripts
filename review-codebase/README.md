@@ -38,7 +38,7 @@ Generates AI prompts in 5 progressive phases:
 
 ```bash
 # Clone the repository
-cd codebase-reviewer
+cd review-codebase
 
 # Create virtual environment
 python3 -m venv venv
@@ -317,7 +317,7 @@ black src/codebase_reviewer
 ## Project Structure
 
 ```
-codebase-reviewer/
+review-codebase/
 ├── src/
 │   └── codebase_reviewer/
 │       ├── __init__.py

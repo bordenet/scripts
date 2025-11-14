@@ -37,7 +37,7 @@ shift
 FILE_TYPES=("*.js" "*.json" "*.py" "*.cs" "*.go" "*.sh" "*.tf" "*.yml" "*.yaml" "*.env" "*env" "*.ENV" "*ENV")
 
 # Directories we do not want the tool traversing
-EXCLUDE_DIRS=(".git" ".github" "node_modules" "vendor" ".idea" ".vscode" "stella_deploy" "secrets_in_source")
+EXCLUDE_DIRS=(".git" ".github" "node_modules" "vendor" ".idea" ".vscode" "stella_deploy" "find-secrets-in-source--OLD")
 
 # Patterns to detect secrets-- used by first screening pass
 SECRET_PATTERNS_FAST_EXPANDED=(

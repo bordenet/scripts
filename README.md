@@ -29,21 +29,21 @@ A collection of utility scripts for various tasks.
 
 | Script | Description |
 |---|---|
-| [`inspection-sandbox/check-alpine-version.sh`](./inspection-sandbox/check-alpine-version.sh) | Checks if the Alpine Linux version specified in the sandbox setup script is the latest stable version. |
-| [`inspection-sandbox/create-vm-alternate.sh`](./inspection-sandbox/create-vm-alternate.sh) | Provides an alternate method for creating the inspection sandbox VM. |
-| [`inspection-sandbox/create-vm.sh`](./inspection-sandbox/create-vm.sh) | Provides detailed manual instructions for creating the malware inspection sandbox VM using UTM. |
-| [`inspection-sandbox/inspect.sh`](./inspection-sandbox/inspect.sh) | A wrapper for inspecting a suspicious file within the isolated malware analysis sandbox. |
-| [`inspection-sandbox/provision-vm.sh`](./inspection-sandbox/provision-vm.sh) | Helps automate the final provisioning steps for the inspection sandbox VM after Alpine Linux has been installed. |
-| [`inspection-sandbox/setup-alpine.sh`](./inspection-sandbox/setup-alpine.sh) | Executed INSIDE the Alpine Linux VM to perform an unattended installation. |
-| [`inspection-sandbox/setup-sandbox.sh`](./inspection-sandbox/setup-sandbox.sh) | Sets up a secure sandbox environment for inspecting potentially malicious files. |
-| [`inspection-sandbox/status.sh`](./inspection-sandbox/status.sh) | Performs a comprehensive health check of the malware inspection sandbox environment. |
-| [`inspection-sandbox/shared/analyze.sh`](./inspection-sandbox/shared/analyze.sh) | Runs inside the Alpine Linux VM to analyze potentially malicious files. |
-| [`packet-capture/capture.sh`](./packet-capture/capture.sh) | Starts a packet capture using tcpdump. |
-| [`packet-capture/compress-pcap-gzip.sh`](./packet-capture/compress-pcap-gzip.sh) | Compresses .pcap files in a specified directory using gzip. |
-| [`packet-capture/compress-pcap-zstd.sh`](./packet-capture/compress-pcap-zstd.sh) | Compresses .pcap files in a specified directory using zstd. |
-| [`packet-capture/start-pcap-rotate.sh`](./packet-capture/start-pcap-rotate.sh) | Starts a rotating packet capture using tcpdump. |
-| [`packet-capture/stop-pcap-rotate.sh`](./packet-capture/stop-pcap-rotate.sh) | Stops the packet capture rotation process. |
-| [`secrets_in_source/passhog-simple.sh`](./secrets_in_source/passhog-simple.sh) | **DEPRECATED.** Performs a simplified scan for sensitive information (e.g., passwords, API keys) within files in a specified directory. Successor project: https://github.com/bordenet/secrets-in-source |
+| [`analyze-malware-sandbox/check-alpine-version.sh`](./analyze-malware-sandbox/check-alpine-version.sh) | Checks if the Alpine Linux version specified in the sandbox setup script is the latest stable version. |
+| [`analyze-malware-sandbox/create-vm-alternate.sh`](./analyze-malware-sandbox/create-vm-alternate.sh) | Provides an alternate method for creating the inspection sandbox VM. |
+| [`analyze-malware-sandbox/create-vm.sh`](./analyze-malware-sandbox/create-vm.sh) | Provides detailed manual instructions for creating the malware inspection sandbox VM using UTM. |
+| [`analyze-malware-sandbox/inspect.sh`](./analyze-malware-sandbox/inspect.sh) | A wrapper for inspecting a suspicious file within the isolated malware analysis sandbox. |
+| [`analyze-malware-sandbox/provision-vm.sh`](./analyze-malware-sandbox/provision-vm.sh) | Helps automate the final provisioning steps for the inspection sandbox VM after Alpine Linux has been installed. |
+| [`analyze-malware-sandbox/setup-alpine.sh`](./analyze-malware-sandbox/setup-alpine.sh) | Executed INSIDE the Alpine Linux VM to perform an unattended installation. |
+| [`analyze-malware-sandbox/setup-sandbox.sh`](./analyze-malware-sandbox/setup-sandbox.sh) | Sets up a secure sandbox environment for inspecting potentially malicious files. |
+| [`analyze-malware-sandbox/status.sh`](./analyze-malware-sandbox/status.sh) | Performs a comprehensive health check of the malware inspection sandbox environment. |
+| [`analyze-malware-sandbox/shared/analyze.sh`](./analyze-malware-sandbox/shared/analyze.sh) | Runs inside the Alpine Linux VM to analyze potentially malicious files. |
+| [`capture-packets/capture.sh`](./capture-packets/capture.sh) | Starts a packet capture using tcpdump. |
+| [`capture-packets/compress-pcap-gzip.sh`](./capture-packets/compress-pcap-gzip.sh) | Compresses .pcap files in a specified directory using gzip. |
+| [`capture-packets/compress-pcap-zstd.sh`](./capture-packets/compress-pcap-zstd.sh) | Compresses .pcap files in a specified directory using zstd. |
+| [`capture-packets/start-pcap-rotate.sh`](./capture-packets/start-pcap-rotate.sh) | Starts a rotating packet capture using tcpdump. |
+| [`capture-packets/stop-pcap-rotate.sh`](./capture-packets/stop-pcap-rotate.sh) | Stops the packet capture rotation process. |
+| [`find-secrets-in-source--OLD/passhog-simple.sh`](./find-secrets-in-source--OLD/passhog-simple.sh) | **DEPRECATED.** Performs a simplified scan for sensitive information (e.g., passwords, API keys) within files in a specified directory. Successor project: https://github.com/bordenet/secrets-in-source |
 
 ## Xcode
 

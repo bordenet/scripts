@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="codebase-reviewer",
+    name="review-codebase",
     version="1.0.0",
     author="Engineering Excellence Team",
     author_email="engineering@example.com",
@@ -53,7 +53,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "codebase-reviewer=codebase_reviewer.cli:main",
+            "review-codebase=codebase_reviewer.cli:main",
         ],
     },
 )
