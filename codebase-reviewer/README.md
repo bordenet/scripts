@@ -384,3 +384,18 @@ Engineering Excellence Team
 ---
 
 **Built with high standards. Tested on real codebases.**
+
+## Claude Skill
+
+A Claude skill is available for interactive codebase review within Claude conversations.
+
+**Location**: `~/.skills/codebase-review/skill.md`
+
+**Usage**: Simply ask Claude to review a codebase, and the skill will guide a systematic multi-phase analysis:
+- Phase 0: Documentation review and claims extraction
+- Phase 1: Architecture validation against code
+- Phase 2: Implementation analysis (quality, security, observability)  
+- Phase 3: Development workflow validation
+- Phase 4: Interactive remediation planning
+
+The skill follows the same documentation-first methodology as this tool.
