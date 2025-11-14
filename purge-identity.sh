@@ -643,23 +643,45 @@ add_discovered_identity() {
 scan_keychain() {
     log "INFO" "Scanning keychain for identities..."
 
-    # Dump login keychain and extract emails
-    local keychain_dump=$(security dump-keychain ~/Library/Keychains/login.keychain-db 2>/dev/null)
+    # Dump login keychain
+    local keychain_dump
+    keychain_dump=$(security dump-keychain 2>/dev/null)
 
     if [[ -z "$keychain_dump" ]]; then
         log "WARN" "Could not dump keychain (may require unlock)"
         return 0
     fi
 
-    # Extract email addresses from dump
-    local emails=$(echo "$keychain_dump" | grep -oE "$EMAIL_PATTERN" | sort -u)
+    # Extract emails from ACCOUNT fields only (what we can actually delete)
+    # This matches what delete_keychain_items does
+    local emails
+    emails=$(echo "$keychain_dump" | \
+             awk -v pattern="$EMAIL_PATTERN" '
+                 /"acct"<blob>=/ {
+                     match($0, /"acct"<blob>="([^"]+)"/, arr)
+                     if (arr[1] ~ pattern) {
+                         print arr[1]
+                     }
+                 }
+             ' | sort -u)
+
+    # Also check certificates (deletable via security delete-certificate)
+    local cert_emails
+    cert_emails=$(security find-certificate -a -p 2>/dev/null | \
+                  openssl x509 -noout -email 2>/dev/null | \
+                  grep -E "^$EMAIL_PATTERN$" | sort -u)
+
+    # Combine and deduplicate
+    local all_emails
+    all_emails=$(printf "%s\n%s\n" "$emails" "$cert_emails" | grep -E "$EMAIL_PATTERN" | sort -u)
 
     # Store in global discovery array
     while IFS= read -r email; do
         [[ -n "$email" ]] && add_discovered_identity "$email" "keychain"
-    done <<< "$emails"
+    done <<< "$all_emails"
 
-    local count=$(echo "$emails" | grep -c .)
+    local count
+    count=$(echo "$all_emails" | grep -c . 2>/dev/null || echo "0")
     log "INFO" "Keychain scan complete: $count unique emails found"
 }
 
