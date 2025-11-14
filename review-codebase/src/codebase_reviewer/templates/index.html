@@ -236,10 +236,21 @@
     <script>
         let currentAnalysis = null;
 
+        // Restore saved path on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedPath = localStorage.getItem('lastRepoPath');
+            if (savedPath) {
+                document.getElementById('repoPath').value = savedPath;
+            }
+        });
+
         document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
             const repoPath = document.getElementById('repoPath').value.trim();
+
+            // Save the path for persistence
+            localStorage.setItem('lastRepoPath', repoPath);
             const analyzeBtn = document.getElementById('analyzeBtn');
             const progress = document.getElementById('progress');
             const status = document.getElementById('status');
