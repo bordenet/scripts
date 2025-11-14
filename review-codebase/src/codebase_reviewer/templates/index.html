@@ -195,6 +195,7 @@
                         name="repoPath"
                         placeholder="e.g., /home/user/my-project"
                         autocomplete="off"
+                        onkeypress="if(event.key === 'Enter') { event.preventDefault(); handleAnalyze(); }"
                     >
                 </div>
 
