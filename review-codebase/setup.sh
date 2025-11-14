@@ -264,7 +264,7 @@ main() {
         fi
 
         # Run analysis
-        python -m codebase_reviewer "$repo_path"
+        python -m codebase_reviewer analyze "$repo_path"
 
     else
         # Web UI mode
@@ -275,7 +275,7 @@ main() {
         echo ""
 
         # Run web server
-        python -m codebase_reviewer --web
+        python -m codebase_reviewer web
     fi
 }
 
