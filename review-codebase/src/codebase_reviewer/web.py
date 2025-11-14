@@ -19,8 +19,7 @@ analysis_cache = {}
 @app.route("/")
 def index():
     """Render main page."""
-    default_path = os.getcwd()
-    return render_template("index.html", default_path=default_path)
+    return render_template("index.html")
 
 
 @app.route("/api/analyze", methods=["POST"])
