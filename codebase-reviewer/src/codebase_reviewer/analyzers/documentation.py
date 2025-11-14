@@ -6,6 +6,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from codebase_reviewer.analyzers.constants import DOCUMENTATION_PATTERNS
+from codebase_reviewer.analyzers.parsing_utils import (
+    extract_section,
+    extract_list_items,
+    extract_code_blocks,
+    detect_architecture_pattern,
+)
 from codebase_reviewer.models import (
     APISpec,
     ArchitectureClaims,
@@ -18,30 +25,6 @@ from codebase_reviewer.models import (
     Severity,
     SetupGuide,
 )
-
-
-# Documentation file patterns by priority
-DOCUMENTATION_PATTERNS = {
-    "primary": ["README.md", "README.rst", "README.txt", "README"],
-    "contributing": [
-        "CONTRIBUTING.md",
-        "CONTRIBUTING.rst",
-        ".github/CONTRIBUTING.md",
-    ],
-    "architecture": [
-        "ARCHITECTURE.md",
-        "docs/architecture.md",
-        "docs/architecture/**/*.md",
-        "ADR/*.md",
-        "docs/adr/**/*.md",
-    ],
-    "api": ["API.md", "docs/api/**/*.md", "openapi.yaml", "swagger.json"],
-    "setup": ["INSTALL.md", "SETUP.md", "docs/setup/**/*.md"],
-    "changelog": ["CHANGELOG.md", "HISTORY.md", "RELEASES.md"],
-    "security": ["SECURITY.md", ".github/SECURITY.md"],
-    "license": ["LICENSE", "LICENSE.md", "COPYING"],
-    "code_of_conduct": ["CODE_OF_CONDUCT.md", ".github/CODE_OF_CONDUCT.md"],
-}
 
 
 class DocumentationAnalyzer:
@@ -186,7 +169,7 @@ class DocumentationAnalyzer:
 
             # Detect architecture patterns
             if not pattern:
-                pattern = self._detect_architecture_pattern(doc.content)
+                pattern = detect_architecture_pattern(doc.content)
                 if pattern:
                     documented_in.append(doc.path)
                     self.claims.append(
@@ -234,27 +217,6 @@ class DocumentationAnalyzer:
             documented_in=documented_in,
         )
 
-    def _detect_architecture_pattern(self, content: str) -> Optional[str]:
-        """Detect architectural pattern from content."""
-        content_lower = content.lower()
-
-        patterns = {
-            "microservices": ["microservice", "micro-service", "service mesh"],
-            "monolith": ["monolithic", "monolith"],
-            "mvc": ["model-view-controller", "mvc"],
-            "mvvm": ["model-view-viewmodel", "mvvm"],
-            "layered": ["layered architecture", "n-tier", "three-tier"],
-            "event-driven": ["event-driven", "event sourcing", "cqrs"],
-            "serverless": ["serverless", "lambda", "faas"],
-            "hexagonal": ["hexagonal", "ports and adapters"],
-        }
-
-        for pattern_name, keywords in patterns.items():
-            if any(keyword in content_lower for keyword in keywords):
-                return pattern_name
-
-        return None
-
     def _extract_setup_guide(self, docs: List[DocumentFile]) -> SetupGuide:
         """Extract setup and installation instructions."""
         prerequisites: List[str] = []
@@ -265,20 +227,20 @@ class DocumentationAnalyzer:
 
         for doc in docs:
             # Extract prerequisites
-            prereq_section = self._extract_section(
+            prereq_section = extract_section(
                 doc.content, ["prerequisite", "requirement", "dependencies"]
             )
             if prereq_section:
-                prerequisites.extend(self._extract_list_items(prereq_section))
+                prerequisites.extend(extract_list_items(prereq_section))
                 documented_in.append(doc.path)
 
             # Extract build steps
-            build_section = self._extract_section(
+            build_section = extract_section(
                 doc.content, ["build", "installation", "install", "setup"]
             )
             if build_section:
-                build_steps.extend(self._extract_list_items(build_section))
-                build_steps.extend(self._extract_code_blocks(build_section))
+                build_steps.extend(extract_list_items(build_section))
+                build_steps.extend(extract_code_blocks(build_section))
 
             # Extract environment variables
             env_vars = re.findall(r"[A-Z_]{3,}=", doc.content)
@@ -398,11 +360,11 @@ class DocumentationAnalyzer:
 
         for doc in docs:
             # Look for known issues sections
-            issues_section = self._extract_section(
+            issues_section = extract_section(
                 doc.content, ["known issue", "limitation", "bug", "todo"]
             )
             if issues_section:
-                items = self._extract_list_items(issues_section)
+                items = extract_list_items(issues_section)
                 for item in items[:10]:  # Limit
                     issues.append(
                         Issue(
@@ -414,55 +376,6 @@ class DocumentationAnalyzer:
                     )
 
         return issues
-
-    def _extract_section(self, content: str, keywords: List[str]) -> Optional[str]:
-        """Extract section from markdown based on keywords."""
-        lines = content.split("\n")
-        in_section = False
-        section_lines: List[str] = []
-        current_level = 0
-
-        for i, line in enumerate(lines):
-            # Check if this is a header
-            header_match = re.match(r"^(#{1,6})\s+(.+)$", line)
-
-            if header_match:
-                level = len(header_match.group(1))
-                title = header_match.group(2).lower()
-
-                # Check if this header matches our keywords
-                if any(keyword in title for keyword in keywords):
-                    in_section = True
-                    current_level = level
-                    section_lines = [line]
-                    continue
-
-                # If we're in a section and hit a same/higher level header, stop
-                if in_section and level <= current_level:
-                    break
-
-            if in_section:
-                section_lines.append(line)
-
-        return "\n".join(section_lines) if section_lines else None
-
-    def _extract_list_items(self, content: str) -> List[str]:
-        """Extract list items from content."""
-        items: List[str] = []
-        pattern = r"^[\s]*[-*+]\s+(.+)$"
-
-        for line in content.split("\n"):
-            match = re.match(pattern, line)
-            if match:
-                items.append(match.group(1).strip())
-
-        return items
-
-    def _extract_code_blocks(self, content: str) -> List[str]:
-        """Extract code blocks from markdown."""
-        pattern = r"```(?:\w+)?\n(.*?)```"
-        matches = re.findall(pattern, content, re.DOTALL)
-        return [match.strip() for match in matches]
 
     def _calculate_completeness(self, docs: List[DocumentFile]) -> float:
         """Calculate documentation completeness score (0-100)."""
