@@ -247,10 +247,18 @@
         document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const repoPath = document.getElementById('repoPath').value.trim();
+            const repoPathInput = document.getElementById('repoPath');
+            const repoPath = repoPathInput.value.trim();
+
+            // Validate path is not empty
+            if (!repoPath) {
+                alert('Please enter a repository path');
+                return;
+            }
 
             // Save the path for persistence
             localStorage.setItem('lastRepoPath', repoPath);
+
             const analyzeBtn = document.getElementById('analyzeBtn');
             const progress = document.getElementById('progress');
             const status = document.getElementById('status');
@@ -258,7 +266,7 @@
             const results = document.getElementById('results');
             const error = document.getElementById('error');
 
-            // Reset UI
+            // Reset UI (but NOT the input field!)
             results.style.display = 'none';
             error.style.display = 'none';
             progress.style.display = 'block';
@@ -295,6 +303,8 @@
                 error.textContent = '❌ Error: ' + err.message;
             } finally {
                 analyzeBtn.disabled = false;
+                // Ensure the input value is preserved
+                repoPathInput.value = repoPath;
             }
         });
 
