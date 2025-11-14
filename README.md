@@ -57,6 +57,7 @@ A collection of utility scripts for various tasks.
 |---|---|
 | [`resume-claude.sh`](./resume-claude.sh) | Automates the process of resuming an AI assistant session with "Claude" within VS Code. |
 | [`schedule-claude.sh`](./schedule-claude.sh) | Schedules the execution of the 'resume-claude.sh' script after a specified delay. |
+| [`review-codebase/`](./review-codebase/) | Analyzes repository documentation and code to generate structured AI prompts for comprehensive code review and onboarding. Includes web UI and CLI modes. |
 
 ## macOS Development Environment Setup
 
