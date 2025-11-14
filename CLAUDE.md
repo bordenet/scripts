@@ -7,6 +7,10 @@ This document contains project-specific guidelines and lessons learned for Claud
 - **All hardware is Apple Silicon** (ARM64 architecture)
 - Homebrew paths: `/opt/homebrew/` (not `/usr/local/`)
 - When suggesting paths, always use Apple Silicon defaults first
+- **macOS uses BSD tools, not GNU** - always test awk/sed/grep syntax
+  - BSD awk does NOT support `match()` with array capture
+  - Use `grep | sed` pipelines instead of complex awk
+  - Test all regex/text processing commands before committing
 
 
 ## Quality Standards for Code Delivery
@@ -20,9 +24,11 @@ This document contains project-specific guidelines and lessons learned for Claud
    - Don't wait to be asked
 
 2. **Test the code**
+   - **ALWAYS test commands with sample data before committing**
    - Test basic functionality where possible
    - Run syntax checks at minimum
    - Don't commit broken code
+   - Test awk/sed/grep commands in isolation with `echo "sample" | command`
    - If you can't test on the target platform, explicitly document this
 
 3. **Handle edge cases**
