@@ -1592,20 +1592,47 @@ delete_chrome_profiles() {
         local profile_name=$(basename "$profile_dir")
         local prefs="${profile_dir}/Preferences"
 
-        # Check if this profile is associated with the identity
+        # Check if this profile contains the identity in ANY location
         local is_match=false
 
+        # Check 1: Sync email
         if [[ -f "$prefs" ]]; then
-            local sync_email=$(jq -r '.account_info[0].email // empty' "$prefs" 2>/dev/null)
+            local sync_email
+            sync_email=$(jq -r '.account_info[0].email // empty' "$prefs" 2>/dev/null)
             [[ "$sync_email" == "$identity" ]] && is_match=true
+
+            # Check 2: Any occurrence in Preferences JSON
+            if [[ "$is_match" == false ]]; then
+                if jq -r '.. | strings' "$prefs" 2>/dev/null | grep -qF "$identity"; then
+                    is_match=true
+                    log "DEBUG" "Found $identity in Chrome prefs: $profile_name"
+                fi
+            fi
+        fi
+
+        # Check 3: Saved passwords
+        if [[ "$is_match" == false ]]; then
+            local login_db="${profile_dir}/Login Data"
+            if [[ -f "$login_db" ]]; then
+                local temp_db="/tmp/chrome_login_check_$$.db"
+                if cp "$login_db" "$temp_db" 2>/dev/null; then
+                    if sqlite3 "$temp_db" "SELECT username_value FROM logins WHERE username_value = '$identity';" 2>/dev/null | grep -q .; then
+                        is_match=true
+                        log "DEBUG" "Found $identity in Chrome passwords: $profile_name"
+                    fi
+                    rm -f "$temp_db"
+                fi
+            fi
         fi
 
         if [[ "$is_match" == true ]]; then
+            echo "      Deleting Chrome profile: $profile_name"
             if rm -rf "$profile_dir" 2>/dev/null; then
-                echo "    ✓ Deleted Chrome profile: $profile_name"
+                echo "      ✓ Deleted Chrome profile: $profile_name"
                 log "INFO" "Deleted Chrome profile: $profile_name"
                 ((deleted++))
             else
+                echo "      ✗ Failed to delete: $profile_name"
                 add_error "Failed to delete Chrome profile: $profile_name" \
                           "Manually delete: $profile_dir"
             fi
@@ -1629,19 +1656,47 @@ delete_edge_profiles() {
         local profile_name=$(basename "$profile_dir")
         local prefs="${profile_dir}/Preferences"
 
+        # Check if this profile contains the identity in ANY location
         local is_match=false
 
+        # Check 1: Sync email
         if [[ -f "$prefs" ]]; then
-            local sync_email=$(jq -r '.account_info[0].email // empty' "$prefs" 2>/dev/null)
+            local sync_email
+            sync_email=$(jq -r '.account_info[0].email // empty' "$prefs" 2>/dev/null)
             [[ "$sync_email" == "$identity" ]] && is_match=true
+
+            # Check 2: Any occurrence in Preferences JSON
+            if [[ "$is_match" == false ]]; then
+                if jq -r '.. | strings' "$prefs" 2>/dev/null | grep -qF "$identity"; then
+                    is_match=true
+                    log "DEBUG" "Found $identity in Edge prefs: $profile_name"
+                fi
+            fi
+        fi
+
+        # Check 3: Saved passwords
+        if [[ "$is_match" == false ]]; then
+            local login_db="${profile_dir}/Login Data"
+            if [[ -f "$login_db" ]]; then
+                local temp_db="/tmp/edge_login_check_$$.db"
+                if cp "$login_db" "$temp_db" 2>/dev/null; then
+                    if sqlite3 "$temp_db" "SELECT username_value FROM logins WHERE username_value = '$identity';" 2>/dev/null | grep -q .; then
+                        is_match=true
+                        log "DEBUG" "Found $identity in Edge passwords: $profile_name"
+                    fi
+                    rm -f "$temp_db"
+                fi
+            fi
         fi
 
         if [[ "$is_match" == true ]]; then
+            echo "      Deleting Edge profile: $profile_name"
             if rm -rf "$profile_dir" 2>/dev/null; then
-                echo "    ✓ Deleted Edge profile: $profile_name"
+                echo "      ✓ Deleted Edge profile: $profile_name"
                 log "INFO" "Deleted Edge profile: $profile_name"
                 ((deleted++))
             else
+                echo "      ✗ Failed to delete: $profile_name"
                 add_error "Failed to delete Edge profile: $profile_name" \
                           "Manually delete: $profile_dir"
             fi
@@ -1664,22 +1719,41 @@ delete_firefox_profiles() {
 
         local profile_name=$(basename "$profile_dir")
 
-        # Check if profile contains the identity in logins or prefs
+        # Check if profile contains the identity in ANY location
         local is_match=false
 
+        # Check 1: logins.json (saved passwords)
         local logins_json="${profile_dir}/logins.json"
         if [[ -f "$logins_json" ]]; then
-            if grep -q "$identity" "$logins_json" 2>/dev/null; then
+            if jq -r '.logins[].username // empty' "$logins_json" 2>/dev/null | grep -qF "$identity"; then
                 is_match=true
+                log "DEBUG" "Found $identity in Firefox logins: $profile_name"
+            fi
+        fi
+
+        # Check 2: places.sqlite (history/bookmarks)
+        if [[ "$is_match" == false ]]; then
+            local places_db="${profile_dir}/places.sqlite"
+            if [[ -f "$places_db" ]]; then
+                local temp_db="/tmp/firefox_places_check_$$.db"
+                if cp "$places_db" "$temp_db" 2>/dev/null; then
+                    if sqlite3 "$temp_db" "SELECT url FROM moz_places WHERE url LIKE '%$identity%';" 2>/dev/null | grep -q .; then
+                        is_match=true
+                        log "DEBUG" "Found $identity in Firefox history: $profile_name"
+                    fi
+                    rm -f "$temp_db"
+                fi
             fi
         fi
 
         if [[ "$is_match" == true ]]; then
+            echo "      Deleting Firefox profile: $profile_name"
             if rm -rf "$profile_dir" 2>/dev/null; then
-                echo "    ✓ Deleted Firefox profile: $profile_name"
+                echo "      ✓ Deleted Firefox profile: $profile_name"
                 log "INFO" "Deleted Firefox profile: $profile_name"
                 ((deleted++))
             else
+                echo "      ✗ Failed to delete: $profile_name"
                 add_error "Failed to delete Firefox profile: $profile_name" \
                           "Manually delete: $profile_dir"
             fi
