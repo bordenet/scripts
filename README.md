@@ -43,8 +43,6 @@ A collection of utility scripts for various tasks.
 | [`capture-packets/compress-pcap-zstd.sh`](./capture-packets/compress-pcap-zstd.sh) | Compresses .pcap files in a specified directory using zstd. |
 | [`capture-packets/start-pcap-rotate.sh`](./capture-packets/start-pcap-rotate.sh) | Starts a rotating packet capture using tcpdump. |
 | [`capture-packets/stop-pcap-rotate.sh`](./capture-packets/stop-pcap-rotate.sh) | Stops the packet capture rotation process. |
-| ~~`find-secrets-in-source--OLD/`~~ | **REMOVED.** Successor project: https://github.com/bordenet/secrets-in-source |
-| ~~`review-codebase/`~~ | **MOVED.** Now available at: https://github.com/bordenet/codebase-reviewer |
 
 ## Xcode
 
