@@ -13,14 +13,14 @@ Per our [STYLE_GUIDE.md](./STYLE_GUIDE.md), **no script shall exceed 400 lines o
 
 | Script | Lines | Priority | Status | Notes |
 |--------|-------|----------|--------|-------|
-| [`purge-identity.sh`](./purge-identity.sh) | 2,073 | High | **Needs Refactoring** | Complex security tool with 53 functions. Break into library modules. |
-| [`backup-wsl-config.sh`](./backup-wsl-config.sh) | 830 | High | **Needs Refactoring** | WSL configuration backup tool. Extract common functions. |
+| [`purge-identity.sh`](./purge-identity.sh) | 2,073 → In Progress | High | **Partial Refactoring** | Extracted common functions to `purge-identity/lib/common.sh` (494 lines). Main script refactoring in progress. |
+| [`backup-wsl-config.sh`](./backup-wsl-config.sh) | 371 | ~~High~~ | ✅ **COMPLETED** | Extracted generators to `lib/wsl-backup-generators.sh` (424 lines) and helpers to `lib/wsl-backup-lib.sh` (89 lines). |
 | [`mu.sh`](./mu.sh) | 400 | ~~Medium~~ | ✅ **COMPLETED** | Extracted helpers to `lib/mu-helpers.sh` (166 lines). |
 | [`macos-setup/setup-macos-template.sh`](./macos-setup/setup-macos-template.sh) | 290 | ~~Medium~~ | ✅ **COMPLETED** | Extracted UI functions to `lib/ui.sh` (151 lines). |
 | [`macos-setup/setup-components/20-mobile.sh`](./macos-setup/setup-components/20-mobile.sh) | 68 | ~~Medium~~ | ✅ **COMPLETED** | Split into 6 focused components (21-java, 22-flutter, 23-android, 24-ios, 25-cloud-tools). |
 
-### Total Violations: 2 scripts (down from 5)
-### Resolved: 3 scripts (60% reduction in violations)
+### Total Violations: 1 script remaining (purge-identity.sh main script)
+### Resolved: 4 of 5 scripts (80% complete)
 
 ---
 
@@ -251,16 +251,16 @@ When refactoring oversized scripts:
 
 ## Tracking
 
-**Total Debt:** 2 scripts remaining, 2,903 excess lines remaining
+**Total Debt:** 1 script remaining (purge-identity.sh main script)
 
 **Progress:**
-- [ ] purge-identity.sh (2,073 lines → target: ≤400)
-- [ ] backup-wsl-config.sh (830 lines → target: ≤400)
+- [ ] purge-identity.sh (2,073 lines → partial: extracted 494 lines to lib)
+- [x] backup-wsl-config.sh (830 → 371 lines) ✅ Completed 2025-11-16
 - [x] mu.sh (575 → 400 lines) ✅ Completed 2025-11-16
 - [x] setup-macos-template.sh (494 → 290 lines) ✅ Completed 2025-11-16
-- [x] 20-mobile.sh (421 → 68 lines coordinator + 5 focused components) ✅ Completed 2025-11-16
+- [x] 20-mobile.sh (421 → 68 lines coordinator + 5 components) ✅ Completed 2025-11-16
 
-**Completed:** 3 of 5 scripts (60%)
+**Completed:** 4 of 5 scripts (80%)
 
 ---
 
