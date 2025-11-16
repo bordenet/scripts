@@ -1,113 +1,60 @@
 #!/usr/bin/env bash
-
 ################################################################################
 # RecipeArchive macOS Development Environment Setup
 ################################################################################
 # PURPOSE: Complete development environment setup for macOS
-#   - Installs Homebrew package manager
-#   - Installs Flutter SDK
-#   - Installs Android Studio and SDK
-#   - Installs Xcode Command Line Tools
-#   - Installs CocoaPods (modern Ruby via Homebrew)
-#   - Installs Node.js and npm
-#   - Installs AWS CLI
-#   - Installs Go
-#   - Installs development tools (git, wget, etc.)
-#   - Configures environment variables
-#   - Sets up shell configuration
-#   - Verifies all installations
-#
-# ARCHITECTURE:
-#   This script uses a modular component-based architecture where installation
-#   logic is organized into reusable, self-contained components in the
-#   setup-components/ directory. See setup-components/ADOPTERS_GUIDE.md for
-#   details on how to adopt/customize this setup system for other repositories.
-#
-# USAGE:
-#   ./scripts/setup-macos.sh [OPTIONS]
-#
+# ARCHITECTURE: Modular component-based. See setup-components/ADOPTERS_GUIDE.md
+# USAGE: ./scripts/setup-macos.sh [OPTIONS]
 # OPTIONS:
-#   -y, --yes       Automatically confirm all prompts (compact output)
+#   -y, --yes       Auto-confirm all prompts (compact output)
 #   -v, --verbose   Show detailed output
-#   -h, --help      Display help message
-#
-# EXAMPLES:
-#   ./scripts/setup-macos.sh                # Interactive with verbose output
-#   ./scripts/setup-macos.sh --yes          # Non-interactive with compact output
-#   ./scripts/setup-macos.sh --yes --verbose # Non-interactive with verbose output
-#
-# DEPENDENCIES:
-#   - macOS (this script is macOS-specific)
-#   - Internet connection
-#
-# NOTES:
-#   - macOS only
-#   - Run once for initial environment setup
-#   - May take 30-60 minutes on first run
-#   - Requires admin password for some operations
-#   - Installs modern Ruby (not system Ruby)
-#   - For customization, see setup-components/ADOPTERS_GUIDE.md
+#   -h, --help      Display help
 ################################################################################
 
-# Source common library
+# Source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 init_script
 
-# Global variable for auto-yes functionality
+# Global variables
 AUTO_YES=false
-VERBOSE=true  # Default to verbose mode
+VERBOSE=true
+FAILED_INSTALLS=()
+CURRENT_SECTION=""
+SECTION_STATUS=""
+declare -a SECTION_FAILURES
 
-# Helper functions (defined early for use in argument parsing)
-print_info()    { [ "$VERBOSE" = true ] && log_info "$1" || true; }
-print_success() { [ "$VERBOSE" = true ] && log_success "$1" || true; }
-print_warning() { [ "$VERBOSE" = true ] && log_warning "$1" || true; }
-print_error()   { log_error "$1"; }  # Always show errors
-
-# Function to display usage information
+# Display usage
 usage() {
-    echo "Usage: $(basename "$0") [OPTIONS]"
-    echo "Automates the setup of a comprehensive macOS development environment for RecipeArchive."
-    echo ""
-    echo "Options:"
-    echo "  -y, --yes       Automatically confirm all prompts."
-    echo "  -v, --verbose   Show detailed output (verbose mode)."
-    echo "  -h, --help      Display this help message and exit."
-    echo ""
-    echo "Notes:"
-    echo "  - Default mode is verbose without --yes (interactive with details)"
-    echo "  - Using --yes alone enables compact mode (auto-confirm + minimal output)"
-    echo "  - Using --yes --verbose enables verbose mode with auto-confirmation"
-    echo ""
-    echo "Examples:"
-    echo "  $(basename "$0")                # Interactive with verbose output"
-    echo "  $(basename "$0") --yes          # Non-interactive with compact output"
-    echo "  $(basename "$0") --yes --verbose # Non-interactive with verbose output"
+    cat << EOF
+Usage: $(basename "$0") [OPTIONS]
+Automates setup of comprehensive macOS development environment.
+
+Options:
+  -y, --yes       Auto-confirm all prompts (compact mode)
+  -v, --verbose   Show detailed output
+  -h, --help      Display help
+
+Examples:
+  $(basename "$0")                # Interactive verbose
+  $(basename "$0") --yes          # Auto compact
+  $(basename "$0") --yes --verbose # Auto verbose
+EOF
     exit 0
 }
 
-# Parse command-line arguments
+# Parse arguments
 while [[ $# -gt 0 ]]; do
-    key="$1"
-    case $key in
-        -y|--yes)
-        AUTO_YES=true
-        VERBOSE=false  # Compact mode by default with --yes
-        shift # past argument
-        ;;
-        -v|--verbose)
-        VERBOSE=true  # Override to verbose mode
-        shift # past argument
-        ;;
-        -h|--help)
-        usage
-        ;;
-        *)
-        print_error "Unknown option: $1"
-        usage
-        ;;
+    case $1 in
+        -y|--yes) AUTO_YES=true; VERBOSE=false; shift ;;
+        -v|--verbose) VERBOSE=true; shift ;;
+        -h|--help) usage ;;
+        *) echo "Unknown option: $1"; usage ;;
     esac
 done
+
+# Source UI library (after setting AUTO_YES/VERBOSE)
+source "$SCRIPT_DIR/lib/ui.sh"
 
 readonly REPO_ROOT="$(get_repo_root)"
 
@@ -116,157 +63,6 @@ if ! is_macos; then
     die "This script is only for macOS"
 fi
 
-# Error tracking for summary report
-FAILED_INSTALLS=()
-
-# Section tracking for compact output
-CURRENT_SECTION=""
-SECTION_STATUS=""
-SECTION_FAILURES=()
-
-# Section output functions (compact mode)
-section_start() {
-    CURRENT_SECTION="$1"
-    SECTION_STATUS="in_progress"
-    SECTION_FAILURES=()
-    if [ "$VERBOSE" = true ]; then
-        echo ""
-        print_info "$1"
-    else
-        printf "${COLOR_BLUE}[…]${COLOR_RESET} $1"
-    fi
-}
-
-section_end() {
-    if [ "$VERBOSE" = false ] && [ -n "$CURRENT_SECTION" ]; then
-        if [ "${#SECTION_FAILURES[@]}" -gt 0 ]; then
-            # Show failed items (space-separated)
-            local failed_list="${SECTION_FAILURES[*]}"
-            printf "\r\033[K${COLOR_RED}[✗]${COLOR_RESET} $CURRENT_SECTION ${COLOR_RED}($failed_list)${COLOR_RESET}\n"
-        else
-            # Clean success - no details, clear any lingering text
-            printf "\r\033[K${COLOR_GREEN}[✓]${COLOR_RESET} $CURRENT_SECTION\n"
-        fi
-    fi
-    CURRENT_SECTION=""
-    SECTION_STATUS=""
-    SECTION_FAILURES=()
-}
-
-section_update() {
-    if [ "$VERBOSE" = false ] && [ -n "$CURRENT_SECTION" ]; then
-        # Clear to end of line, then print section with current operation
-        printf "\r\033[K${COLOR_BLUE}[…]${COLOR_RESET} $CURRENT_SECTION ${COLOR_DIM}($1)${COLOR_RESET}"
-    fi
-}
-
-section_fail() {
-    SECTION_STATUS="failed"
-    # Add failed item to section failures array
-    if [ "$VERBOSE" = false ]; then
-        SECTION_FAILURES+=("$1")
-    fi
-}
-
-# Checklist-style output functions (verbose mode)
-check_installing() {
-    if [ "$VERBOSE" = true ]; then
-        printf "[ ] Installing $1..."
-    else
-        section_update "$1"
-    fi
-}
-
-check_done() {
-    if [ "$VERBOSE" = true ]; then
-        printf "\r[✓] Installing $1... Done!\n"
-    else
-        section_update "$1 ✓"
-    fi
-}
-
-check_skip() {
-    if [ "$VERBOSE" = true ]; then
-        printf "\r[→] $1 already installed\n"
-    else
-        section_update "$1 ✓"
-    fi
-}
-
-check_exists() {
-    if [ "$VERBOSE" = true ]; then
-        printf "[✓] $1 already installed\n"
-    else
-        section_update "$1 ✓"
-    fi
-}
-
-check_failed() {
-    if [ "$VERBOSE" = true ]; then
-        printf "\r${COLOR_RED}[✗]${COLOR_RESET} $1 installation failed\n"
-    else
-        section_update "${COLOR_RED}$1 failed${COLOR_RESET}"
-        section_fail "$1"
-    fi
-    FAILED_INSTALLS+=("$1")
-}
-
-# Function for timed confirmation (15 seconds default to 'N')
-timed_confirm() {
-    local message="$1"
-    local timeout="${2:-15}"
-    local default_response="${3:-N}"
-
-    if [ "$AUTO_YES" = true ]; then
-        print_info "$message (Auto-accepting: YES)"
-        return 0
-    fi
-
-    print_warning "$message"
-    local prompt_options="[y/N]"
-    if [ "$default_response" = "Y" ] || [ "$default_response" = "y" ]; then
-        prompt_options="[Y/n]"
-    fi
-    echo -n "Continue? ${prompt_options} (auto-${default_response} in ${timeout}s): "
-
-    if read -t "$timeout" -r response; then
-        # Handle empty response (user just pressed Enter)
-        if [ -z "$response" ]; then
-            if [ "$default_response" = "Y" ] || [ "$default_response" = "y" ]; then
-                print_info "Using default: YES"
-                return 0
-            else
-                print_info "Using default: NO"
-                return 1
-            fi
-        fi
-
-        # Handle explicit user response
-        case "$response" in
-            [yY]|[yY][eE][sS]) return 0 ;;
-            [nN]|[nN][oO]) return 1 ;;
-            *)
-                # Invalid response - use default
-                if [ "$default_response" = "Y" ] || [ "$default_response" = "y" ]; then
-                    print_warning "Invalid response, using default: YES"
-                    return 0
-                else
-                    print_warning "Invalid response, using default: NO"
-                    return 1
-                fi
-                ;;
-        esac
-    else
-        echo ""
-        if [ "$default_response" = "Y" ] || [ "$default_response" = "y" ]; then
-            print_info "Timed out, defaulting to YES"
-            return 0
-        else
-            print_info "Timed out, defaulting to NO"
-            return 1
-        fi
-    fi
-}
 
 log_header "RecipeArchive Project Setup for macOS"
 cd "$REPO_ROOT"
