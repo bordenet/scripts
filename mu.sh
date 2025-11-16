@@ -1,239 +1,64 @@
-#!/bin/bash
-# -----------------------------------------------------------------------------
-#
+#!/usr/bin/env bash
+################################################################################
 # Script Name: mu.sh (Matt's Update)
-#
-# Description: Comprehensive system update script for WSL + Windows environments.
-#              Updates apt, version managers (nvm, rbenv, rustup), Homebrew (optional),
-#              npm, pip/pipx in WSL, then triggers winget and Windows Update via PowerShell
-#              interop with UAC elevation. Optimized for ARM64 architecture with native
-#              tools. Designed for daily manual execution with compact console output and
-#              actionable error reporting.
-#
-# Usage: ./mu.sh [--skip-windows-update]
-#
-# Options:
-#   --skip-windows-update    Skip Windows Update (winget will still run)
-#
-# Dependencies:
-#   WSL: apt, nvm (optional), rbenv (optional), rustup (optional), Homebrew (optional), npm, pip, pipx (optional)
-#   Windows: PowerShell with UAC elevation, winget, PSWindowsUpdate module
-#
-# Author: Claude Code
-# Last Updated: 2025-01-10
-#
-# -----------------------------------------------------------------------------
-
-# Don't exit on error - we handle errors explicitly and continue
+################################################################################
+# PURPOSE: Comprehensive system update script for WSL + Windows environments
+# USAGE: ./mu.sh [--skip-windows-update]
+# PLATFORM: WSL/Linux + Windows
+# DEPENDENCIES: apt, npm, pip, winget, PowerShell
+################################################################################
 set -o pipefail
-
-# -----------------------------------------------------------------------------
+################################################################################
 # Configuration
-# -----------------------------------------------------------------------------
+################################################################################
 
 LOG_DIR="/tmp"
 LOG_RETENTION_HOURS=24
 ERRORS=()
 SKIP_WINDOWS_UPDATE=false
 
-# Parse command line arguments
+# Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --skip-windows-update)
-            SKIP_WINDOWS_UPDATE=true
-            shift
-            ;;
+        --skip-windows-update) SKIP_WINDOWS_UPDATE=true; shift ;;
         -h|--help)
             echo "Usage: $0 [--skip-windows-update]"
-            echo ""
             echo "Options:"
-            echo "  --skip-windows-update    Skip Windows Update (winget will still run)"
-            echo "  -h, --help              Show this help message"
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1"
-            echo "Use --help for usage information"
-            exit 1
-            ;;
+            echo "  --skip-windows-update    Skip Windows Update"
+            echo "  -h, --help              Show help"
+            exit 0 ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
 
-# -----------------------------------------------------------------------------
-# Helper Functions
-# -----------------------------------------------------------------------------
+# Source helper library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/mu-helpers.sh
+source "$SCRIPT_DIR/lib/mu-helpers.sh"
 
-# Spinner function for visual feedback with timeout
-spinner() {
-    local pid=$1
-    local timeout_seconds=${2:-600}  # Default 10 minutes
-    local delay=0.1
-    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-    local elapsed=0
-
-    while ps -p "$pid" > /dev/null 2>&1; do
-        local temp=${spinstr#?}
-        printf " %c  " "$spinstr"
-        spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
-        printf "\b\b\b\b"
-
-        elapsed=$((elapsed + 1))
-        # Check timeout (elapsed * delay = seconds)
-        if [ $elapsed -gt $((timeout_seconds * 10)) ]; then
-            kill -9 $pid 2>/dev/null
-            printf "    \b\b\b\b"
-            return 124  # Timeout exit code
-        fi
-    done
-    printf "    \b\b\b\b"
-    return 0
-}
-
-# Run command with spinner, timeout, and error capture
-run_phase() {
-    local phase_name=$1
-    local log_file=$2
-    local timeout_seconds=600  # 10 minutes default
-    shift 2
-    local cmd=("$@")
-
-    printf "%-30s" "$phase_name..."
-
-    # Ensure log file is writable by creating it first
-    # This handles cases where the command uses sudo but redirection doesn't
-    touch "$log_file" 2>/dev/null || {
-        # If touch fails, try with sudo
-        sudo touch "$log_file" 2>/dev/null || {
-            echo "✗"
-            ERRORS+=("$phase_name failed - cannot create log file $log_file")
-            return 1
-        }
-        # Make it writable by current user
-        sudo chmod 666 "$log_file" 2>/dev/null
-    }
-
-    # Run command in background
-    "${cmd[@]}" > "$log_file" 2>&1 &
-    local pid=$!
-
-    # Show spinner with timeout
-    spinner $pid $timeout_seconds
-    local spinner_exit=$?
-
-    # Check if timed out
-    if [ $spinner_exit -eq 124 ]; then
-        echo "⏱ TIMEOUT"
-        ERRORS+=("$phase_name timed out after ${timeout_seconds}s - see $log_file")
-        return 124
-    fi
-
-    # Check exit status
-    wait $pid 2>/dev/null
-    local exit_code=$?
-
-    if [ $exit_code -eq 0 ]; then
-        echo "✓"
-        return 0
-    else
-        echo "✗"
-        ERRORS+=("$phase_name failed (exit code: $exit_code) - see $log_file")
-        return 1
-    fi
-}
-
-# Wait for PID with timeout
-wait_with_timeout() {
-    local pid=$1
-    local timeout_seconds=${2:-600}  # Default 10 minutes
-    local elapsed=0
-    local delay=0.1
-
-    while ps -p "$pid" > /dev/null 2>&1; do
-        sleep $delay
-        elapsed=$((elapsed + 1))
-        # Check timeout (elapsed * delay = seconds)
-        if [ $elapsed -gt $((timeout_seconds * 10)) ]; then
-            kill -9 $pid 2>/dev/null
-            return 124  # Timeout exit code
-        fi
-    done
-
-    wait $pid 2>/dev/null
-    return $?
-}
-
-# Clean up old logs
-cleanup_old_logs() {
-    find "$LOG_DIR" -name "mu_*.log" -type f -mtime +1 -delete 2>/dev/null || true
-}
-
-# Print error report
-print_error_report() {
-    local error_count=${#ERRORS[@]}
-
-    echo ""
-    echo "=================================================="
-    echo "UPDATE SUMMARY"
-    echo "=================================================="
-    echo "Execution Time: $1 seconds"
-    echo ""
-
-    if [ $error_count -eq 0 ]; then
-        echo "✓ All updates completed successfully!"
-        echo "=================================================="
-    else
-        echo "⚠ ERRORS DETECTED ($error_count)"
-        echo "=================================================="
-        echo ""
-        local i=1
-        for error in "${ERRORS[@]}"; do
-            echo "$i. $error"
-            echo ""
-            i=$((i + 1))
-        done
-        echo "Review logs in $LOG_DIR for details."
-        echo "=================================================="
-    fi
-}
-
-# -----------------------------------------------------------------------------
+################################################################################
 # Main Script
-# -----------------------------------------------------------------------------
+################################################################################
 
 echo "=================================================="
 echo "mu.sh - Matt's Update Script"
 echo "=================================================="
 echo ""
 
-# Start timer
 start_time=$(date +%s)
 
 # Request sudo upfront
 echo "Requesting sudo privileges..."
 if sudo -v; then
     echo "✓ Sudo privileges granted"
-    # Keep sudo alive in background - exit if parent dies
     (while true; do sudo -n true; sleep 50; kill -0 $$ 2>/dev/null || exit; done 2>/dev/null) &
     SUDO_KEEPER_PID=$!
 else
-    echo "⚠ Sudo authentication failed - some operations may require manual password entry"
+    echo "⚠ Sudo authentication failed"
 fi
 echo ""
 
-# Clean up old logs
 cleanup_old_logs
-
-# -----------------------------------------------------------------------------
-# Phase 1: WSL Updates
-# -----------------------------------------------------------------------------
-
-echo "PHASE 1: WSL Updates"
-echo "--------------------------------------------------"
-
-# apt updates
-run_phase "apt update" "$LOG_DIR/mu_apt_update.log" \
-    sudo apt update || true
 
 run_phase "apt upgrade" "$LOG_DIR/mu_apt_upgrade.log" \
     sudo apt upgrade -y || true
