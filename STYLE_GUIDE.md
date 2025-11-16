@@ -22,8 +22,9 @@ This is the authoritative style guide for all shell scripts in this repository. 
 10. [Testing and Linting](#testing-and-linting)
 11. [Platform Compatibility](#platform-compatibility)
 12. [Security](#security)
-13. [Common Patterns](#common-patterns)
-14. [Code Examples](#code-examples)
+13. [Command-Line Interface](#command-line-interface)
+14. [Common Patterns](#common-patterns)
+15. [Code Examples](#code-examples)
 
 ---
 
@@ -766,6 +767,128 @@ trap 'rm -f "$TEMP_FILE"' EXIT
 TEMP_DIR=$(mktemp -d) || die "Failed to create temp directory"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 ```
+
+---
+
+## Command-Line Interface
+
+### MANDATORY: Help Flag Support
+
+**ABSOLUTE RULE:** Every script **MUST** implement `-h` and `--help` flags.
+
+**Requirements:**
+1. Both `-h` and `--help` must be supported
+2. Help output must follow man-page style format
+3. Help must be accessible without requiring other arguments
+4. Help flag must exit with status code 0
+5. Help must be comprehensive and include all options
+
+**Man-Page Style Format (MANDATORY):**
+
+```bash
+show_help() {
+    cat << EOF
+NAME
+    $(basename "$0") - Brief one-line description
+
+SYNOPSIS
+    $(basename "$0") [OPTIONS] <ARGUMENTS>
+
+DESCRIPTION
+    Detailed description of what the script does.
+    Can span multiple paragraphs if needed.
+
+OPTIONS
+    -h, --help
+        Display this help message and exit
+
+    -v, --verbose
+        Enable verbose output
+
+    -o, --output FILE
+        Specify output file (default: stdout)
+
+ARGUMENTS
+    INPUT_FILE
+        Path to input file (required)
+
+EXAMPLES
+    $(basename "$0") file.txt
+        Process file.txt with default options
+
+    $(basename "$0") --verbose --output result.txt input.txt
+        Process input.txt with verbose output to result.txt
+
+EXIT STATUS
+    0   Success
+    1   General error
+    2   Invalid arguments
+
+ENVIRONMENT
+    DEBUG=1
+        Enable debug output
+
+SEE ALSO
+    related-script.sh(1), documentation-url
+
+AUTHOR
+    Your Name or Organization
+
+EOF
+}
+```
+
+**Minimal Acceptable Format:**
+
+At minimum, help output must include:
+- NAME: Script name and brief description
+- SYNOPSIS: Usage syntax
+- DESCRIPTION: What the script does
+- OPTIONS: List of all options with descriptions
+- EXAMPLES: At least one usage example
+
+**Argument Parsing with Help:**
+
+```bash
+# Parse arguments - help must come first
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        *)
+            echo "Error: Unknown option: $1" >&2
+            echo "Use --help for usage information" >&2
+            exit 1
+            ;;
+    esac
+done
+```
+
+**Testing Help Output:**
+
+```bash
+# Verify help is accessible
+./script.sh --help
+./script.sh -h
+
+# Should exit with 0
+echo $?  # Should be 0
+
+# Should not require other arguments
+./script.sh --help  # Works even without required args
+```
+
+**Enforcement:**
+- Scripts without help flags will be rejected in code review
+- Help output must be tested before committing
+- Use `show_help()` function for consistency
+- Keep help text up-to-date with script changes
 
 ---
 
