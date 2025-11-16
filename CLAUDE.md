@@ -109,16 +109,25 @@ This is **NON-NEGOTIABLE**. Do not skip these steps. Do not wait to be asked.
 
 ### Creating Pull Requests:
 
-**ALWAYS provide a PR URL when changes are ready for review.**
+**⚠️ CRITICAL - MANDATORY IN EVERY SESSION ⚠️**
+
+**YOU MUST ALWAYS PROVIDE A PR URL AT THE END OF EVERY WORK SESSION**
+
+This is **NON-NEGOTIABLE**. Do not wait to be asked. Do not forget this step.
 
 When in Web mode (where `gh` CLI is unavailable):
-1. Provide the direct GitHub compare URL for PR creation
+1. **ALWAYS** provide the direct GitHub compare URL for PR creation
 2. Format: `https://github.com/OWNER/REPO/compare/BASE...BRANCH?expand=1`
 3. Include pre-written title and description for user to paste
-4. Don't leave the user hunting for how to create the PR
+4. Provide this URL **BEFORE** the session ends
+5. Don't leave the user hunting for how to create the PR
 
-Example:
+**Example:**
 ```
 https://github.com/bordenet/scripts/compare/main...claude/feature-branch?expand=1
 ```
+
+**This must be the LAST thing you do in every session that involves code changes.**
+
+If you forget to provide the PR URL, you have failed to complete the task.
 
