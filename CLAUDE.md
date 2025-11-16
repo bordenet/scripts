@@ -15,35 +15,49 @@ This document contains project-specific guidelines and lessons learned for Claud
 
 ## Quality Standards for Code Delivery
 
+### ⚠️ MANDATORY PRE-COMMIT REQUIREMENTS ⚠️
+
+**YOU MUST TEST, VALIDATE, AND LINT ALL CODE CHANGES BEFORE COMMITTING**
+
+This is **NON-NEGOTIABLE**. Do not skip these steps. Do not wait to be asked.
+
 ### ALWAYS Do Before Claiming "Done":
 
-1. **Lint the code**
+1. **Lint the code** ✅ **MANDATORY**
    - Run shellcheck for bash scripts
    - Run appropriate linter for the language
    - Fix ALL warnings that aren't explicitly false positives
    - Don't wait to be asked
+   - **Zero linting errors/warnings allowed before commit**
 
-2. **Test the code**
+2. **Test the code** ✅ **MANDATORY**
    - **ALWAYS test commands with sample data before committing**
    - Test basic functionality where possible
    - Run syntax checks at minimum
    - Don't commit broken code
    - Test awk/sed/grep commands in isolation with `echo "sample" | command`
    - If you can't test on the target platform, explicitly document this
+   - **Verify all functions work as expected**
 
-3. **Handle edge cases**
+3. **Validate the code** ✅ **MANDATORY**
+   - Check syntax: `bash -n script.sh`
+   - Verify all sourced files exist
+   - Confirm all required commands/dependencies are available
+   - Test with edge cases (empty inputs, special characters, etc.)
+
+4. **Handle edge cases**
    - Filenames with spaces/special characters
    - Empty inputs
    - Command failures
    - Concurrent execution (file locking where needed)
 
-4. **Error handling**
+5. **Error handling**
    - Check return codes
    - Don't mask errors with `local var=$(cmd)` without checking
    - Provide actionable error messages
    - Log errors comprehensively
 
-5. **Input validation**
+6. **Input validation**
    - Sanitize user input
    - Validate formats (emails, paths, etc.)
    - Prevent command injection
