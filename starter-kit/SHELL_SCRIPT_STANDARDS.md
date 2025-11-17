@@ -28,7 +28,7 @@
 #!/usr/bin/env bash
 
 ################################################################################
-# RecipeArchive <Script Purpose>
+# your-project <Script Purpose>
 ################################################################################
 # PURPOSE: <One sentence description>
 #   - <Key responsibility 1>
@@ -80,7 +80,7 @@ main "$@"
 #!/usr/bin/env bash
 
 ################################################################################
-# RecipeArchive <Script Purpose>
+# your-project <Script Purpose>
 ################################################################################
 # PURPOSE: <One sentence description>
 #   - <Key responsibility 1>
@@ -196,7 +196,7 @@ chmod +x scripts/lib/common.sh
 | `log_error` | Errors (continues) | `log_error "Failed to upload file.txt"` |
 | `die` | Fatal errors (exits) | `die "AWS credentials not found"` |
 | `log_debug` | Debug info (DEBUG=1) | `log_debug "Using bucket: s3://example"` |
-| `log_header` | Major section | `log_header "iOS Build - RecipeArchive"` |
+| `log_header` | Major section | `log_header "iOS Build - your-project"` |
 | `log_section` | Minor section | `log_section "Step 1: Environment Validation"` |
 
 #### Error Handling
@@ -459,7 +459,7 @@ mv /usr/local/bin/flutter /usr/local/bin/flutter.bak
 #!/usr/bin/env bash
 
 ################################################################################
-# RecipeArchive Hello World
+# your-project Hello World
 ################################################################################
 # PURPOSE: Example script demonstrating standardized style
 ################################################################################
@@ -470,7 +470,7 @@ init_script
 
 main() {
     log_header "Hello World Example"
-    log_info "Hello from RecipeArchive!"
+    log_info "Hello from your-project!"
     log_success "Example complete"
 }
 
@@ -483,7 +483,7 @@ main "$@"
 #!/usr/bin/env bash
 
 ################################################################################
-# RecipeArchive Deployment Script
+# your-project Deployment Script
 ################################################################################
 # PURPOSE: Deploy application to AWS infrastructure
 #   - Validates environment configuration
@@ -651,7 +651,7 @@ invalidate_cache() {
 }
 
 main() {
-    log_header "RecipeArchive Deployment - $ENVIRONMENT"
+    log_header "your-project Deployment - $ENVIRONMENT"
 
     validate_environment
     build_application
@@ -702,7 +702,7 @@ GREEN='\033[0;32m'
 **To adopt for your project**:
 
 1. Copy `common.sh` to `scripts/lib/common.sh`
-2. Update project name in headers (change "RecipeArchive" to your project name)
+2. Update project name in headers (change "your-project" to your project name)
 3. Add project-specific helper functions to `common.sh`
 4. Create script templates in your docs/
 5. Enforce standards in code reviews

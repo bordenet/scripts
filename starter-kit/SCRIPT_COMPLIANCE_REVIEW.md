@@ -10,7 +10,7 @@
 
 ## Overview
 
-RecipeArchive has **excellent** script hygiene. The scripts directory contains 50+ scripts that follow consistent patterns. This review identifies minor improvements to achieve 100% style guide compliance.
+your-project has **excellent** script hygiene. The scripts directory contains 50+ scripts that follow consistent patterns. This review identifies minor improvements to achieve 100% style guide compliance.
 
 ### Overall Health: **95% Compliant** ✅
 
@@ -171,7 +171,7 @@ parse_arguments() {
 
 ### 5. Add Script Name to Header Comments
 
-**Issue**: Some headers say "RecipeArchive X Script" but don't match the actual filename.
+**Issue**: Some headers say "your-project X Script" but don't match the actual filename.
 
 **Recommendation**: Ensure header PURPOSE matches script name and function.
 
@@ -180,7 +180,7 @@ parse_arguments() {
 ```bash
 # File: scripts/ios/build.sh
 ################################################################################
-# RecipeArchive iOS Build Script
+# your-project iOS Build Script
 ################################################################################
 # PURPOSE: Build iOS app for development or production
 ```
@@ -366,7 +366,7 @@ Script compliance is achieved when:
 
 ## Conclusion
 
-RecipeArchive scripts are in **excellent** shape. The style guide compliance is already at 95%. The remaining 5% is cosmetic refinement that can be done incrementally without breaking anything.
+your-project scripts are in **excellent** shape. The style guide compliance is already at 95%. The remaining 5% is cosmetic refinement that can be done incrementally without breaking anything.
 
 **Recommendation**:
 1. Create starter-kit with current scripts as examples (they're already great)

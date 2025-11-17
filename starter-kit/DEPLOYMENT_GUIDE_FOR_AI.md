@@ -13,7 +13,7 @@ If you're an AI assistant and you see a `starter-kit/` directory in a repository
 ### Step 1: Understand the Context
 
 Ask the user:
-- "I see you have the RecipeArchive starter-kit. Would you like me to deploy it into this project?"
+- "I see you have the your-project starter-kit. Would you like me to deploy it into this project?"
 - "Which components do you need? (All / Safety net only / Specific documents)"
 
 ### Step 2: Deploy Materials (Don't Just Copy)
@@ -27,7 +27,7 @@ Ask the user:
 | Starter-Kit File | Deploy To | Customization Needed |
 |------------------|-----------|----------------------|
 | `README.md` | Reference only | N/A - explains starter-kit |
-| `SAFETY_NET.md` | `docs/SAFETY_NET.md` | Replace "RecipeArchive" with project name |
+| `SAFETY_NET.md` | `docs/SAFETY_NET.md` | Replace "your-project" with project name |
 | `DEVELOPMENT_PROTOCOLS.md` | `CLAUDE.md` (root) | Extract relevant sections, add project-specific protocols |
 | `CODE_STYLE_STANDARDS.md` | `docs/CODING_STANDARDS.md` | Remove unused languages |
 | `SHELL_SCRIPT_STANDARDS.md` | `docs/SHELL_SCRIPTS.md` | Minimal changes |
@@ -44,7 +44,7 @@ Ask the user:
 
 #### Special Handling
 
-**SCRIPT_COMPLIANCE_REVIEW.md**: DO NOT deploy. This is specific to RecipeArchive.
+**SCRIPT_COMPLIANCE_REVIEW.md**: DO NOT deploy. This is specific to your-project.
 
 ---
 
@@ -126,7 +126,7 @@ Ask the user:
 3. **Create docs/SAFETY_NET.md**
    ```bash
    cp starter-kit/SAFETY_NET.md docs/SAFETY_NET.md
-   # Replace "RecipeArchive" with project name
+   # Replace "your-project" with project name
    # Update examples to use project-specific code
    ```
 
@@ -188,8 +188,8 @@ Ask the user:
 
 Use search and replace:
 ```bash
-# Replace "RecipeArchive" with actual project name
-find docs/ -type f -name "*.md" -exec sed -i '' 's/RecipeArchive/YourProject/g' {} +
+# Replace "your-project" with actual project name
+find docs/ -type f -name "*.md" -exec sed -i '' 's/your-project/YourProject/g' {} +
 ```
 
 ### Remove Unused Languages
@@ -270,9 +270,9 @@ bash -c 'source scripts/lib/common.sh && log_info "Test"'
 
 **DON'T**:
 - ❌ Copy entire starter-kit directory to new project
-- ❌ Keep `SCRIPT_COMPLIANCE_REVIEW.md` (RecipeArchive-specific)
+- ❌ Keep `SCRIPT_COMPLIANCE_REVIEW.md` (your-project-specific)
 - ❌ Keep unused language sections in style guides
-- ❌ Keep RecipeArchive project name in deployed docs
+- ❌ Keep your-project project name in deployed docs
 - ❌ Deploy without customizing for project tech stack
 
 **DO**:
@@ -287,7 +287,7 @@ bash -c 'source scripts/lib/common.sh && log_info "Test"'
 
 ## Example Deployment Session
 
-**User**: "I want to use the RecipeArchive starter-kit for my new Go API project"
+**User**: "I want to use the your-project starter-kit for my new Go API project"
 
 **AI Response**:
 ```
