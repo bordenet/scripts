@@ -1,2 +1,0 @@
-[console_scripts]
-review-codebase = codebase_reviewer.cli:main
