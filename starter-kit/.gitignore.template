@@ -1,0 +1,258 @@
+# .gitignore Template for Production Projects
+# Based on RecipeArchive - Adjust for your project
+
+################################################################################
+# SECURITY: Never commit credentials or secrets
+################################################################################
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+aws-credentials.json
+secrets.json
+config/secrets.yml
+*.pem
+*.key
+*.crt
+gitleaks-report.json
+
+################################################################################
+# Binaries (platform-specific, should be built from source)
+################################################################################
+*.exe
+*.dll
+*.bin
+*.a
+*.o
+**/*-darwin-*
+**/*-linux-*
+**/*-windows-*
+
+# Project binaries (customize for your project)
+/monorepo-validator
+tools/*/bin/*
+**/bin/*
+
+################################################################################
+# Temporary Files
+################################################################################
+*.tmp
+*.backup
+*.bak
+*.log
+wget-log
+test-results/
+.validation-logs/
+
+################################################################################
+# AWS
+################################################################################
+.aws/
+cdk.out/
+terraform.tfstate
+terraform.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+*.zip
+
+################################################################################
+# Node.js / TypeScript / React
+################################################################################
+node_modules/
+dist/
+build/
+builds/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+*.tscache
+
+# Lock files (choose one strategy)
+# Option 1: Commit lock files (recommended for applications)
+# (no entries here)
+# Option 2: Ignore lock files (for libraries)
+# package-lock.json
+# pnpm-lock.yaml
+# yarn.lock
+
+################################################################################
+# Go
+################################################################################
+bin/
+dist/
+*.exe
+*.test
+*.out
+coverage/
+vendor/
+__debug_bin*
+
+# Go compiled binaries
+tools/*/tool-name
+aws-backend/functions/*/bootstrap
+
+################################################################################
+# Flutter / Dart
+################################################################################
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Platform-specific Flutter builds
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Pods/
+android/.gradle/
+android/app/release/
+
+################################################################################
+# iOS / Swift
+################################################################################
+# Xcode user data (machine-specific)
+xcuserdata/
+*.xcuserstate
+
+# Build outputs
+DerivedData/
+*.ipa
+*.dSYM
+
+# Xcode project user-specific files
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xccheckout
+*.moved-aside
+*.xcscmblueprint
+
+# CocoaPods
+Pods/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+################################################################################
+# Android / Kotlin
+################################################################################
+.gradle/
+local.properties
+.idea/
+*.iml
+*.apk
+*.aab
+captures/
+.externalNativeBuild/
+.cxx/
+
+################################################################################
+# IDEs and Editors
+################################################################################
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+*.bak
+*.orig
+.DS_Store
+Thumbs.db
+
+################################################################################
+# Test Artifacts
+################################################################################
+coverage/
+*.lcov
+tests/results/
+*test-results.json
+junit.xml
+test-output/
+playwright-report/
+
+################################################################################
+# Build Artifacts (project-specific)
+################################################################################
+# Adjust these paths for your project structure
+/build/
+/dist/
+/builds/
+
+################################################################################
+# Logs and Temporary Files
+################################################################################
+logs/
+*.log
+/tmp/
+temp/
+.cache/
+*.pid
+*.seed
+*.pid.lock
+
+################################################################################
+# Database Files (if applicable)
+################################################################################
+*.db
+*.sqlite
+*.sqlite3
+local-data/
+
+################################################################################
+# Documentation Builds
+################################################################################
+docs/build/
+docs/.docusaurus/
+
+################################################################################
+# CDK / Infrastructure as Code
+################################################################################
+cdk.context.json
+*.asset.*
+
+################################################################################
+# Runtime and Process Files
+################################################################################
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+################################################################################
+# Package Manager Caches
+################################################################################
+.npm
+.yarn
+.pnpm
+.eslintcache
+
+################################################################################
+# Framework-Specific
+################################################################################
+# Next.js
+.next/
+out/
+
+# Nuxt.js
+.nuxt
+dist
+
+# Gatsby
+.cache/
+public
+
+# Storybook
+.out
+.storybook-out
+
+################################################################################
+# End of .gitignore Template
+################################################################################
+
+# Add project-specific patterns below:
