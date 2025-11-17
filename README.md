@@ -57,6 +57,33 @@ A collection of utility scripts for various tasks.
 | [`resume-claude.sh`](./resume-claude.sh) | Automates the process of resuming an AI assistant session with "Claude" within VS Code. |
 | [`schedule-claude.sh`](./schedule-claude.sh) | Schedules the execution of the 'resume-claude.sh' script after a specified delay. |
 
+## Engineering Starter Kit
+
+**NEW**: Portable collection of battle-tested engineering best practices ready to copy into new projects.
+
+See **[`starter-kit/`](./starter-kit/README.md)** for production-grade engineering standards including:
+- ✅ **Safety nets**: Pre-commit hooks, validation systems, dependency management
+- ✅ **AI development protocols**: Guidelines for Claude Code, token conservation, quality gates
+- ✅ **Code style standards**: Cross-language style guides (Go, JS/TS, Dart, Kotlin, Swift)
+- ✅ **Shell script library**: Reusable common.sh with logging, error handling, UI helpers
+- ✅ **Project setup checklist**: Step-by-step guide for new repository setup
+
+**Quick Start:**
+```bash
+# Copy to your project
+cp -r starter-kit/ your-project/docs/
+
+# Or cherry-pick specific components
+cp starter-kit/DEVELOPMENT_PROTOCOLS.md your-project/docs/
+cp starter-kit/common.sh your-project/scripts/lib/
+
+# See ./starter-kit/README.md for comprehensive documentation
+```
+
+**Use this to avoid repeating painful mistakes from production experience.**
+
+---
+
 ## macOS Development Environment Setup
 
 **NEW**: Modular, component-based architecture for maintainable macOS setup scripts.
