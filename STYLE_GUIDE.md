@@ -1,7 +1,7 @@
 # Shell Script Style Guide
 
-**Version:** 1.0
-**Last Updated:** 2025-11-16
+**Version:** 1.1
+**Last Updated:** 2025-11-17
 **Target Audience:** Claude Code, Google Gemini, Human Developers
 
 This is the authoritative style guide for all shell scripts in this repository. These standards are **non-negotiable** and must be followed without exception.
@@ -508,6 +508,243 @@ fi
 - `WARNING`: Non-fatal issues
 - `ERROR`: Fatal errors (write to stderr)
 - `DEBUG`: Detailed debugging (only when `DEBUG=1`)
+
+### Display Requirements (MANDATORY)
+
+**ABSOLUTE RULE:** All scripts **MUST** optimize for minimum vertical space in the console.
+
+#### Minimum Vertical Space with ANSI Escape Codes
+
+Scripts must use ANSI escape codes to keep display height to a minimum:
+
+- **INFO-level output** should ONLY appear with `-v | --verbose` flag
+- **Without verbose mode**, output must be compact and overwrite itself as sections complete
+- Use `\r` (carriage return) and ANSI positioning to update lines in-place
+- Clear completed sections to reduce visual clutter
+
+**Example of verbose vs non-verbose:**
+
+```bash
+# VERBOSE MODE (-v | --verbose)
+[INFO] Running in auto-confirm mode
+[INFO] macOS version: 26.1
+[✓] System requirements check passed
+[INFO] Homebrew already installed: Homebrew 5.0.1
+[INFO] Update Homebrew? [auto-confirmed]
+[INFO] Updating Homebrew...
+[✓] Homebrew updated
+
+# NON-VERBOSE MODE (default)
+▶ Checking System Requirements     [✓]
+▶ Installing Homebrew              [✓]
+▶ Installing Python                [✓]
+```
+
+#### ANSI Escape Code Examples
+
+```bash
+# Move cursor up N lines
+echo -e "\033[${N}A"
+
+# Clear from cursor to end of line
+echo -e "\033[K"
+
+# Clear entire line
+echo -e "\033[2K"
+
+# Move cursor to beginning of line (carriage return)
+echo -ne "\r"
+
+# Save cursor position
+echo -ne "\033[s"
+
+# Restore cursor position
+echo -ne "\033[u"
+
+# Move cursor to specific position (row, col)
+echo -e "\033[${row};${col}H"
+
+# Example: Overwriting progress in place
+for i in {1..100}; do
+    echo -ne "\rProgress: ${i}%  "
+    sleep 0.1
+done
+echo -e "\rProgress: Complete! ✓\033[K"
+```
+
+#### Running Wall Clock Timer (MANDATORY)
+
+**ABSOLUTE RULE:** EVERY script **MUST** display a running wall clock time in the top-right corner of the terminal.
+
+**Requirements:**
+- Display format: `[00:00:15]` (hours:minutes:seconds)
+- Location: Top-right corner of terminal
+- Color: **Yellow text on black background** (`\033[33;40m`)
+- Must update throughout script execution (at least every second)
+- Use background process or function to update timer
+
+**Implementation Example:**
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Timer variables
+SCRIPT_START_TIME=$(date +%s)
+TIMER_PID=""
+
+# Function: Update wall clock timer
+update_timer() {
+    local start_time="$1"
+    local cols
+
+    while true; do
+        cols=$(tput cols 2>/dev/null || echo 80)
+        local elapsed=$(($(date +%s) - start_time))
+        local hours=$((elapsed / 3600))
+        local minutes=$(((elapsed % 3600) / 60))
+        local seconds=$((elapsed % 60))
+
+        # Format timer: [HH:MM:SS]
+        local timer_text
+        printf -v timer_text "[%02d:%02d:%02d]" "$hours" "$minutes" "$seconds"
+
+        # Move to top-right corner (row 1, col = terminal_width - timer_length)
+        local timer_col=$((cols - ${#timer_text}))
+
+        # Yellow on black, position, print timer, reset
+        echo -ne "\033[s"                          # Save cursor position
+        echo -ne "\033[1;${timer_col}H"            # Move to top-right
+        echo -ne "\033[33;40m${timer_text}\033[0m" # Yellow on black
+        echo -ne "\033[u"                          # Restore cursor position
+
+        sleep 1
+    done
+}
+
+# Function: Start timer
+start_timer() {
+    update_timer "$SCRIPT_START_TIME" &
+    TIMER_PID=$!
+}
+
+# Function: Stop timer
+stop_timer() {
+    if [[ -n "$TIMER_PID" ]]; then
+        kill "$TIMER_PID" 2>/dev/null || true
+        wait "$TIMER_PID" 2>/dev/null || true
+    fi
+}
+
+# Cleanup trap
+cleanup() {
+    stop_timer
+}
+trap cleanup EXIT
+
+# Start timer at script start
+start_timer
+
+# Main script logic
+main() {
+    echo "Doing work..."
+    sleep 5
+    echo "More work..."
+    sleep 3
+}
+
+main "$@"
+
+# Stop timer and show total time
+stop_timer
+elapsed=$(($(date +%s) - SCRIPT_START_TIME))
+hours=$((elapsed / 3600))
+minutes=$(((elapsed % 3600) / 60))
+seconds=$((elapsed % 60))
+printf "\nTotal execution time: %02d:%02d:%02d\n" "$hours" "$minutes" "$seconds"
+```
+
+#### Total Execution Time (MANDATORY)
+
+At the end of script execution, **MUST** display total time taken:
+
+```bash
+# At script end
+SCRIPT_END_TIME=$(date +%s)
+TOTAL_ELAPSED=$((SCRIPT_END_TIME - SCRIPT_START_TIME))
+
+hours=$((TOTAL_ELAPSED / 3600))
+minutes=$(((TOTAL_ELAPSED % 3600) / 60))
+seconds=$((TOTAL_ELAPSED % 60))
+
+echo ""
+echo "========================================="
+printf "Total execution time: %02d:%02d:%02d\n" "$hours" "$minutes" "$seconds"
+echo "========================================="
+```
+
+#### Verbose Flag Implementation
+
+Every script must support verbose output control:
+
+```bash
+# Default to non-verbose
+VERBOSE=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        # ... other options
+    esac
+done
+
+# Logging functions that respect verbose flag
+log_info() {
+    if [[ "$VERBOSE" == true ]]; then
+        echo "[INFO] $*"
+    fi
+}
+
+log_section() {
+    # Always show sections, but format differently based on verbose
+    if [[ "$VERBOSE" == true ]]; then
+        echo ""
+        echo "▶ $*"
+        echo ""
+    else
+        # Compact format - will be overwritten
+        echo -ne "\r\033[K▶ $*  "
+    fi
+}
+
+log_success() {
+    if [[ "$VERBOSE" == true ]]; then
+        echo "[✓] $*"
+    else
+        # Update in-place
+        echo -e "\r\033[K▶ $*\t\t[✓]"
+    fi
+}
+```
+
+#### Summary of Display Requirements
+
+**Every script MUST:**
+1. ✅ Support `-v | --verbose` flag
+2. ✅ Show INFO-level messages ONLY in verbose mode
+3. ✅ Use compact, overwriting display in non-verbose mode
+4. ✅ Display running wall clock timer in top-right corner (yellow on black)
+5. ✅ Show total execution time at script end
+6. ✅ Use ANSI escape codes to minimize vertical space
+
+**Enforcement:**
+- Scripts without these display features will be rejected in code review
+- Timer must be visible and updating during execution
+- Non-verbose mode must be genuinely compact (< 10 lines for typical scripts)
 
 ---
 
@@ -1096,9 +1333,10 @@ When writing or modifying shell scripts in this repository:
 
 ## Version History
 
-| Version | Date       | Changes                          |
-|---------|------------|----------------------------------|
-| 1.0     | 2025-11-16 | Initial style guide creation     |
+| Version | Date       | Changes                                              |
+|---------|------------|------------------------------------------------------|
+| 1.1     | 2025-11-17 | Add mandatory display requirements (ANSI, timer)    |
+| 1.0     | 2025-11-16 | Initial style guide creation                         |
 
 ---
 
