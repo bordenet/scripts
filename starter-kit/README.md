@@ -1,6 +1,8 @@
-# RecipeArchive Engineering Starter Kit
+# Engineering Starter Kit
 
-**Purpose**: Portable collection of battle-tested engineering best practices from the RecipeArchive project, ready to be copied into new projects.
+**Purpose**: Portable collection of battle-tested engineering best practices, ready to be copied into new projects.
+
+**Origin**: Born from the [RecipeArchive](https://github.com/bordenet/RecipeArchive) project.
 
 ## What Is This?
 
@@ -48,20 +50,20 @@ Copy this starter-kit to a new project when:
 ```bash
 # In your new project
 mkdir -p docs/starter-kit
-cp -r /path/to/RecipeArchive/starter-kit/* ./docs/starter-kit/
+cp -r /path/to/your-project/starter-kit/* ./docs/starter-kit/
 
 # Review and customize for your project
 # Then commit to git
 git add docs/starter-kit
-git commit -m "Add engineering starter-kit from RecipeArchive"
+git commit -m "Add engineering starter-kit from your-project"
 ```
 
 ### Option 2: Cherry-Pick Specific Documents
 
 ```bash
 # Copy only what you need
-cp /path/to/RecipeArchive/starter-kit/SAFETY_NET.md ./docs/
-cp /path/to/RecipeArchive/starter-kit/common.sh ./scripts/lib/
+cp /path/to/your-project/starter-kit/SAFETY_NET.md ./docs/
+cp /path/to/your-project/starter-kit/common.sh ./scripts/lib/
 ```
 
 ### Option 3: Provide to AI Assistants
@@ -106,17 +108,17 @@ Follow this order:
 
 ## Maintenance
 
-This starter-kit was created from RecipeArchive at commit `66ba440` on 2025-11-17.
+This starter-kit was created from your-project at commit `66ba440` on 2025-11-17.
 
-**To update**: When RecipeArchive improves a practice, update these documents and bump the version.
+**To update**: When your-project improves a practice, update these documents and bump the version.
 
 ## License
 
-Same as RecipeArchive project. These are engineering best practices, not proprietary code.
+Same as your-project project. These are engineering best practices, not proprietary code.
 
 ## Questions?
 
-- **Original project**: [RecipeArchive](https://github.com/bordenet/RecipeArchive)
+- **Original project**: [your-project](https://github.com/bordenet/your-project)
 - **Created by**: Human engineer + Claude Code collaboration
 - **Last updated**: 2025-11-17
 

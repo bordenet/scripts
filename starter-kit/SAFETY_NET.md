@@ -280,7 +280,7 @@ Use Go-based validator for real-time progress:
 
 ```
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ RecipeArchive Monorepo Validation (med)  ┃
+┃ your-project Monorepo Validation (med)  ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
 Prerequisites     ████████████████████  100%  ✓
@@ -361,7 +361,7 @@ for component in scripts/setup-components/*.sh; do
 done
 
 # Run installation
-log_header "RecipeArchive Development Environment Setup"
+log_header "your-project Development Environment Setup"
 
 install_homebrew
 install_essentials

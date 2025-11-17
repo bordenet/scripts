@@ -194,7 +194,7 @@ async function authenticateUser(username, password) {
 
 ```javascript
 // ✅ Good - Uses emojis for visual distinction in DevTools
-console.log("🎯 RecipeArchive content script starting...");
+console.log("🎯 your-project content script starting...");
 console.log("✅ Recipe extraction completed");
 console.error("❌ Failed to authenticate:", error);
 console.warn("⚠️ Token validation failed");

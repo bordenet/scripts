@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ################################################################################
-# RecipeArchive Shell Script Common Library
+# Common Shell Script Library
 ################################################################################
 # PURPOSE: Standardized functions, colors, and conventions for all shell scripts
 # USAGE: source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
