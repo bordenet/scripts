@@ -172,6 +172,14 @@ update_repo() {
         return 1
     }
 
+    # Check if this is an empty/uninitialized repo
+    if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+        complete_status "${YELLOW}⊘${NC} ${repo_name} (empty repository, skipped)"
+        SKIPPED_REPOS+=("$repo_name: empty repository")
+        popd > /dev/null || return
+        return 0
+    fi
+
     # Detect default branch
     DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}')
     if [ -z "$DEFAULT_BRANCH" ]; then
@@ -180,8 +188,16 @@ update_repo() {
         elif git show-ref --quiet refs/heads/master; then
             DEFAULT_BRANCH="master"
         else
-            DEFAULT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+            DEFAULT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
         fi
+    fi
+
+    # If still no branch, skip this repo
+    if [ -z "$DEFAULT_BRANCH" ] || [ "$DEFAULT_BRANCH" = "HEAD" ]; then
+        complete_status "${YELLOW}⊘${NC} ${repo_name} (detached HEAD or no branch, skipped)"
+        SKIPPED_REPOS+=("$repo_name: detached HEAD or no branch")
+        popd > /dev/null || return
+        return 0
     fi
 
     # Check for local changes
@@ -249,7 +265,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -d "$SCRIPT_DIR/.git" ]; then
     pushd "$SCRIPT_DIR" > /dev/null || exit
     git fetch origin > /dev/null 2>&1
-    LOCAL=$(git rev-parse @)
+    LOCAL=$(git rev-parse @ 2>/dev/null)
     REMOTE=$(git rev-parse '@{u}' 2>/dev/null)
 
     if [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
