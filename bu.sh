@@ -120,11 +120,15 @@ log_success() {
 }
 
 log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $*"
+    if [ "$VERBOSE" = true ]; then
+        echo -e "${YELLOW}[WARNING]${NC} $*"
+    fi
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $*"
+    if [ "$VERBOSE" = true ]; then
+        echo -e "${RED}[ERROR]${NC} $*"
+    fi
 }
 
 # Execute command with retry logic
@@ -508,12 +512,16 @@ if command_exists mas; then
             done
 
             if [ "$mas_success" = false ]; then
-                complete_status "${RED}✗${NC} Upgrading App Store apps (see manual steps below)"
+                complete_status "${RED}✗${NC} Upgrading App Store apps"
                 log_error "Mac App Store upgrades failed after $mas_max_attempts attempts"
-                echo -e "${YELLOW}Manual steps:${NC}"
-                echo "  1. Open App Store app and check for updates"
-                echo "  2. Try running 'mas upgrade' later"
-                log_warning "Continuing with remaining updates..."
+                if [ "$VERBOSE" = false ]; then
+                    # Show manual steps in concise mode too since this is actionable
+                    echo
+                    echo -e "${YELLOW}Manual steps for App Store updates:${NC}"
+                    echo "  1. Open App Store app and check for updates"
+                    echo "  2. Try running 'mas upgrade' later"
+                    echo
+                fi
                 FAILED_TASKS+=("Mac App Store upgrades")
             fi
         fi
@@ -548,6 +556,16 @@ else
 fi
 
 # --- Completion ---
+
+# Stop timer before showing summary
+stop_timer
+
+# Clear timer line and add spacing
+if [ "$VERBOSE" = false ]; then
+    echo -ne "\033[1;1H${ERASE_LINE}"
+    echo  # Blank line after last status
+fi
+
 if [ "$VERBOSE" = true ]; then
     echo
     echo "========================================================================"
@@ -558,14 +576,6 @@ fi
 end_time=$(date +%s)
 execution_time=$((end_time - start_time))
 
-# Stop timer before showing summary
-stop_timer
-
-# Clear timer line
-if [ "$VERBOSE" = false ]; then
-    echo -ne "\033[1;1H${ERASE_LINE}"
-fi
-
 echo
 if [ "$VERBOSE" = false ]; then
     echo -e "${BOLD}Summary${NC} (${execution_time}s)"
@@ -575,12 +585,14 @@ fi
 echo
 
 # Display summary
-if [ ${#SUCCEEDED_TASKS[@]} -gt 0 ] && [ "$VERBOSE" = true ]; then
-    echo -e "${GREEN}✓ Successful tasks (${#SUCCEEDED_TASKS[@]}):${NC}"
-    for task in "${SUCCEEDED_TASKS[@]}"; do
-        echo "  • $task"
-    done
-    echo
+if [ "$VERBOSE" = true ]; then
+    if [ ${#SUCCEEDED_TASKS[@]} -gt 0 ]; then
+        echo -e "${GREEN}✓ Successful tasks (${#SUCCEEDED_TASKS[@]}):${NC}"
+        for task in "${SUCCEEDED_TASKS[@]}"; do
+            echo "  • $task"
+        done
+        echo
+    fi
 fi
 
 if [ ${#SKIPPED_TASKS[@]} -gt 0 ]; then
@@ -597,16 +609,11 @@ if [ ${#FAILED_TASKS[@]} -gt 0 ]; then
         echo "  • $task"
     done
     echo
-    log_warning "Script completed with some failures"
     if [ "$VERBOSE" = false ]; then
         echo "Run with --verbose for detailed error information"
     fi
     exit 1
 else
-    if [ "$VERBOSE" = false ]; then
-        echo -e "${GREEN}✓${NC} All updates completed successfully!"
-    else
-        log_success "All tasks completed successfully!"
-    fi
+    echo -e "${GREEN}✓${NC} All updates completed successfully!"
     exit 0
 fi
