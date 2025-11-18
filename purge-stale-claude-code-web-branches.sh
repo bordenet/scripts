@@ -26,6 +26,7 @@ DELETED_BRANCHES=()
 SKIPPED_BRANCHES=()
 FAILED_BRANCHES=()
 ALL_MODE=false
+WHAT_IF=false
 
 # Array to store branch info: "name|timestamp|author|subject|location"
 declare -a BRANCHES
@@ -105,7 +106,13 @@ format_timestamp() {
 delete_branch() {
     local branch_name=$1
     local location=$2
+    local what_if=$3
     local failed=false
+
+    if [ "$what_if" = true ]; then
+        # Dry-run mode - don't actually delete
+        return 0
+    fi
 
     if [[ "$location" == *"local"* ]]; then
         if ! git branch -D "$branch_name" &> /dev/null; then
@@ -137,7 +144,7 @@ NAME
 
 SYNOPSIS
     purge-stale-claude-code-web-branches.sh [OPTIONS]
-    purge-stale-claude-code-web-branches.sh --all
+    purge-stale-claude-code-web-branches.sh --all [--what-if]
 
 DESCRIPTION
     Interactive tool to identify and delete stale Claude Code web branches.
@@ -159,6 +166,10 @@ OPTIONS
         Process all branches sequentially (still requires per-branch confirmation).
         Without this flag, displays interactive menu for selection.
 
+    --what-if
+        Dry-run mode: show what would be deleted without making any changes.
+        No branches will be deleted locally or remotely.
+
     -h, --help
         Display this help message and exit
 
@@ -174,6 +185,9 @@ EXAMPLES
 
     # Process all branches with confirmations
     ./purge-stale-claude-code-web-branches.sh --all
+
+    # Dry-run to see what would be deleted
+    ./purge-stale-claude-code-web-branches.sh --all --what-if
 
 SAFETY FEATURES
     • Shows commit details before deletion
@@ -200,29 +214,42 @@ EOF
 }
 
 # --- Argument Parsing ---
-case "${1:-}" in
-    -h|--help)
-        show_help
-        ;;
-    --all)
-        ALL_MODE=true
-        ;;
-    "")
-        ALL_MODE=false
-        ;;
-    *)
-        echo -e "${RED}Error:${NC} Unknown option: $1"
-        echo "Try '$0 --help' for more information"
-        exit 1
-        ;;
-esac
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        --all)
+            ALL_MODE=true
+            shift
+            ;;
+        --what-if)
+            WHAT_IF=true
+            shift
+            ;;
+        -*)
+            echo -e "${RED}Error:${NC} Unknown option: $1"
+            echo "Try '$0 --help' for more information"
+            exit 1
+            ;;
+        *)
+            echo -e "${RED}Error:${NC} Unexpected argument: $1"
+            echo "Try '$0 --help' for more information"
+            exit 1
+            ;;
+    esac
+done
 
 # --- Validation ---
 start_time=$(date +%s)
 
 # Clear screen and start
 clear
-echo -e "${BOLD}Claude Code Branch Cleanup${NC}\n"
+if [ "$WHAT_IF" = true ]; then
+    echo -e "${BOLD}Claude Code Branch Cleanup${NC} ${YELLOW}[DRY-RUN]${NC}\n"
+else
+    echo -e "${BOLD}Claude Code Branch Cleanup${NC}\n"
+fi
 start_timer
 
 # Ensure timer stops on exit
@@ -332,12 +359,17 @@ if [ "$ALL_MODE" = true ]; then
         echo
 
         if [[ "$response" =~ ^[Yy]$ ]]; then
-            if delete_branch "$name" "$location"; then
-                echo -e "${GREEN}✓${NC} Deleted $location branch(es)"
+            if [ "$WHAT_IF" = true ]; then
+                echo -e "${YELLOW}⊙${NC} Would delete $location branch(es) [DRY-RUN]"
                 DELETED_BRANCHES+=("$name ($age)")
             else
-                echo -e "${RED}✗${NC} Failed to delete branch"
-                FAILED_BRANCHES+=("$name: deletion failed")
+                if delete_branch "$name" "$location" "$WHAT_IF"; then
+                    echo -e "${GREEN}✓${NC} Deleted $location branch(es)"
+                    DELETED_BRANCHES+=("$name ($age)")
+                else
+                    echo -e "${RED}✗${NC} Failed to delete branch"
+                    FAILED_BRANCHES+=("$name: deletion failed")
+                fi
             fi
         else
             echo -e "${YELLOW}⊘${NC} Skipped $name"
@@ -380,12 +412,17 @@ else
                 echo
 
                 if [[ "$response" =~ ^[Yy]$ ]]; then
-                    if delete_branch "$name" "$location"; then
-                        echo -e "${GREEN}✓${NC} Deleted $location branch(es)"
+                    if [ "$WHAT_IF" = true ]; then
+                        echo -e "${YELLOW}⊙${NC} Would delete $location branch(es) [DRY-RUN]"
                         DELETED_BRANCHES+=("$name ($age)")
                     else
-                        echo -e "${RED}✗${NC} Failed to delete branch"
-                        FAILED_BRANCHES+=("$name: deletion failed")
+                        if delete_branch "$name" "$location" "$WHAT_IF"; then
+                            echo -e "${GREEN}✓${NC} Deleted $location branch(es)"
+                            DELETED_BRANCHES+=("$name ($age)")
+                        else
+                            echo -e "${RED}✗${NC} Failed to delete branch"
+                            FAILED_BRANCHES+=("$name: deletion failed")
+                        fi
                     fi
                 else
                     echo -e "${YELLOW}⊘${NC} Skipped $name"
@@ -413,15 +450,23 @@ else
             echo
 
             if [[ "$response" =~ ^[Yy]$ ]]; then
-                if delete_branch "$name" "$location"; then
-                    echo -e "${GREEN}✓${NC} Deleted $location branch(es)"
+                if [ "$WHAT_IF" = true ]; then
+                    echo -e "${YELLOW}⊙${NC} Would delete $location branch(es) [DRY-RUN]"
                     DELETED_BRANCHES+=("$name ($age)")
-                    # Remove from array
+                    # Remove from array in dry-run too for consistent UX
                     unset 'BRANCHES[$idx]'
                     BRANCHES=("${BRANCHES[@]}")
                 else
-                    echo -e "${RED}✗${NC} Failed to delete branch"
-                    FAILED_BRANCHES+=("$name: deletion failed")
+                    if delete_branch "$name" "$location" "$WHAT_IF"; then
+                        echo -e "${GREEN}✓${NC} Deleted $location branch(es)"
+                        DELETED_BRANCHES+=("$name ($age)")
+                        # Remove from array
+                        unset 'BRANCHES[$idx]'
+                        BRANCHES=("${BRANCHES[@]}")
+                    else
+                        echo -e "${RED}✗${NC} Failed to delete branch"
+                        FAILED_BRANCHES+=("$name: deletion failed")
+                    fi
                 fi
             else
                 echo -e "${YELLOW}⊘${NC} Skipped $name"
@@ -447,8 +492,17 @@ echo
 echo -e "${BOLD}Summary${NC} (${execution_time}s)"
 echo
 
+if [ "$WHAT_IF" = true ] && [ ${#DELETED_BRANCHES[@]} -gt 0 ]; then
+    echo -e "${YELLOW}DRY-RUN: No changes were made${NC}"
+    echo
+fi
+
 if [ ${#DELETED_BRANCHES[@]} -gt 0 ]; then
-    echo -e "${GREEN}✓ Deleted (${#DELETED_BRANCHES[@]}):${NC}"
+    if [ "$WHAT_IF" = true ]; then
+        echo -e "${YELLOW}⊙ Would delete (${#DELETED_BRANCHES[@]}):${NC}"
+    else
+        echo -e "${GREEN}✓ Deleted (${#DELETED_BRANCHES[@]}):${NC}"
+    fi
     for branch in "${DELETED_BRANCHES[@]}"; do
         echo "  • $branch"
     done

@@ -25,6 +25,7 @@ TIMER_PID=""
 BRANCH_NAME=""
 MAIN_BRANCH=""
 PR_NUMBER=""
+WHAT_IF=false
 
 # --- Helper Functions ---
 
@@ -82,19 +83,22 @@ NAME
     integrate-claude-web-branch.sh - Integrate Claude Code web branches via PR
 
 SYNOPSIS
-    integrate-claude-web-branch.sh <branch-name>
+    integrate-claude-web-branch.sh [OPTIONS] <branch-name>
     integrate-claude-web-branch.sh -h|--help
 
 DESCRIPTION
-    Integrates a Claude Code web branch into the main branch via PR workflow.
+    Integrates a Claude Code web branch (remote-only) into main via PR workflow.
 
     This script automates the complete integration workflow:
-    1. Validates the branch exists locally and remotely
-    2. Pulls latest main branch to avoid conflicts
-    3. Creates a pull request against main
-    4. Merges the pull request
-    5. Pushes the merged changes to origin
-    6. Optionally cleans up the feature branch
+    1. Fetches latest from origin (including remote Claude branch)
+    2. Validates the remote branch exists
+    3. Pulls latest main branch
+    4. Creates a pull request from remote branch
+    5. Verifies PR can be merged (no conflicts, checks passing)
+    6. Shows PR URL with 90-second countdown before auto-merge
+    7. Merges the pull request
+    8. Pulls merged changes into local main
+    9. Leaves remote branch intact (use purge script to clean up later)
 
     Features live timer and inline status updates for clean, minimal output.
 
@@ -104,6 +108,10 @@ ARGUMENTS
         Example: claude/review-project-plan-011r6RivoGzbqxC2cSGVMceH
 
 OPTIONS
+    --what-if
+        Dry-run mode: show what would happen without making any changes.
+        No branches will be pushed, no PRs created or merged.
+
     -h, --help
         Display this help message and exit
 
@@ -118,12 +126,16 @@ EXAMPLES
     # Integrate a Claude Code web branch
     ./integrate-claude-web-branch.sh claude/review-project-plan-011r6RivoGzbqxC2cSGVMceH
 
+    # Dry-run to see what would happen
+    ./integrate-claude-web-branch.sh --what-if claude/review-project-plan-011r6RivoGzbqxC2cSGVMceH
+
 NOTES
     This script requires:
-    - Current directory must be a git repository
+    - Must be run from within the target git repository
     - GitHub CLI (gh) must be installed and authenticated
-    - Branch must exist both locally and on origin
-    - User must have push permissions to the repository
+    - Branch must exist on origin (created by Claude Code web)
+    - User must have merge permissions to the repository
+    - After 90 seconds, PR will auto-merge unless cancelled (Ctrl+C or 'n')
 
 AUTHOR
     Claude Code
@@ -138,26 +150,51 @@ EOF
 # --- Argument Parsing ---
 if [ $# -eq 0 ]; then
     echo -e "${RED}Error:${NC} Branch name required"
-    echo "Usage: $0 <branch-name>"
+    echo "Usage: $0 [--what-if] <branch-name>"
     echo "Try '$0 --help' for more information"
     exit 1
 fi
 
-case "$1" in
-    -h|--help)
-        show_help
-        ;;
-    *)
-        BRANCH_NAME="$1"
-        ;;
-esac
+# Parse options
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        --what-if)
+            WHAT_IF=true
+            shift
+            ;;
+        -*)
+            echo -e "${RED}Error:${NC} Unknown option: $1"
+            echo "Try '$0 --help' for more information"
+            exit 1
+            ;;
+        *)
+            BRANCH_NAME="$1"
+            shift
+            ;;
+    esac
+done
+
+# Validate branch name was provided
+if [ -z "$BRANCH_NAME" ]; then
+    echo -e "${RED}Error:${NC} Branch name required"
+    echo "Usage: $0 [--what-if] <branch-name>"
+    echo "Try '$0 --help' for more information"
+    exit 1
+fi
 
 # --- Validation ---
 start_time=$(date +%s)
 
 # Clear screen and start
 clear
-echo -e "${BOLD}Claude Code Branch Integration${NC}: $BRANCH_NAME\n"
+if [ "$WHAT_IF" = true ]; then
+    echo -e "${BOLD}Claude Code Branch Integration${NC} ${YELLOW}[DRY-RUN]${NC}: $BRANCH_NAME\n"
+else
+    echo -e "${BOLD}Claude Code Branch Integration${NC}: $BRANCH_NAME\n"
+fi
 start_timer
 
 # Ensure timer stops on exit
@@ -195,6 +232,15 @@ if ! gh auth status &> /dev/null; then
 fi
 complete_status "${GREEN}✓${NC} GitHub authenticated"
 
+# Fetch latest from origin (including remote Claude branches)
+update_status "  Fetching latest from origin..."
+if git fetch origin &> /dev/null; then
+    complete_status "${GREEN}✓${NC} Fetched latest from origin"
+else
+    complete_status "${RED}✗${NC} Failed to fetch from origin"
+    exit 1
+fi
+
 # Detect main branch
 update_status "  Detecting main branch..."
 MAIN_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}')
@@ -212,127 +258,154 @@ if [ -z "$MAIN_BRANCH" ]; then
 fi
 complete_status "${GREEN}✓${NC} Main branch: $MAIN_BRANCH"
 
-# Check if branch exists locally
-update_status "  Checking branch existence..."
-if ! git show-ref --quiet refs/heads/"$BRANCH_NAME"; then
-    complete_status "${RED}✗${NC} Branch not found locally"
+# Check if remote branch exists
+update_status "  Verifying remote branch exists..."
+if ! git show-ref --quiet refs/remotes/origin/"$BRANCH_NAME"; then
+    complete_status "${RED}✗${NC} Remote branch not found"
     echo
-    echo -e "${RED}Error:${NC} Branch '$BRANCH_NAME' does not exist locally"
+    echo -e "${RED}Error:${NC} Branch 'origin/$BRANCH_NAME' does not exist"
+    echo "Available claude/* branches:"
+    git branch -r | grep "origin/claude/" || echo "  (none found)"
     exit 1
 fi
-complete_status "${GREEN}✓${NC} Branch exists locally"
+complete_status "${GREEN}✓${NC} Remote branch exists"
 
 # --- Integration Workflow ---
 
-# Fetch latest from origin
-update_status "  Fetching latest from origin..."
-if git fetch origin &> /dev/null; then
-    complete_status "${GREEN}✓${NC} Fetched latest from origin"
-else
-    complete_status "${RED}✗${NC} Failed to fetch from origin"
-    exit 1
-fi
-
 # Switch to main branch
 update_status "  Switching to $MAIN_BRANCH branch..."
-if git checkout "$MAIN_BRANCH" &> /dev/null; then
-    complete_status "${GREEN}✓${NC} Switched to $MAIN_BRANCH"
+if [ "$WHAT_IF" = true ]; then
+    complete_status "${YELLOW}⊙${NC} Would switch to $MAIN_BRANCH"
 else
-    complete_status "${RED}✗${NC} Failed to switch to $MAIN_BRANCH"
-    exit 1
+    if git checkout "$MAIN_BRANCH" &> /dev/null; then
+        complete_status "${GREEN}✓${NC} Switched to $MAIN_BRANCH"
+    else
+        complete_status "${RED}✗${NC} Failed to switch to $MAIN_BRANCH"
+        exit 1
+    fi
 fi
 
 # Pull latest main
 update_status "  Pulling latest $MAIN_BRANCH..."
-if git pull origin "$MAIN_BRANCH" &> /dev/null; then
-    complete_status "${GREEN}✓${NC} Pulled latest $MAIN_BRANCH"
+if [ "$WHAT_IF" = true ]; then
+    complete_status "${YELLOW}⊙${NC} Would pull latest $MAIN_BRANCH"
 else
-    complete_status "${RED}✗${NC} Failed to pull $MAIN_BRANCH"
-    exit 1
+    if git pull origin "$MAIN_BRANCH" &> /dev/null; then
+        complete_status "${GREEN}✓${NC} Pulled latest $MAIN_BRANCH"
+    else
+        complete_status "${RED}✗${NC} Failed to pull $MAIN_BRANCH"
+        exit 1
+    fi
 fi
 
-# Switch back to feature branch
-update_status "  Switching to $BRANCH_NAME..."
-if git checkout "$BRANCH_NAME" &> /dev/null; then
-    complete_status "${GREEN}✓${NC} Switched to $BRANCH_NAME"
-else
-    complete_status "${RED}✗${NC} Failed to switch to $BRANCH_NAME"
-    exit 1
-fi
-
-# Push branch to origin (in case it's not there)
-update_status "  Pushing $BRANCH_NAME to origin..."
-if git push -u origin "$BRANCH_NAME" &> /dev/null; then
-    complete_status "${GREEN}✓${NC} Pushed branch to origin"
-else
-    complete_status "${RED}✗${NC} Failed to push branch"
-    exit 1
-fi
-
-# Create pull request
+# Create pull request from remote branch
 update_status "  Creating pull request..."
-if PR_OUTPUT=$(gh pr create --base "$MAIN_BRANCH" --head "$BRANCH_NAME" --fill 2>&1); then
-    PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
-    complete_status "${GREEN}✓${NC} Created PR #$PR_NUMBER"
+if [ "$WHAT_IF" = true ]; then
+    complete_status "${YELLOW}⊙${NC} Would create PR: origin/$BRANCH_NAME → $MAIN_BRANCH"
+    PR_NUMBER="(dry-run)"
+    PR_URL="https://github.com/owner/repo/pull/123"
 else
-    # Check if PR already exists
-    if echo "$PR_OUTPUT" | grep -q "already exists"; then
-        PR_NUMBER=$(gh pr list --head "$BRANCH_NAME" --json number --jq '.[0].number' 2>/dev/null)
-        if [ -n "$PR_NUMBER" ]; then
-            complete_status "${BLUE}•${NC} PR #$PR_NUMBER already exists"
+    if PR_OUTPUT=$(gh pr create --base "$MAIN_BRANCH" --head "$BRANCH_NAME" --fill 2>&1); then
+        PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
+        PR_URL=$(echo "$PR_OUTPUT" | grep -oE 'https://[^ ]+')
+        complete_status "${GREEN}✓${NC} Created PR #$PR_NUMBER"
+    else
+        # Check if PR already exists
+        if echo "$PR_OUTPUT" | grep -q "already exists"; then
+            PR_NUMBER=$(gh pr list --head "$BRANCH_NAME" --json number --jq '.[0].number' 2>/dev/null)
+            if [ -n "$PR_NUMBER" ]; then
+                PR_URL=$(gh pr view "$PR_NUMBER" --json url --jq '.url' 2>/dev/null)
+                complete_status "${BLUE}•${NC} PR #$PR_NUMBER already exists"
+            else
+                complete_status "${RED}✗${NC} Failed to create PR"
+                echo
+                echo "$PR_OUTPUT"
+                exit 1
+            fi
         else
             complete_status "${RED}✗${NC} Failed to create PR"
             echo
             echo "$PR_OUTPUT"
             exit 1
         fi
-    else
-        complete_status "${RED}✗${NC} Failed to create PR"
+    fi
+fi
+
+# Check if PR is mergeable
+if [ "$WHAT_IF" = false ]; then
+    update_status "  Checking PR mergability..."
+    MERGEABLE=$(gh pr view "$PR_NUMBER" --json mergeable --jq '.mergeable' 2>/dev/null)
+    if [ "$MERGEABLE" != "MERGEABLE" ]; then
+        complete_status "${RED}✗${NC} PR cannot be merged"
         echo
-        echo "$PR_OUTPUT"
+        echo -e "${RED}Error:${NC} PR #$PR_NUMBER has conflicts or failing checks"
+        echo "PR URL: $PR_URL"
+        echo "Please resolve conflicts manually"
         exit 1
     fi
+    complete_status "${GREEN}✓${NC} PR is mergeable"
+fi
+
+# Show PR URL and countdown
+if [ "$WHAT_IF" = false ]; then
+    # Stop timer during countdown
+    stop_timer
+    echo
+    echo -e "${BOLD}Pull Request Ready${NC}"
+    echo -e "${BLUE}$PR_URL${NC}"
+    echo
+    echo "Auto-merging in 90 seconds... (Press Ctrl+C or 'n' to cancel)"
+    echo
+
+    # 90 second countdown with ability to cancel
+    for i in {90..1}; do
+        echo -ne "${ERASE_LINE}\rMerging in ${i}s... [Cancel: Ctrl+C or type 'n']"
+
+        # Check for user input (non-blocking)
+        if read -t 1 -n 1 -r response; then
+            if [[ "$response" =~ ^[Nn]$ ]]; then
+                echo
+                echo
+                echo -e "${YELLOW}⊘${NC} Merge cancelled by user"
+                echo "PR #$PR_NUMBER remains open: $PR_URL"
+                exit 0
+            fi
+        fi
+    done
+    echo
+    echo
+
+    # Restart timer for merge operations
+    start_timer
 fi
 
 # Merge pull request
 update_status "  Merging PR #$PR_NUMBER..."
-if gh pr merge "$PR_NUMBER" --merge --delete-branch=false &> /dev/null; then
-    complete_status "${GREEN}✓${NC} Merged PR #$PR_NUMBER"
+if [ "$WHAT_IF" = true ]; then
+    complete_status "${YELLOW}⊙${NC} Would merge PR into $MAIN_BRANCH"
 else
-    complete_status "${RED}✗${NC} Failed to merge PR"
-    echo
-    echo -e "${RED}Error:${NC} Failed to merge PR #$PR_NUMBER"
-    echo "You may need to resolve conflicts or check PR status"
-    exit 1
-fi
-
-# Switch back to main
-update_status "  Switching to $MAIN_BRANCH..."
-if git checkout "$MAIN_BRANCH" &> /dev/null; then
-    complete_status "${GREEN}✓${NC} Switched to $MAIN_BRANCH"
-else
-    complete_status "${RED}✗${NC} Failed to switch to $MAIN_BRANCH"
-    exit 1
+    if gh pr merge "$PR_NUMBER" --merge --delete-branch=false &> /dev/null; then
+        complete_status "${GREEN}✓${NC} Merged PR #$PR_NUMBER"
+    else
+        complete_status "${RED}✗${NC} Failed to merge PR"
+        echo
+        echo -e "${RED}Error:${NC} Failed to merge PR #$PR_NUMBER"
+        echo "You may need to resolve conflicts or check PR status"
+        echo "PR URL: $PR_URL"
+        exit 1
+    fi
 fi
 
 # Pull the merged changes
 update_status "  Pulling merged changes..."
-if git pull origin "$MAIN_BRANCH" &> /dev/null; then
-    complete_status "${GREEN}✓${NC} Pulled merged changes"
+if [ "$WHAT_IF" = true ]; then
+    complete_status "${YELLOW}⊙${NC} Would pull merged changes from $MAIN_BRANCH"
 else
-    complete_status "${RED}✗${NC} Failed to pull merged changes"
-    exit 1
-fi
-
-# Ask about branch cleanup
-echo
-read -r -p "Delete local branch '$BRANCH_NAME'? [y/N]: " DELETE_LOCAL
-if [[ "$DELETE_LOCAL" =~ ^[Yy]$ ]]; then
-    update_status "  Deleting local branch..."
-    if git branch -D "$BRANCH_NAME" &> /dev/null; then
-        complete_status "${GREEN}✓${NC} Deleted local branch"
+    if git pull origin "$MAIN_BRANCH" &> /dev/null; then
+        complete_status "${GREEN}✓${NC} Pulled merged changes"
     else
-        complete_status "${YELLOW}⊘${NC} Could not delete local branch"
+        complete_status "${RED}✗${NC} Failed to pull merged changes"
+        exit 1
     fi
 fi
 
@@ -347,8 +420,26 @@ execution_time=$((end_time - start_time))
 echo
 echo -e "${BOLD}Summary${NC} (${execution_time}s)"
 echo
-echo -e "${GREEN}✓${NC} Branch '$BRANCH_NAME' successfully integrated into $MAIN_BRANCH"
-echo -e "${GREEN}✓${NC} PR #$PR_NUMBER merged and changes pulled"
+if [ "$WHAT_IF" = true ]; then
+    echo -e "${YELLOW}DRY-RUN:${NC} No changes were made"
+    echo
+    echo "Would have performed:"
+    echo "  • Fetched latest from origin"
+    echo "  • Verified remote branch origin/$BRANCH_NAME exists"
+    echo "  • Pulled latest $MAIN_BRANCH"
+    echo "  • Created PR: origin/$BRANCH_NAME → $MAIN_BRANCH"
+    echo "  • Checked PR mergability"
+    echo "  • Shown PR URL with 90-second countdown"
+    echo "  • Merged PR into $MAIN_BRANCH"
+    echo "  • Pulled merged changes"
+    echo "  • Left remote branch intact"
+else
+    echo -e "${GREEN}✓${NC} Branch 'origin/$BRANCH_NAME' successfully integrated into $MAIN_BRANCH"
+    echo -e "${GREEN}✓${NC} PR #$PR_NUMBER merged and changes pulled"
+    echo
+    echo "Remote branch 'origin/$BRANCH_NAME' remains intact."
+    echo "Use purge-stale-claude-code-web-branches.sh to clean up when ready."
+fi
 echo
 
 exit 0
