@@ -59,7 +59,7 @@ show_timer() {
     local minutes=$((elapsed / 60))
     local seconds=$((elapsed % 60))
     local cols
-    cols=$(tput cols)
+    cols=$(tput cols 2>/dev/null || echo 80)
     local timer_text
     timer_text=$(printf "%02d:%02d" "$minutes" "$seconds")
     local timer_pos=$((cols - 6))
@@ -257,6 +257,8 @@ EXAMPLES
 
 NOTES
     This script requires sudo privileges and will request them at startup.
+    All sudo operations have a 10-minute timeout to prevent hanging if no one
+    is available to dismiss the sudo dialog, allowing unattended background runs.
     The script will continue even if individual tasks fail, showing a summary
     at the end.
 
@@ -303,8 +305,9 @@ else
 fi
 
 # Request sudo privileges upfront to avoid prompts later.
-if ! sudo -v; then
-    log_error "Failed to obtain sudo privileges"
+# 10 minute timeout ensures script can run in background
+if ! timeout 600 sudo -v; then
+    log_error "Failed to obtain sudo privileges (timed out after 10 minutes)"
     exit 1
 fi
 
@@ -543,15 +546,26 @@ if [ "$VERBOSE" = true ]; then
 fi
 
 # Software updates can take a long time, don't retry
+# 10 minute timeout ensures script doesn't hang indefinitely
 update_status "  Checking for macOS updates (may take several minutes)..."
-if sudo softwareupdate --all --install --force -R >/dev/null 2>&1; then
+if timeout 600 sudo softwareupdate --all --install --force -R >/dev/null 2>&1; then
     complete_status "${GREEN}✓${NC} macOS software updates"
     log_success "macOS software updates completed"
 else
-    complete_status "${YELLOW}⊘${NC} macOS software updates (none available or check System Preferences)"
-    if [ "$VERBOSE" = true ]; then
-        log_warning "macOS software updates failed or no updates available"
-        log_info "You can manually check: System Preferences > Software Update"
+    exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        complete_status "${RED}✗${NC} macOS software updates (timed out after 10 minutes)"
+        if [ "$VERBOSE" = true ]; then
+            log_error "macOS software update timed out after 10 minutes"
+            log_info "You can manually check: System Preferences > Software Update"
+        fi
+        FAILED_TASKS+=("macOS software updates (timeout)")
+    else
+        complete_status "${YELLOW}⊘${NC} macOS software updates (none available or check System Preferences)"
+        if [ "$VERBOSE" = true ]; then
+            log_warning "macOS software updates failed or no updates available"
+            log_info "You can manually check: System Preferences > Software Update"
+        fi
     fi
 fi
 
@@ -560,9 +574,10 @@ fi
 # Stop timer before showing summary
 stop_timer
 
-# Clear timer line and add spacing
+# Clear timer line and ensure cursor is at start of line
 if [ "$VERBOSE" = false ]; then
-    echo -ne "\033[1;1H${ERASE_LINE}"
+    # Move to top-left, clear that line, then move cursor back to current position
+    echo -ne "\033[s\033[1;1H${ERASE_LINE}\033[u"
     echo  # Blank line after last status
 fi
 
