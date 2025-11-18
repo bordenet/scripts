@@ -26,6 +26,7 @@ BRANCH_NAME=""
 MAIN_BRANCH=""
 PR_NUMBER=""
 WHAT_IF=false
+CREATE_ONLY=false
 
 # --- Helper Functions ---
 
@@ -160,6 +161,10 @@ ARGUMENTS
         Example: claude/review-project-plan-011r6RivoGzbqxC2cSGVMceH
 
 OPTIONS
+    --create-only
+        Create the PR but don't merge it. Shows PR URL and exits.
+        Use this when you want to review the PR manually before merging.
+
     --what-if
         Dry-run mode: show what would happen without making any changes.
         No branches will be pushed, no PRs created or merged.
@@ -175,7 +180,10 @@ DEPENDENCIES
     • gh - GitHub CLI (for PR operations)
 
 EXAMPLES
-    # Integrate a Claude Code web branch
+    # Create PR only (don't merge) - for manual review
+    ./integrate-claude-web-branch.sh --create-only claude/feature-branch-name
+
+    # Integrate a Claude Code web branch (full workflow with auto-merge)
     ./integrate-claude-web-branch.sh claude/review-project-plan-011r6RivoGzbqxC2cSGVMceH
 
     # Dry-run to see what would happen
@@ -213,6 +221,10 @@ while [ $# -gt 0 ]; do
         -h|--help)
             show_help
             ;;
+        --create-only)
+            CREATE_ONLY=true
+            shift
+            ;;
         --what-if)
             WHAT_IF=true
             shift
@@ -244,6 +256,8 @@ start_time=$(date +%s)
 clear
 if [ "$WHAT_IF" = true ]; then
     echo -e "${BOLD}Claude Code Branch Integration${NC} ${YELLOW}[DRY-RUN]${NC}: $BRANCH_NAME\n"
+elif [ "$CREATE_ONLY" = true ]; then
+    echo -e "${BOLD}Claude Code Branch Integration${NC} ${GREEN}[CREATE-ONLY]${NC}: $BRANCH_NAME\n"
 else
     echo -e "${BOLD}Claude Code Branch Integration${NC}: $BRANCH_NAME\n"
 fi
@@ -436,6 +450,18 @@ else
             exit 1
         fi
     fi
+fi
+
+# If create-only mode, stop here and show PR URL
+if [ "$CREATE_ONLY" = true ]; then
+    stop_timer
+    echo
+    echo -e "${BOLD}Pull Request Created${NC}"
+    echo -e "${BLUE}$PR_URL${NC}"
+    echo
+    echo "PR #$PR_NUMBER is ready for review"
+    echo "Merge manually when ready, or run without --create-only to auto-merge"
+    exit 0
 fi
 
 # Check if PR is mergeable
