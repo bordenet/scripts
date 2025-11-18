@@ -305,6 +305,8 @@ if [ "$WHAT_IF" = true ]; then
     PR_NUMBER="(dry-run)"
     PR_URL="https://github.com/owner/repo/pull/123"
 else
+    # For remote-only branches, we need to specify origin/ prefix or fetch the branch locally first
+    # Try creating PR directly; if it fails with ambiguous revision, fetch the branch
     if PR_OUTPUT=$(gh pr create --base "$MAIN_BRANCH" --head "$BRANCH_NAME" --fill 2>&1); then
         PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
         PR_URL=$(echo "$PR_OUTPUT" | grep -oE 'https://[^ ]+')
@@ -318,6 +320,30 @@ else
                 complete_status "${BLUE}•${NC} PR #$PR_NUMBER already exists"
             else
                 complete_status "${RED}✗${NC} Failed to create PR"
+                echo
+                echo "$PR_OUTPUT"
+                exit 1
+            fi
+        # Check if it failed due to ambiguous revision (remote-only branch)
+        elif echo "$PR_OUTPUT" | grep -q "ambiguous argument\|unknown revision"; then
+            # Fetch the remote branch locally to allow gh pr create to work
+            update_status "  Fetching remote branch locally..."
+            if git fetch origin "$BRANCH_NAME:$BRANCH_NAME" &> /dev/null; then
+                complete_status "${GREEN}✓${NC} Fetched remote branch locally"
+                # Try creating PR again
+                update_status "  Creating pull request..."
+                if PR_OUTPUT=$(gh pr create --base "$MAIN_BRANCH" --head "$BRANCH_NAME" --fill 2>&1); then
+                    PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
+                    PR_URL=$(echo "$PR_OUTPUT" | grep -oE 'https://[^ ]+')
+                    complete_status "${GREEN}✓${NC} Created PR #$PR_NUMBER"
+                else
+                    complete_status "${RED}✗${NC} Failed to create PR"
+                    echo
+                    echo "$PR_OUTPUT"
+                    exit 1
+                fi
+            else
+                complete_status "${RED}✗${NC} Failed to fetch remote branch"
                 echo
                 echo "$PR_OUTPUT"
                 exit 1
