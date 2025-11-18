@@ -24,6 +24,7 @@ UPDATED_REPOS=()
 SKIPPED_REPOS=()
 FAILED_REPOS=()
 TIMER_PID=""
+TIMER_WAS_RUNNING=false
 
 # --- Helper Functions ---
 
@@ -54,6 +55,7 @@ timer_loop() {
 start_timer() {
     timer_loop &
     TIMER_PID=$!
+    TIMER_WAS_RUNNING=true
 }
 
 # Stop timer
@@ -342,6 +344,12 @@ if [ ${#repos[@]} -eq 0 ]; then
 fi
 
 if [ "$MENU_MODE" = true ]; then
+    # Stop timer during menu interaction
+    stop_timer
+    # Clear entire screen and redisplay header without timer
+    clear
+    echo -e "${BOLD}Git Repository Updates${NC}: $TARGET_DIR\n"
+
     echo "Select a repository to update:"
     for i in "${!repos[@]}"; do
         printf "%3d) %s\n" "$((i+1))" "${repos[$i]%/}"
@@ -349,10 +357,14 @@ if [ "$MENU_MODE" = true ]; then
     echo
 
     read -r -p "Enter number (or 'all'): " choice
+    echo
 
     if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#repos[@]}" ]; then
+        # Single repo - no timer needed for quick operation
         update_repo "${repos[$((choice-1))]}"
     elif [ "$choice" == "all" ]; then
+        # Multiple repos - restart timer
+        start_timer
         for dir in "${repos[@]}"; do
             update_repo "$dir"
         done
@@ -369,7 +381,10 @@ fi
 
 # Stop timer and show summary
 stop_timer
-echo -ne "\033[1;1H${ERASE_LINE}"  # Clear timer line
+# Only clear timer line if timer was actually running
+if [ "$TIMER_WAS_RUNNING" = true ]; then
+    echo -ne "\033[s\033[1;1H${ERASE_LINE}\033[u"  # Clear timer line, restore cursor
+fi
 echo  # Blank line after last status
 
 end_time=$(date +%s)

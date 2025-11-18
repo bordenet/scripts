@@ -7,7 +7,9 @@ A collection of utility scripts for various tasks.
 | Script | Description |
 |---|---|
 | [`enumerate-gh-repos.sh`](./enumerate-gh-repos.sh) | Enumerates repositories within a specified GitHub Enterprise instance and organization. |
-| [`fetch-github-projects.sh`](./fetch-github-projects.sh) | Automates the process of updating all local Git repositories located within a specified directory. |
+| [`fetch-github-projects.sh`](./fetch-github-projects.sh) | Automates the process of updating all local Git repositories located within a specified directory. [Docs](./docs/fetch-github-projects.md) |
+| [`integrate-claude-web-branch.sh`](./integrate-claude-web-branch.sh) | Integrates Claude Code web branches into main via complete PR workflow with minimal output. [Docs](./docs/integrate-claude-web-branch.md) |
+| [`purge-stale-claude-code-web-branches.sh`](./purge-stale-claude-code-web-branches.sh) | Interactive tool to safely delete stale Claude Code web branches with human-readable timestamps. [Docs](./docs/purge-stale-claude-code-web-branches.md) |
 | [`get-active-repos.sh`](./get-active-repos.sh) | Identifies and lists active GitHub repositories within a specified organization. |
 | [`list-dormant-repos.sh`](./list-dormant-repos.sh) | Identifies and lists dormant GitHub repositories within a specified organization. |
 | [`reset-all-repos.sh`](./reset-all-repos.sh) | Automates the process of resetting multiple Git repositories to match their remote main/master branch. |
