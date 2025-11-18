@@ -142,16 +142,32 @@ SYNOPSIS
 DESCRIPTION
     Integrates a Claude Code web branch (remote-only) into main via PR workflow.
 
-    This script automates the complete integration workflow:
+    TWO MODES:
+
+    1. CREATE-ONLY MODE (--create-only flag):
+       • Creates PR and shows URL
+       • Exits without merging
+       • Use when you want to review PR manually in browser
+
+    2. FULL AUTO-MERGE MODE (default, no flags):
+       • Creates PR
+       • Checks mergability
+       • Shows PR URL with 90-second countdown
+       • Auto-merges after countdown (cancellable with Ctrl+C or 'n')
+       • Pulls merged changes
+       • Complete end-to-end integration
+
+    WORKFLOW STEPS:
     1. Fetches latest from origin (including remote Claude branch)
     2. Validates the remote branch exists
     3. Pulls latest main branch
     4. Creates a pull request from remote branch
-    5. Verifies PR can be merged (no conflicts, checks passing)
-    6. Shows PR URL with 90-second countdown before auto-merge
-    7. Merges the pull request
-    8. Pulls merged changes into local main
-    9. Leaves remote branch intact (use purge script to clean up later)
+    5. [CREATE-ONLY: exits here] OR [FULL: continues below]
+    6. Verifies PR can be merged (no conflicts, checks passing)
+    7. Shows PR URL with 90-second countdown before auto-merge
+    8. Merges the pull request
+    9. Pulls merged changes into local main
+    10. Leaves remote branch intact (use purge script to clean up later)
 
     Features live timer and inline status updates for clean, minimal output.
 
