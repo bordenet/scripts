@@ -76,6 +76,58 @@ complete_status() {
     echo -e "${ERASE_LINE}\r$*"
 }
 
+# List available Claude branches with details
+list_available_branches() {
+    echo
+    echo "Available claude/* branches:"
+
+    # Get all remote claude branches with commit info
+    local branches
+    branches=$(git branch -r | grep "origin/claude/" | sed 's|origin/||' | sort)
+
+    if [ -z "$branches" ]; then
+        echo "  (none found)"
+        return
+    fi
+
+    # Show each branch with age and last commit subject
+    while IFS= read -r branch; do
+        if [ -n "$branch" ]; then
+            # Get last commit timestamp and subject
+            local timestamp subject age
+            timestamp=$(git log -1 --format='%ct' "origin/$branch" 2>/dev/null)
+            subject=$(git log -1 --format='%s' "origin/$branch" 2>/dev/null | cut -c1-60)
+
+            if [ -n "$timestamp" ]; then
+                local now diff
+                now=$(date +%s)
+                diff=$((now - timestamp))
+
+                # Calculate human-readable age
+                local minutes hours days weeks
+                minutes=$((diff / 60))
+                hours=$((diff / 3600))
+                days=$((diff / 86400))
+                weeks=$((diff / 604800))
+
+                if [ $minutes -lt 60 ]; then
+                    age="${minutes}m ago"
+                elif [ $hours -lt 24 ]; then
+                    age="${hours}h ago"
+                elif [ $days -lt 7 ]; then
+                    age="${days}d ago"
+                else
+                    age="${weeks}w ago"
+                fi
+
+                printf "  ${BLUE}%-60s${NC} ${YELLOW}%8s${NC} %s\n" "$branch" "$age" "$subject"
+            else
+                printf "  ${BLUE}%s${NC}\n" "$branch"
+            fi
+        fi
+    done <<< "$branches"
+}
+
 # --- Help Function ---
 show_help() {
     cat << EOF
@@ -264,8 +316,7 @@ if ! git show-ref --quiet refs/remotes/origin/"$BRANCH_NAME"; then
     complete_status "${RED}✗${NC} Remote branch not found"
     echo
     echo -e "${RED}Error:${NC} Branch 'origin/$BRANCH_NAME' does not exist"
-    echo "Available claude/* branches:"
-    git branch -r | grep "origin/claude/" || echo "  (none found)"
+    list_available_branches
     exit 1
 fi
 complete_status "${GREEN}✓${NC} Remote branch exists"
@@ -322,8 +373,21 @@ else
                 complete_status "${RED}✗${NC} Failed to create PR"
                 echo
                 echo "$PR_OUTPUT"
+                list_available_branches
                 exit 1
             fi
+        # Check for "could not find any commits" error
+        elif echo "$PR_OUTPUT" | grep -q "could not find any commits"; then
+            complete_status "${RED}✗${NC} No new commits to merge"
+            echo
+            echo -e "${RED}Error:${NC} Branch '$BRANCH_NAME' has no commits different from $MAIN_BRANCH"
+            echo "This usually means:"
+            echo "  • The branch was already merged"
+            echo "  • The branch has no new changes"
+            echo
+            echo "Try a different branch:"
+            list_available_branches
+            exit 1
         # Check if it failed due to ambiguous revision (remote-only branch)
         elif echo "$PR_OUTPUT" | grep -q "ambiguous argument\|unknown revision"; then
             # Fetch the remote branch locally to allow gh pr create to work
@@ -336,22 +400,39 @@ else
                     PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
                     PR_URL=$(echo "$PR_OUTPUT" | grep -oE 'https://[^ ]+')
                     complete_status "${GREEN}✓${NC} Created PR #$PR_NUMBER"
+                # Check for "could not find any commits" error on retry
+                elif echo "$PR_OUTPUT" | grep -q "could not find any commits"; then
+                    complete_status "${RED}✗${NC} No new commits to merge"
+                    echo
+                    echo -e "${RED}Error:${NC} Branch '$BRANCH_NAME' has no commits different from $MAIN_BRANCH"
+                    echo "This usually means:"
+                    echo "  • The branch was already merged"
+                    echo "  • The branch has no new changes"
+                    echo
+                    echo "Try a different branch:"
+                    list_available_branches
+                    exit 1
                 else
                     complete_status "${RED}✗${NC} Failed to create PR"
                     echo
                     echo "$PR_OUTPUT"
+                    list_available_branches
                     exit 1
                 fi
             else
                 complete_status "${RED}✗${NC} Failed to fetch remote branch"
                 echo
                 echo "$PR_OUTPUT"
+                list_available_branches
                 exit 1
             fi
         else
             complete_status "${RED}✗${NC} Failed to create PR"
             echo
             echo "$PR_OUTPUT"
+            echo
+            echo "Try a different branch:"
+            list_available_branches
             exit 1
         fi
     fi
