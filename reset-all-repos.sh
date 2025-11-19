@@ -157,6 +157,7 @@ YELLOW='\033[33m'
 WHITE_BACKGROUND='\033[47m'
 BOLD='\033[1m'
 RESET='\033[0m'
+# shellcheck disable=SC2034  # ANSI codes reserved for future use
 CURSOR_UP='\033[1A'
 CURSOR_HOME='\033[0G'
 ERASE_LINE='\033[2K'
@@ -194,7 +195,7 @@ reset_git_repo() {
       git reset --hard "origin/$branch" >/dev/null
       git clean -fdx >/dev/null
 
-      popd > /dev/null
+      popd > /dev/null || return 1
       return 0
     else
       log_message "Failed to enter directory: $repo_path"
@@ -213,15 +214,17 @@ display_gas_gauge() {
   local width=50
   local filled=$((current * width / total))
   local empty=$((width - filled))
-  local gauge=$(printf "%${filled}s" | tr ' ' '#')
-  local spaces=$(printf "%${empty}s" | tr ' ' ' ')
+  local gauge
+  local spaces
+  gauge=$(printf "%${filled}s" | tr ' ' '#')
+  spaces=$(printf "%${empty}s" | tr ' ' ' ')
   printf "[%s%s] %d%%" "$gauge" "$spaces" $((current * 100 / total))
 }
 
 # --- Main Execution ---
 
 # Create or clear the log file.
-> "$LOG_FILE"
+true > "$LOG_FILE"
 
 log_message "Starting git reset script in directory: $SEARCH_DIR"
 
@@ -247,7 +250,7 @@ if [ "$WHAT_IF" = "true" ]; then
       if [ "$uncommitted" -gt 0 ]; then
         echo "    ⚠️  Has $uncommitted uncommitted change(s)"
       fi
-      popd > /dev/null
+      popd > /dev/null || true
     fi
   done <<< "$repo_list"
   echo ""
@@ -281,6 +284,7 @@ estimated_time=""
 while read -r git_dir; do
   repo_dir=$(dirname "$git_dir")
   repo_index=$((repo_index + 1))
+  # shellcheck disable=SC2034  # Reserved for per-repo timing metrics
   iteration_start=$(date +%s)
   
   # Calculate and display estimated time.

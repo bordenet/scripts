@@ -42,6 +42,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --force)
       WHAT_IF=""
+      # shellcheck disable=SC2034  # FORCE documents intent, behavior controlled by other vars
       FORCE="true"
       shift
       ;;

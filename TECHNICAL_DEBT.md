@@ -3,7 +3,7 @@
 This document tracks known violations of coding standards and areas requiring refactoring.
 
 ## Last Updated
-2025-11-16
+2025-11-19
 
 ---
 
@@ -191,20 +191,17 @@ macos-setup/setup-components/
 
 ### Linting Status
 
-**Note:** Shellcheck is not available in the current development environment (Claude Code web mode). All scripts should be linted locally before deployment.
+✅ **All scripts pass shellcheck with zero warnings** (as of 2025-11-19)
 
 **Linting Requirements:**
 - All scripts must pass `shellcheck` with zero warnings
 - Use `shellcheck --severity=warning` as minimum standard
 - Document any intentional rule disables with comments
 
-**Local Linting Command:**
+**Verification Command:**
 ```bash
 # Lint all scripts
-find . -type f -name "*.sh" -exec shellcheck {} +
-
-# Lint with specific severity
-find . -type f -name "*.sh" -exec shellcheck --severity=warning {} +
+shellcheck --severity=warning $(find . -name "*.sh" -type f)
 ```
 
 ### Missing Features
@@ -271,4 +268,4 @@ When refactoring oversized scripts:
 - Consider adding integration tests before refactoring complex scripts
 - Preserve git history during refactoring for better traceability
 
-**Last Review Date:** 2025-11-16
+**Last Review Date:** 2025-11-19

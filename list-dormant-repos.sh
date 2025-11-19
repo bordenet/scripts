@@ -126,10 +126,12 @@ fetch_all_repos() {
         if [ -z "$repo_names" ]; then
             break
         fi
-        all_repos+=($repo_names)
+        while IFS= read -r repo; do
+            all_repos+=("$repo")
+        done <<< "$repo_names"
         ((page++))
     done
-    echo "${all_repos[@]}"
+    printf '%s\n' "${all_repos[@]}"
 }
 
 # Function to count lines of code in a repository.
@@ -150,18 +152,18 @@ count_loc() {
 # --- Main Script ---
 
 # Get all repositories.
-all_repos=$(fetch_all_repos)
+mapfile -t all_repos < <(fetch_all_repos)
 
-if [ -z "$all_repos" ]; then
+if [ "${#all_repos[@]}" -eq 0 ]; then
     echo "Error: No repositories found for organization '$GITHUB_ORG'. Check configuration and token permissions."
     exit 1
 fi
 
-echo "Found $(echo "$all_repos" | wc -w | xargs) repositories. Checking for inactivity..."
+echo "Found ${#all_repos[@]} repositories. Checking for inactivity..."
 echo -e "\nRepo\tLast-Pushed\tLines-of-Code"
 
 # Check each repository for activity.
-for repo in $all_repos; do
+for repo in "${all_repos[@]}"; do
     echo "Checking activity for: $repo"
     response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$GITHUB_API_URL/repos/$GITHUB_ORG/$repo")
     last_pushed=$(echo "$response" | jq -r '.pushed_at')

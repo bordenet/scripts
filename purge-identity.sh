@@ -202,10 +202,14 @@ start_timer() {
 update_timer_display() {
     local current_time
     current_time=$(date +%s)
-    local elapsed=$((current_time - START_TIME))
-    local hours=$((elapsed / 3600))
-    local minutes=$(((elapsed % 3600) / 60))
-    local seconds=$((elapsed % 60))
+    local elapsed
+    elapsed=$((current_time - START_TIME))
+    local hours
+    hours=$((elapsed / 3600))
+    local minutes
+    minutes=$(((elapsed % 3600) / 60))
+    local seconds
+    seconds=$((elapsed % 60))
 
     # Only display if we're in an interactive terminal
     if [[ -t 1 ]]; then
@@ -227,10 +231,14 @@ stop_timer() {
 get_elapsed_time() {
     local current_time
     current_time=$(date +%s)
-    local elapsed=$((current_time - START_TIME))
-    local hours=$((elapsed / 3600))
-    local minutes=$(((elapsed % 3600) / 60))
-    local seconds=$((elapsed % 60))
+    local elapsed
+    elapsed=$((current_time - START_TIME))
+    local hours
+    hours=$((elapsed / 3600))
+    local minutes
+    minutes=$(((elapsed % 3600) / 60))
+    local seconds
+    seconds=$((elapsed % 60))
     printf "%02d:%02d:%02d" "$hours" "$minutes" "$seconds"
 }
 
@@ -696,7 +704,8 @@ scan_safari() {
 
         if [[ -f "$temp_db" ]]; then
             # Extract emails from history URLs and titles
-            local emails=$(sqlite3 "$temp_db" "SELECT url FROM history_items;" 2>/dev/null | \
+            local emails
+            emails=$(sqlite3 "$temp_db" "SELECT url FROM history_items;" 2>/dev/null | \
                           grep -oE "$EMAIL_PATTERN" | sort -u)
             while IFS= read -r email; do
                 [[ -n "$email" ]] && add_discovered_identity "$email" "safari_history"
@@ -708,7 +717,8 @@ scan_safari() {
     # Check Safari preferences
     local prefs="${safari_dir}/Preferences/com.apple.Safari.plist"
     if [[ -f "$prefs" ]]; then
-        local emails=$(plutil -convert json -o - "$prefs" 2>/dev/null | grep -oE "$EMAIL_PATTERN" | sort -u)
+        local emails
+        emails=$(plutil -convert json -o - "$prefs" 2>/dev/null | grep -oE "$EMAIL_PATTERN" | sort -u)
         while IFS= read -r email; do
             [[ -n "$email" ]] && add_discovered_identity "$email" "safari_prefs"
         done <<< "$emails"
@@ -729,17 +739,20 @@ scan_chrome() {
     for profile_dir in "$chrome_dir"/*/ "$chrome_dir/Default"; do
         [[ ! -d "$profile_dir" ]] && continue
 
-        local profile_name=$(basename "$profile_dir")
+        local profile_name
+        profile_name=$(basename "$profile_dir")
         log "DEBUG" "Scanning Chrome profile: $profile_name"
 
         # Parse Preferences JSON for sync email
         local prefs="${profile_dir}/Preferences"
         if [[ -f "$prefs" ]]; then
-            local sync_email=$(jq -r '.account_info[0].email // empty' "$prefs" 2>/dev/null)
+            local sync_email
+            sync_email=$(jq -r '.account_info[0].email // empty' "$prefs" 2>/dev/null)
             [[ -n "$sync_email" ]] && add_discovered_identity "$sync_email" "chrome_profile:$profile_name"
 
             # Extract any emails from preferences
-            local emails=$(jq -r '.. | strings' "$prefs" 2>/dev/null | grep -oE "$EMAIL_PATTERN" | sort -u)
+            local emails
+            emails=$(jq -r '.. | strings' "$prefs" 2>/dev/null | grep -oE "$EMAIL_PATTERN" | sort -u)
             while IFS= read -r email; do
                 [[ -n "$email" ]] && add_discovered_identity "$email" "chrome_prefs:$profile_name"
             done <<< "$emails"
@@ -752,7 +765,8 @@ scan_chrome() {
             cp "$login_db" "$temp_db" 2>/dev/null || true
 
             if [[ -f "$temp_db" ]]; then
-                local usernames=$(sqlite3 "$temp_db" "SELECT username_value FROM logins WHERE username_value LIKE '%@%';" 2>/dev/null | sort -u)
+                local usernames
+                usernames=$(sqlite3 "$temp_db" "SELECT username_value FROM logins WHERE username_value LIKE '%@%';" 2>/dev/null | sort -u)
                 while IFS= read -r email; do
                     [[ -n "$email" ]] && add_discovered_identity "$email" "chrome_passwords:$profile_name"
                 done <<< "$usernames"
@@ -778,16 +792,19 @@ scan_edge() {
     for profile_dir in "$edge_dir"/*/ "$edge_dir/Default"; do
         [[ ! -d "$profile_dir" ]] && continue
 
-        local profile_name=$(basename "$profile_dir")
+        local profile_name
+        profile_name=$(basename "$profile_dir")
         log "DEBUG" "Scanning Edge profile: $profile_name"
 
         # Parse Preferences JSON
         local prefs="${profile_dir}/Preferences"
         if [[ -f "$prefs" ]]; then
-            local sync_email=$(jq -r '.account_info[0].email // empty' "$prefs" 2>/dev/null)
+            local sync_email
+            sync_email=$(jq -r '.account_info[0].email // empty' "$prefs" 2>/dev/null)
             [[ -n "$sync_email" ]] && add_discovered_identity "$sync_email" "edge_profile:$profile_name"
 
-            local emails=$(jq -r '.. | strings' "$prefs" 2>/dev/null | grep -oE "$EMAIL_PATTERN" | sort -u)
+            local emails
+            emails=$(jq -r '.. | strings' "$prefs" 2>/dev/null | grep -oE "$EMAIL_PATTERN" | sort -u)
             while IFS= read -r email; do
                 [[ -n "$email" ]] && add_discovered_identity "$email" "edge_prefs:$profile_name"
             done <<< "$emails"
@@ -800,7 +817,8 @@ scan_edge() {
             cp "$login_db" "$temp_db" 2>/dev/null || true
 
             if [[ -f "$temp_db" ]]; then
-                local usernames=$(sqlite3 "$temp_db" "SELECT username_value FROM logins WHERE username_value LIKE '%@%';" 2>/dev/null | sort -u)
+                local usernames
+                usernames=$(sqlite3 "$temp_db" "SELECT username_value FROM logins WHERE username_value LIKE '%@%';" 2>/dev/null | sort -u)
                 while IFS= read -r email; do
                     [[ -n "$email" ]] && add_discovered_identity "$email" "edge_passwords:$profile_name"
                 done <<< "$usernames"
@@ -826,13 +844,15 @@ scan_firefox() {
     for profile_dir in "$firefox_dir"/*/ ; do
         [[ ! -d "$profile_dir" ]] && continue
 
-        local profile_name=$(basename "$profile_dir")
+        local profile_name
+        profile_name=$(basename "$profile_dir")
         log "DEBUG" "Scanning Firefox profile: $profile_name"
 
         # Scan logins.json for saved usernames
         local logins_json="${profile_dir}/logins.json"
         if [[ -f "$logins_json" ]]; then
-            local emails=$(jq -r '.logins[].username // empty' "$logins_json" 2>/dev/null | \
+            local emails
+            emails=$(jq -r '.logins[].username // empty' "$logins_json" 2>/dev/null | \
                           grep -E "$EMAIL_PATTERN" | sort -u)
             while IFS= read -r email; do
                 [[ -n "$email" ]] && add_discovered_identity "$email" "firefox_logins:$profile_name"
@@ -846,7 +866,8 @@ scan_firefox() {
             cp "$places_db" "$temp_db" 2>/dev/null || true
 
             if [[ -f "$temp_db" ]]; then
-                local emails=$(sqlite3 "$temp_db" "SELECT url FROM moz_places;" 2>/dev/null | \
+                local emails
+                emails=$(sqlite3 "$temp_db" "SELECT url FROM moz_places;" 2>/dev/null | \
                               grep -oE "$EMAIL_PATTERN" | sort -u)
                 while IFS= read -r email; do
                     [[ -n "$email" ]] && add_discovered_identity "$email" "firefox_history:$profile_name"
@@ -869,7 +890,8 @@ scan_mail() {
     [[ ! -d "$mail_dir" ]] && { log "DEBUG" "Mail directory not found"; return 0; }
 
     # Find Mail version directory (V9, V10, etc.)
-    local mail_version_dir=$(find "$mail_dir" -maxdepth 1 -type d -name "V*" 2>/dev/null | sort -r | head -n 1)
+    local mail_version_dir
+    mail_version_dir=$(find "$mail_dir" -maxdepth 1 -type d -name "V*" 2>/dev/null | sort -r | head -n 1)
 
     if [[ -z "$mail_version_dir" ]]; then
         log "DEBUG" "No Mail version directory found"
@@ -880,9 +902,11 @@ scan_mail() {
 
     if [[ -f "$accounts_plist" ]]; then
         # Convert plist to JSON and extract email addresses
-        local accounts_json=$(plutil -convert json -o - "$accounts_plist" 2>/dev/null)
+        local accounts_json
+        accounts_json=$(plutil -convert json -o - "$accounts_plist" 2>/dev/null)
         if [[ -n "$accounts_json" ]]; then
-            local emails=$(echo "$accounts_json" | jq -r '.. | .EmailAddresses? // empty | .[]?' 2>/dev/null | sort -u)
+            local emails
+            emails=$(echo "$accounts_json" | jq -r '.. | .EmailAddresses? // empty | .[]?' 2>/dev/null | sort -u)
 
             while IFS= read -r email; do
                 [[ -n "$email" ]] && add_discovered_identity "$email" "mail_account"
@@ -925,7 +949,8 @@ scan_application_support() {
             is_preserved_file "$file" && continue
 
             # Extract emails from file
-            local emails=$(strings "$file" 2>/dev/null | grep -oE "$EMAIL_PATTERN" | sort -u)
+            local emails
+            emails=$(strings "$file" 2>/dev/null | grep -oE "$EMAIL_PATTERN" | sort -u)
             while IFS= read -r email; do
                 [[ -n "$email" ]] && add_discovered_identity "$email" "app_support:$app"
             done <<< "$emails"
@@ -945,7 +970,8 @@ scan_ssh() {
     # Scan public keys for email comments
     while IFS= read -r -d '' pubkey; do
         # Public keys often end with email as comment
-        local comment=$(tail -c 200 "$pubkey" 2>/dev/null | grep -oE "$EMAIL_PATTERN")
+        local comment
+        comment=$(tail -c 200 "$pubkey" 2>/dev/null | grep -oE "$EMAIL_PATTERN")
         if [[ -n "$comment" ]]; then
             add_discovered_identity "$comment" "ssh_key:$(basename "$pubkey")"
         fi
@@ -954,7 +980,8 @@ scan_ssh() {
     # Check SSH config for potential identity hints
     local ssh_config="${ssh_dir}/config"
     if [[ -f "$ssh_config" ]]; then
-        local emails=$(grep -oE "$EMAIL_PATTERN" "$ssh_config" 2>/dev/null | sort -u)
+        local emails
+        emails=$(grep -oE "$EMAIL_PATTERN" "$ssh_config" 2>/dev/null | sort -u)
         while IFS= read -r email; do
             [[ -n "$email" ]] && add_discovered_identity "$email" "ssh_config"
         done <<< "$emails"
@@ -979,7 +1006,8 @@ scan_internet_accounts() {
 
         if [[ -f "$temp_db" ]]; then
             # Extract account identifiers
-            local accounts=$(sqlite3 "$temp_db" "SELECT ZUSERNAME FROM ZACCOUNT WHERE ZUSERNAME LIKE '%@%';" 2>/dev/null | sort -u)
+            local accounts
+            accounts=$(sqlite3 "$temp_db" "SELECT ZUSERNAME FROM ZACCOUNT WHERE ZUSERNAME LIKE '%@%';" 2>/dev/null | sort -u)
             while IFS= read -r email; do
                 [[ -n "$email" ]] && add_discovered_identity "$email" "internet_account"
             done <<< "$accounts"
@@ -997,7 +1025,8 @@ scan_cloud_storage() {
     # OneDrive preferences
     local onedrive_prefs="$HOME/Library/Preferences/com.microsoft.OneDrive.plist"
     if [[ -f "$onedrive_prefs" ]]; then
-        local emails=$(plutil -convert json -o - "$onedrive_prefs" 2>/dev/null | grep -oE "$EMAIL_PATTERN" | sort -u)
+        local emails
+        emails=$(plutil -convert json -o - "$onedrive_prefs" 2>/dev/null | grep -oE "$EMAIL_PATTERN" | sort -u)
         while IFS= read -r email; do
             [[ -n "$email" ]] && add_discovered_identity "$email" "onedrive_config"
         done <<< "$emails"
@@ -1007,7 +1036,8 @@ scan_cloud_storage() {
     local gdrive_prefs="$HOME/Library/Application Support/Google/Drive"
     if [[ -d "$gdrive_prefs" ]]; then
         while IFS= read -r -d '' file; do
-            local emails=$(strings "$file" 2>/dev/null | grep -oE "$EMAIL_PATTERN" | sort -u)
+            local emails
+            emails=$(strings "$file" 2>/dev/null | grep -oE "$EMAIL_PATTERN" | sort -u)
             while IFS= read -r email; do
                 [[ -n "$email" ]] && add_discovered_identity "$email" "google_drive_config"
             done <<< "$emails"
@@ -1097,7 +1127,8 @@ display_menu() {
     echo
 
     # Sort identities by count (descending)
-    local sorted_identities=$(for email in "${!DISCOVERED_IDENTITIES[@]}"; do
+    local sorted_identities
+    sorted_identities=$(for email in "${!DISCOVERED_IDENTITIES[@]}"; do
         echo "${DISCOVERED_IDENTITIES[$email]} $email"
     done | sort -rn)
 
@@ -1106,8 +1137,10 @@ display_menu() {
     declare -g -A MENU_INDEX_TO_EMAIL  # Map menu number to email
 
     while IFS= read -r line; do
-        local count=$(echo "$line" | awk '{print $1}')
-        local email=$(echo "$line" | cut -d' ' -f2-)
+        local count
+        count=$(echo "$line" | awk '{print $1}')
+        local email
+        email=$(echo "$line" | cut -d' ' -f2-)
 
         printf "  ${CYAN}%2d.${NC} %-40s ${YELLOW}(%d occurrences)${NC}\n" "$index" "$email" "$count"
 
@@ -1176,7 +1209,8 @@ parse_selection() {
     done
 
     # Remove duplicates
-    local unique_emails=$(printf '%s\n' "${selected_emails[@]}" | sort -u)
+    local unique_emails
+    unique_emails=$(printf '%s\n' "${selected_emails[@]}" | sort -u)
 
     echo "$unique_emails"
     return 0
@@ -1233,7 +1267,8 @@ get_user_selection() {
     read -p "Select identities to purge: " user_input
 
     # Parse selection
-    local selected=$(parse_selection "$user_input")
+    local selected
+    selected=$(parse_selection "$user_input")
 
     if [[ -z "$selected" ]]; then
         log_error "No valid selections made"
@@ -1416,8 +1451,10 @@ delete_keychain_items() {
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
 
-        local service=$(echo "$line" | awk '{print $1}')
-        local account=$(echo "$line" | awk '{print $2}')
+        local service
+        service=$(echo "$line" | awk '{print $1}')
+        local account
+        account=$(echo "$line" | awk '{print $2}')
 
         if security delete-generic-password -s "$service" -a "$account" 2>/dev/null; then
             log "INFO" "Deleted generic password: $service ($account)"
@@ -1453,8 +1490,10 @@ delete_keychain_items() {
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
 
-        local server=$(echo "$line" | awk '{print $1}')
-        local account=$(echo "$line" | awk '{print $2}')
+        local server
+        server=$(echo "$line" | awk '{print $1}')
+        local account
+        account=$(echo "$line" | awk '{print $2}')
 
         if security delete-internet-password -s "$server" -a "$account" 2>/dev/null; then
             log "INFO" "Deleted internet password: $server ($account)"
@@ -1589,7 +1628,8 @@ delete_chrome_profiles() {
     for profile_dir in "$chrome_dir"/*/ "$chrome_dir/Default"; do
         [[ ! -d "$profile_dir" ]] && continue
 
-        local profile_name=$(basename "$profile_dir")
+        local profile_name
+        profile_name=$(basename "$profile_dir")
         local prefs="${profile_dir}/Preferences"
 
         # Check if this profile contains the identity in ANY location
@@ -1653,7 +1693,8 @@ delete_edge_profiles() {
     for profile_dir in "$edge_dir"/*/ "$edge_dir/Default"; do
         [[ ! -d "$profile_dir" ]] && continue
 
-        local profile_name=$(basename "$profile_dir")
+        local profile_name
+        profile_name=$(basename "$profile_dir")
         local prefs="${profile_dir}/Preferences"
 
         # Check if this profile contains the identity in ANY location
@@ -1717,7 +1758,8 @@ delete_firefox_profiles() {
     for profile_dir in "$firefox_dir"/*/ ; do
         [[ ! -d "$profile_dir" ]] && continue
 
-        local profile_name=$(basename "$profile_dir")
+        local profile_name
+        profile_name=$(basename "$profile_dir")
 
         # Check if profile contains the identity in ANY location
         local is_match=false
@@ -1777,7 +1819,8 @@ delete_mail_account() {
     fi
 
     local mail_dir="$HOME/Library/Mail"
-    local mail_version_dir=$(find "$mail_dir" -maxdepth 1 -type d -name "V*" 2>/dev/null | sort -r | head -n 1)
+    local mail_version_dir
+    mail_version_dir=$(find "$mail_dir" -maxdepth 1 -type d -name "V*" 2>/dev/null | sort -r | head -n 1)
 
     [[ ! -d "$mail_version_dir" ]] && { echo "  No Mail data found"; return 0; }
 
@@ -1789,7 +1832,8 @@ delete_mail_account() {
     fi
 
     # Convert to JSON and find account
-    local accounts_json=$(plutil -convert json -o - "$accounts_plist" 2>/dev/null)
+    local accounts_json
+    accounts_json=$(plutil -convert json -o - "$accounts_plist" 2>/dev/null)
 
     # Find account ID for this identity
     # This is complex - for now, report that manual removal may be needed
@@ -1980,7 +2024,8 @@ execute_deletion() {
 display_exit_report() {
     stop_timer
 
-    local elapsed=$(get_elapsed_time)
+    local elapsed
+    elapsed=$(get_elapsed_time)
 
     echo
     echo -e "${CYAN}${BOLD}════════════════════════════════════════════════════════════${NC}"

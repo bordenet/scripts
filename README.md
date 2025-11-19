@@ -61,46 +61,34 @@ A collection of utility scripts for various tasks.
 
 ## Engineering Starter Kit
 
-**NEW**: Portable collection of battle-tested engineering best practices ready to copy into new projects.
+Portable collection of engineering best practices for new projects.
 
-See **[`starter-kit/`](./starter-kit/README.md)** for production-grade engineering standards including:
-- ✅ **Safety nets**: Pre-commit hooks, validation systems, dependency management
-- ✅ **AI development protocols**: Guidelines for Claude Code, token conservation, quality gates
-- ✅ **Code style standards**: Cross-language style guides (Go, JS/TS, Dart, Kotlin, Swift)
-- ✅ **Shell script library**: Reusable common.sh with logging, error handling, UI helpers
-- ✅ **Project setup checklist**: Step-by-step guide for new repository setup
+See **[`starter-kit/`](./starter-kit/README.md)** for:
+- Pre-commit hooks, validation systems, dependency management
+- AI development protocols for Claude Code
+- Cross-language style guides (Go, JS/TS, Dart, Kotlin, Swift)
+- Reusable shell script library (common.sh)
+- Project setup checklist
 
-**Quick Start:**
 ```bash
 # Copy to your project
 cp -r starter-kit/ your-project/docs/
-
-# Or cherry-pick specific components
-cp starter-kit/DEVELOPMENT_PROTOCOLS.md your-project/docs/
-cp starter-kit/common.sh your-project/scripts/lib/
-
-# See ./starter-kit/README.md for comprehensive documentation
 ```
-
-**Use this to avoid repeating painful mistakes from production experience.**
 
 ---
 
 ## macOS Development Environment Setup
 
-**NEW**: Modular, component-based architecture for maintainable macOS setup scripts.
+Modular, component-based architecture for macOS setup scripts.
 
-See **[`macos-setup/`](./macos-setup/README.md)** for a reusable template system that:
-- ✅ Reduces setup script complexity by ~65%
-- ✅ Enables selective component reuse across projects
-- ✅ Provides consistent UI (verbose/compact modes)
-- ✅ Includes comprehensive adoption guide for AI-assisted customization
+See **[`macos-setup/`](./macos-setup/README.md)** for reusable template system with:
+- Component-based architecture (reduces complexity ~65%)
+- Selective component reuse
+- Consistent UI (verbose/compact modes)
+- AI-assisted customization guide
 
-**Quick Start:**
 ```bash
 # Copy to your project
 cp -r macos-setup/lib your-project/scripts/
 cp -r macos-setup/setup-components your-project/scripts/
 cp macos-setup/setup-macos-template.sh your-project/scripts/setup-macos.sh
-
-# See ./macos-setup/README.md for detailed documentation and customization guide
