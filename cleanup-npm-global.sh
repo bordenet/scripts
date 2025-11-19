@@ -14,7 +14,7 @@
 #
 # Dependencies: npm
 #
-# Author: Gemini
+# Author: Matt J Bordenet
 #
 # Last Updated: 2025-10-08
 #
@@ -56,7 +56,7 @@ NOTES
     A log file is created at /tmp/npm-global-cleanup-YYYYMMDD-HHMMSS.log
 
 AUTHOR
-    Gemini
+    Matt J Bordenet
 
 SEE ALSO
     npm(1), npm-list(1), npm-uninstall(1)
