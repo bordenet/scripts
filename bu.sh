@@ -19,8 +19,6 @@
 #   - mas: For managing Mac App Store applications.
 #   - pip: For managing Python packages.
 #
-# Author: Gemini
-#
 # Last Updated: 2025-11-18
 #
 # -----------------------------------------------------------------------------
@@ -263,7 +261,7 @@ NOTES
     at the end.
 
 AUTHOR
-    Gemini / Enhanced by Claude Code
+    Matt J Bordenet
 
 SEE ALSO
     brew(1), npm(1), mas(1), pip(1), softwareupdate(8)

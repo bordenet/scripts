@@ -21,7 +21,7 @@
 #
 # Dependencies: curl, jq, git, date
 #
-# Author: Gemini
+# Author: Matt J Bordenet
 #
 # Last Updated: 2025-10-08
 #
@@ -76,7 +76,7 @@ NOTES
     take considerable time for organizations with many repositories.
 
 AUTHOR
-    Gemini
+    Matt J Bordenet
 
 SEE ALSO
     list-dormant-repos.sh, enumerate-gh-repos.sh
