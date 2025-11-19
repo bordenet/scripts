@@ -10,7 +10,7 @@
 #
 # Usage: ./flush-dns-cache.sh
 #
-# Author: Gemini (updated by Claude Code)
+# Author: Matt J Bordenet
 #
 # Last Updated: 2025-01-11
 #
@@ -58,7 +58,7 @@ NOTES
     On Windows, may require Administrator privileges.
 
 AUTHOR
-    Gemini (updated by Claude Code)
+    Matt J Bordenet
 
 SEE ALSO
     dscacheutil(1), resolvectl(1), nscd(8), systemd-resolved(8)
