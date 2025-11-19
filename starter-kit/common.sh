@@ -13,8 +13,10 @@ readonly COLOR_GREEN='\033[0;32m'
 readonly COLOR_YELLOW='\033[1;33m'
 readonly COLOR_BLUE='\033[0;34m'
 readonly COLOR_CYAN='\033[0;36m'
+# shellcheck disable=SC2034  # Color palette for library users
 readonly COLOR_MAGENTA='\033[0;35m'
 readonly COLOR_BOLD='\033[1m'
+# shellcheck disable=SC2034  # Color palette for library users
 readonly COLOR_DIM='\033[2m'
 readonly COLOR_RESET='\033[0m'
 

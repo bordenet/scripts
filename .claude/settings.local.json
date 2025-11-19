@@ -25,7 +25,8 @@
       "Bash(./fetch-github-projects.sh:*)",
       "Bash(./bu.sh:*)",
       "Bash(timeout 30 ./bu.sh:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(~/GitHub/Personal/scripts/integrate-claude-web-branch.sh:*)"
     ],
     "deny": [],
     "ask": []

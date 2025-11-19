@@ -116,7 +116,12 @@ main() {
       --message) COMMIT_MSG="$2"; shift 2 ;;
       --repo) REPO_URL_PARAM="$2"; shift 2 ;;
       --what-if) WHAT_IF="true"; shift ;;  # Explicit what-if (already default)
-      --force) WHAT_IF=""; FORCE="true"; shift ;;  # Disable what-if when --force is used
+      --force)
+        WHAT_IF=""
+        # shellcheck disable=SC2034  # FORCE used to document intent, WHAT_IF controls behavior
+        FORCE="true"
+        shift
+        ;;  # Disable what-if when --force is used
       --verbose) VERBOSE="true"; shift ;;
       --help) usage; exit 0 ;;
       -*) echo "Unknown option: $1"; usage; exit 1 ;;

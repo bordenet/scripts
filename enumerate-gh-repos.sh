@@ -145,7 +145,7 @@ get_repos() {
 # Function to get the timestamp of the last push for a given repository.
 get_latest_push() {
     local repo_url=$1
-    local repo_name=$(basename "$repo_url" .git)
+    local repo_name; repo_name=$(basename "$repo_url" .git)
     log "Getting last push time for: $repo_name"
     curl -s -H "Authorization: token $GITHUB_TOKEN" "$GITHUB_URL/api/v3/repos/$GITHUB_ORG/$repo_name" | jq -r '.pushed_at'
 }
@@ -153,7 +153,7 @@ get_latest_push() {
 # Function to clone a repository and count its lines of code.
 count_loc() {
     local repo_url=$1
-    local repo_name=$(basename "$repo_url" .git)
+    local repo_name; repo_name=$(basename "$repo_url" .git)
     local clone_dir="$TEMP_DIR/$repo_name"
     log "Cloning $repo_name to $clone_dir"
     git clone "$repo_url" "$clone_dir" --quiet || error_exit "Failed to clone $repo_url"

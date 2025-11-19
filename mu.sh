@@ -106,7 +106,7 @@ if [ -d "$HOME/.nvm" ]; then
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
         # Update nvm itself
-        cd "$NVM_DIR" && git fetch --tags origin && git checkout `git describe --abbrev=0 --tags --match "v[0-9]*" $(git rev-list --tags --max-count=1)` && \. "$NVM_DIR/nvm.sh"
+        cd "$NVM_DIR" && git fetch --tags origin && git checkout "$(git describe --abbrev=0 --tags --match "v[0-9]*" "$(git rev-list --tags --max-count=1)")" && \. "$NVM_DIR/nvm.sh"
     ) > "$LOG_DIR/mu_nvm.log" 2>&1 &
     pid=$!
     spinner $pid 600
