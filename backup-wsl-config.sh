@@ -52,7 +52,7 @@
 #
 # Platform: WSL (Linux)
 #
-# Author: Claude Code
+# Author: Matt J Bordenet
 # Last Updated: 2025-01-11
 #
 # -----------------------------------------------------------------------------
@@ -125,7 +125,7 @@ NOTES
     Existing files are automatically backed up before overwriting during restore.
 
 AUTHOR
-    Claude Code
+    Matt J Bordenet
 
 SEE ALSO
     wsl.conf(5), rsync(1), zip(1)
