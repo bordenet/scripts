@@ -20,8 +20,11 @@ init_script
 AUTO_YES=false
 VERBOSE=true
 FAILED_INSTALLS=()
+# shellcheck disable=SC2034  # Variables reserved for future use
 CURRENT_SECTION=""
+# shellcheck disable=SC2034  # Variables reserved for future use
 SECTION_STATUS=""
+# shellcheck disable=SC2034  # Variables reserved for future use
 declare -a SECTION_FAILURES
 
 # Display usage
@@ -46,7 +49,12 @@ EOF
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -y|--yes) AUTO_YES=true; VERBOSE=false; shift ;;
+        -y|--yes)
+            # shellcheck disable=SC2034  # AUTO_YES used by sourced ui.sh library
+            AUTO_YES=true
+            VERBOSE=false
+            shift
+            ;;
         -v|--verbose) VERBOSE=true; shift ;;
         -h|--help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
@@ -56,7 +64,8 @@ done
 # Source UI library (after setting AUTO_YES/VERBOSE)
 source "$SCRIPT_DIR/lib/ui.sh"
 
-readonly REPO_ROOT="$(get_repo_root)"
+readonly REPO_ROOT
+REPO_ROOT="$(get_repo_root)"
 
 # Validate platform
 if ! is_macos; then
@@ -65,7 +74,7 @@ fi
 
 
 log_header "RecipeArchive Project Setup for macOS"
-cd "$REPO_ROOT"
+cd "$REPO_ROOT" || die "Failed to change to repository root"
 
 # Discover and execute components
 COMPONENTS_DIR="$SCRIPT_DIR/setup-components"
@@ -79,6 +88,7 @@ for component_file in "$COMPONENTS_DIR"/*.sh; do
     if [ -f "$component_file" ]; then
         # ADOPTION NOTE: Component sourcing happens here
         # Each component exports an install_component() function
+        # shellcheck disable=SC1090  # Dynamic component loading by design
         source "$component_file"
 
         # Execute the component's installation
