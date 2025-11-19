@@ -15,31 +15,27 @@ This document contains project-specific guidelines and lessons learned for Claud
 
 ## Quality Standards for Code Delivery
 
-### ⚠️ MANDATORY PRE-COMMIT REQUIREMENTS ⚠️
+### Pre-Commit Requirements
 
-**YOU MUST TEST, VALIDATE, AND LINT ALL CODE CHANGES BEFORE COMMITTING**
+All code changes should be tested, validated, and linted before committing.
 
-This is **NON-NEGOTIABLE**. Do not skip these steps. Do not wait to be asked.
+### Standard Pre-Commit Checklist:
 
-### ALWAYS Do Before Claiming "Done":
-
-1. **Lint the code** ✅ **MANDATORY**
+1. **Lint the code**
    - Run shellcheck for bash scripts
    - Run appropriate linter for the language
-   - Fix ALL warnings that aren't explicitly false positives
-   - Don't wait to be asked
-   - **Zero linting errors/warnings allowed before commit**
+   - Fix all warnings that aren't explicitly false positives
+   - Target: zero linting errors/warnings before commit
 
-2. **Test the code** ✅ **MANDATORY**
-   - **ALWAYS test commands with sample data before committing**
+2. **Test the code**
+   - Test commands with sample data before committing
    - Test basic functionality where possible
    - Run syntax checks at minimum
-   - Don't commit broken code
    - Test awk/sed/grep commands in isolation with `echo "sample" | command`
    - If you can't test on the target platform, explicitly document this
-   - **Verify all functions work as expected**
+   - Verify all functions work as expected
 
-3. **Validate the code** ✅ **MANDATORY**
+3. **Validate the code**
    - Check syntax: `bash -n script.sh`
    - Verify all sourced files exist
    - Confirm all required commands/dependencies are available
@@ -105,29 +101,18 @@ This is **NON-NEGOTIABLE**. Do not skip these steps. Do not wait to be asked.
 5. Code follows project conventions
 6. Commit messages are descriptive
 
-**Don't make the user ask for basic quality practices.**
-
 ### Creating Pull Requests:
 
-**⚠️ CRITICAL - MANDATORY IN EVERY SESSION ⚠️**
-
-**YOU MUST ALWAYS PROVIDE A PR URL AT THE END OF EVERY WORK SESSION**
-
-This is **NON-NEGOTIABLE**. Do not wait to be asked. Do not forget this step.
+Always provide a PR URL at the end of every work session that involves code changes.
 
 When in Web mode (where `gh` CLI is unavailable):
-1. **ALWAYS** provide the direct GitHub compare URL for PR creation
+1. Provide the direct GitHub compare URL for PR creation
 2. Format: `https://github.com/OWNER/REPO/compare/BASE...BRANCH?expand=1`
 3. Include pre-written title and description for user to paste
-4. Provide this URL **BEFORE** the session ends
-5. Don't leave the user hunting for how to create the PR
+4. Provide this URL before the session ends
 
 **Example:**
 ```
 https://github.com/bordenet/scripts/compare/main...claude/feature-branch?expand=1
 ```
-
-**This must be the LAST thing you do in every session that involves code changes.**
-
-If you forget to provide the PR URL, you have failed to complete the task.
 

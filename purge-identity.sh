@@ -57,7 +57,7 @@ fi
 #   - Comprehensive error handling and logging
 #   - What-if mode for safe preview
 #
-# Author: Claude Code
+# Author: Matt J Bordenet
 # Last Updated: 2025-01-13
 #
 # -----------------------------------------------------------------------------
@@ -395,7 +395,7 @@ EXAMPLES OF IDENTITIES
     • Deprecated personal emails (old.email@provider.com)
 
 AUTHOR
-    Claude Code
+    Matt J Bordenet
 
 SEE ALSO
     security(1), sqlite3(1), jq(1)

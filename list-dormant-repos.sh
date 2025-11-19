@@ -21,7 +21,7 @@
 #
 # Dependencies: curl, jq, git, date
 #
-# Author: Gemini
+# Author: Matt J Bordenet
 #
 # Last Updated: 2025-10-08
 #
@@ -77,7 +77,7 @@ NOTES
     this script to identify candidates for archiving or cleanup.
 
 AUTHOR
-    Gemini
+    Matt J Bordenet
 
 SEE ALSO
     get-active-repos.sh, enumerate-gh-repos.sh

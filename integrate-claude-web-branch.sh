@@ -214,7 +214,7 @@ NOTES
     - After 90 seconds, PR will auto-merge unless cancelled (Ctrl+C or 'n')
 
 AUTHOR
-    Claude Code
+    Matt J Bordenet
 
 SEE ALSO
     git(1), gh(1), git-pull(1), git-merge(1)

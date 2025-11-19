@@ -23,7 +23,7 @@
 #
 # Dependencies: curl, jq, git, mktemp
 #
-# Author: Matt Bordenet (Original), Gemini (Enhancements)
+# Author: Matt J Bordenet
 #
 # Last Updated: 2025-10-08
 #
@@ -86,7 +86,7 @@ NOTES
     directory is created and cleaned up automatically on exit.
 
 AUTHOR
-    Matt Bordenet (Original), Gemini (Enhancements)
+    Matt J Bordenet
 
 SEE ALSO
     get-active-repos.sh, list-dormant-repos.sh
