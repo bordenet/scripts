@@ -139,7 +139,7 @@ EXAMPLES
     ./fetch-github-projects.sh /path/to/repos
 
 AUTHOR
-    Claude Code
+    Matt J Bordenet
 
 SEE ALSO
     git-pull(1), git-fetch(1)

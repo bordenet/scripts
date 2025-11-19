@@ -15,7 +15,7 @@
 #   - keep-files: Number of capture files to keep (default: 48)
 #   - filter: tcpdump filter expression (default: "(host 1.1.1.1 or host 8.8.8.8) and (tcp[tcpflags] & (tcp-rst|tcp-fin) != 0 or icmp or arp)")
 #
-# Author: Gemini
+# Author: Matt J Bordenet
 #
 # Last Updated: 2025-10-08
 #

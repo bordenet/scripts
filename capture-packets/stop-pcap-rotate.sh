@@ -9,7 +9,7 @@
 #
 # Usage: ./stop-pcap-rotate.sh
 #
-# Author: Gemini
+# Author: Matt J Bordenet
 #
 # Last Updated: 2025-10-08
 #

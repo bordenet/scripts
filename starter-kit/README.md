@@ -108,19 +108,19 @@ Follow this order:
 
 ## Maintenance
 
-This starter-kit was created from your-project at commit `66ba440` on 2025-11-17.
+This starter-kit was created from RecipeArchive at commit `66ba440` on 2025-11-17 and is maintained in the scripts repository.
 
-**To update**: When your-project improves a practice, update these documents and bump the version.
+**To update**: When practices improve, update these documents and bump the version.
 
 ## License
 
-Same as your-project project. These are engineering best practices, not proprietary code.
+MIT License - Copyright (c) 2025 Matt J Bordenet. These are engineering best practices, not proprietary code.
 
 ## Questions?
 
-- **Original project**: [your-project](https://github.com/bordenet/your-project)
-- **Created by**: Human engineer + Claude Code collaboration
-- **Last updated**: 2025-11-17
+- **Repository**: [scripts](https://github.com/bordenet/scripts)
+- **Origin**: [RecipeArchive](https://github.com/bordenet/RecipeArchive) project
+- **Last updated**: 2025-11-19
 
 ---
 

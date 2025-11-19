@@ -204,7 +204,7 @@ BRANCH INFORMATION
     • Location (local/remote/both)
 
 AUTHOR
-    Claude Code
+    Matt J Bordenet
 
 SEE ALSO
     git(1), git-branch(1), git-push(1)

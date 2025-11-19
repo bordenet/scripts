@@ -312,7 +312,7 @@ EXAMPLES OF IDENTITIES
     • Deprecated personal emails (old.email@provider.com)
 
 AUTHOR
-    Claude Code
+    Matt J Bordenet
 
 SEE ALSO
     security(1), sqlite3(1), jq(1)

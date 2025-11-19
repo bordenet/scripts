@@ -23,7 +23,7 @@
 # WARNING: This script performs a hard reset and will discard ALL local
 #          changes in the repositories it processes. Use with EXTREME caution.
 #
-# Author: Gemini
+# Author: Matt J Bordenet
 #
 # Last Updated: 2025-10-08
 #
@@ -102,7 +102,7 @@ NOTES
     You must explicitly use --force to execute the reset operations.
 
 AUTHOR
-    Gemini
+    Matt J Bordenet
 
 SEE ALSO
     git-reset(1), git-clean(1), git-fetch(1)
