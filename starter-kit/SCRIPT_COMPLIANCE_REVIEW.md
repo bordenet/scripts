@@ -373,4 +373,4 @@ your-project scripts are in **excellent** shape. The style guide compliance is a
 2. Make Phase 1 improvements (low-risk, high-value)
 3. Consider Phase 2 improvements later (optional polish)
 
-**Most Important**: These scripts represent months of hard-won battle-tested solutions. Preserve that work while making incremental improvements.
+**Most Important**: These scripts represent months of development. Preserve that work while making incremental improvements.

@@ -32,9 +32,33 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Source helper library
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get the directory where this script is located (portable across macOS/Linux)
+# This resolves the actual script location even when called via relative path or symlink
+get_script_dir() {
+    local source="${BASH_SOURCE[0]}"
+    # Resolve symlinks
+    while [ -h "$source" ]; do
+        local dir
+        dir="$(cd -P "$(dirname "$source")" && pwd)"
+        source="$(readlink "$source")"
+        [[ $source != /* ]] && source="$dir/$source"
+    done
+    cd -P "$(dirname "$source")" && pwd
+}
+
+SCRIPT_DIR="$(get_script_dir)"
+
+# Verify helper library exists before sourcing
+HELPER_LIB="$SCRIPT_DIR/lib/mu-helpers.sh"
+if [[ ! -f "$HELPER_LIB" ]]; then
+    echo "ERROR: Cannot find helper library at: $HELPER_LIB" >&2
+    echo "SCRIPT_DIR resolved to: $SCRIPT_DIR" >&2
+    echo "Please run this script from the repository root or ensure lib/mu-helpers.sh exists" >&2
+    exit 1
+fi
+
 # shellcheck source=lib/mu-helpers.sh
-source "$SCRIPT_DIR/lib/mu-helpers.sh"
+source "$HELPER_LIB"
 
 ################################################################################
 # Main Script

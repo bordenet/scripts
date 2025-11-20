@@ -1,10 +1,22 @@
-git_reset.log
+# System files
 .DS_Store
+git_reset.log
 
-#Ignore vscode AI rules
+# AI assistant rules
 .github/instructions/codacy.instructions.md
-
-
-#Ignore cursor AI rules
 .cursor/rules/codacy.mdc
+
+# Temporary/personal scripts
 resume-at-0801.sh
+
+# Malware sandbox - security sensitive files
+analyze-malware-sandbox/id_rsa
+analyze-malware-sandbox/id_rsa.pub
+analyze-malware-sandbox/*.iso
+analyze-malware-sandbox/shared/*
+analyze-malware-sandbox/vm/*
+analyze-malware-sandbox/.env
+
+# Purge identity - runtime data
+purge-identity/cache/*
+purge-identity/logs/*

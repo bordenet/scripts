@@ -16,7 +16,7 @@
 
 ## Overview
 
-A production-grade safety net consists of multiple layers of automated checks that run BEFORE code reaches version control or production:
+A comprehensive safety net consists of multiple layers of automated checks that run before code reaches version control:
 
 ```
 Developer writes code

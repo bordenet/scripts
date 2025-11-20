@@ -1,12 +1,12 @@
 # Engineering Starter Kit
 
-**Purpose**: Portable collection of battle-tested engineering best practices, ready to be copied into new projects.
+**Purpose**: Portable collection of engineering best practices, ready to be copied into new projects.
 
 **Origin**: Born from the [RecipeArchive](https://github.com/bordenet/RecipeArchive) project.
 
 ## What Is This?
 
-This directory contains **hard-won lessons** from building a production-grade, multi-platform application (Flutter mobile, browser extensions, AWS backend, Go microservices). These documents capture engineering protocols, safety nets, and coding standards that took months to develop and debug.
+This directory contains engineering best practices from building a multi-platform application (Flutter mobile, browser extensions, AWS backend, Go microservices). These documents capture engineering protocols, safety nets, and coding standards.
 
 **Use this starter-kit to avoid repeating painful mistakes in future projects.**
 
@@ -14,7 +14,7 @@ This directory contains **hard-won lessons** from building a production-grade, m
 
 Copy this starter-kit to a new project when:
 
-1. **Starting a new repository** - Bootstrap with proven engineering practices
+1. **Starting a new repository** - Bootstrap with established engineering practices
 2. **Onboarding an AI assistant** - Give Claude Code / Gemini / ChatGPT these documents
 3. **Standardizing an existing project** - Retrofit safety nets into legacy codebases
 4. **Teaching best practices** - Use as training material for new engineers
@@ -104,7 +104,7 @@ Follow this order:
 - ✅ All scripts follow same conventions (readable by anyone)
 - ✅ 5-minute / 3-attempt escalation policy saves hours
 - ✅ Standardized logging makes debugging 10x faster
-- ✅ AI assistants follow consistent, proven protocols
+- ✅ AI assistants follow consistent protocols
 
 ## Maintenance
 
