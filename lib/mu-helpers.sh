@@ -164,3 +164,89 @@ print_error_report() {
         echo "=================================================="
     fi
 }
+
+
+################################################################################
+# Windows Update Helper
+################################################################################
+
+# Run Windows Update via PowerShell (requires elevation)
+run_windows_update() {
+    printf "%-30s" "Windows Update..."
+
+    # Create a temporary PowerShell script
+    local temp_ps_script
+    temp_ps_script=$(mktemp --suffix=.ps1)
+    local win_ps_script
+    win_ps_script=$(wslpath -w "$temp_ps_script")
+    local win_log_file
+    win_log_file=$(wslpath -w "$LOG_DIR/mu_windows_update.log")
+
+    # Write the PowerShell script that will run elevated
+    cat > "$temp_ps_script" << 'PSEOF'
+param($LogFile)
+$ErrorActionPreference = "Continue"
+$output = @()
+
+try {
+    # Install PSWindowsUpdate if not present
+    if (!(Get-Module -ListAvailable -Name PSWindowsUpdate)) {
+        $output += "Installing PSWindowsUpdate module..."
+        Install-Module PSWindowsUpdate -Force -Scope CurrentUser
+    }
+
+    # Import module
+    Import-Module PSWindowsUpdate
+
+    # Run Windows Update
+    $updates = Get-WindowsUpdate -AcceptAll -Install -AutoReboot:$false
+    $output += $updates | Format-List | Out-String
+
+    if (!$updates) {
+        $output += "No updates available."
+    }
+}
+catch {
+    $output += "Error: $_"
+    $output += $_.ScriptStackTrace
+}
+
+$output | Out-File -FilePath $LogFile -Encoding UTF8
+PSEOF
+
+    # Use Start-Process with -Verb RunAs to elevate
+    # The outer powershell.exe launches the elevated one
+    powershell.exe -NoProfile -Command "
+        Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '$win_ps_script', '$win_log_file' -Verb RunAs -Wait -WindowStyle Normal
+    " > /dev/null 2>&1 &
+    local pid=$!
+    spinner $pid 600
+    local spinner_exit=$?
+
+    # Clean up
+    rm -f "$temp_ps_script"
+
+    if [ $spinner_exit -eq 124 ]; then
+        echo "⏱ TIMEOUT"
+        ERRORS+=("Windows Update timed out after 600s - see $LOG_DIR/mu_windows_update.log")
+    else
+        wait $pid 2>/dev/null
+        local wu_exit=$?
+
+        # Check the result
+        if [ $wu_exit -eq 0 ] && [ -f "$LOG_DIR/mu_windows_update.log" ]; then
+            if grep -qi "PermissionDenied\|AccessDenied\|elevated" "$LOG_DIR/mu_windows_update.log" 2>/dev/null; then
+                echo "✗"
+                ERRORS+=("Windows Update requires elevation - UAC prompt may have been dismissed - see $LOG_DIR/mu_windows_update.log")
+            elif grep -qi "Error:" "$LOG_DIR/mu_windows_update.log" 2>/dev/null; then
+                echo "⚠"
+                ERRORS+=("Windows Update completed with errors - see $LOG_DIR/mu_windows_update.log")
+            else
+                echo "✓"
+            fi
+        else
+            echo "✗"
+            ERRORS+=("Windows Update failed - see $LOG_DIR/mu_windows_update.log")
+        fi
+    fi
+}

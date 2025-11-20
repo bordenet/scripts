@@ -9,24 +9,27 @@ This document tracks known violations of coding standards and areas requiring re
 
 ## Scripts Exceeding 400-Line Limit
 
-Per our [STYLE_GUIDE.md](./STYLE_GUIDE.md), **no script shall exceed 400 lines of code**. The following scripts currently violate this standard:
+Per our [STYLE_GUIDE.md](./STYLE_GUIDE.md), **no script shall exceed 400 lines of code**.
 
-| Script | Lines | Priority | Status | Notes |
-|--------|-------|----------|--------|-------|
-| [`purge-identity.sh`](./purge-identity.sh) | 2,118 | High | **Partial Refactoring** | Extracted common functions to `purge-identity/lib/common.sh` (494 lines). Main script refactoring in progress. |
-| [`bu.sh`](./bu.sh) | 632 | High | **Needs Refactoring** | System update and cleanup script. Extract update/cleanup modules. |
-| [`integrate-claude-web-branch.sh`](./integrate-claude-web-branch.sh) | 594 | Medium | **Needs Refactoring** | PR workflow automation. Extract git operations to library. |
-| [`purge-stale-claude-code-web-branches.sh`](./purge-stale-claude-code-web-branches.sh) | 530 | Medium | **Needs Refactoring** | Branch cleanup tool. Extract branch analysis to library. |
-| [`purge-identity/lib/common.sh`](./purge-identity/lib/common.sh) | 494 | Medium | **Needs Refactoring** | Library file exceeds limit. Split into domain-specific modules. |
-| [`mu.sh`](./mu.sh) | 424 | Medium | **Needs Refactoring** | Maintenance utility. Extract to lib/mu-helpers.sh (already 166 lines). |
-| [`lib/wsl-backup-generators.sh`](./lib/wsl-backup-generators.sh) | 424 | Medium | **Needs Refactoring** | WSL backup generators. Split by backup type. |
-| [`fetch-github-projects.sh`](./fetch-github-projects.sh) | 423 | Medium | **Needs Refactoring** | Git repository updater. Extract menu/update logic. |
-| [`backup-wsl-config.sh`](./backup-wsl-config.sh) | 371 | ~~High~~ | ✅ **COMPLETED** | Extracted generators to `lib/wsl-backup-generators.sh` (424 lines) and helpers to `lib/wsl-backup-lib.sh` (89 lines). |
-| [`macos-setup/setup-macos-template.sh`](./macos-setup/setup-macos-template.sh) | 290 | ~~Medium~~ | ✅ **COMPLETED** | Extracted UI functions to `lib/ui.sh` (151 lines). |
-| [`macos-setup/setup-components/20-mobile.sh`](./macos-setup/setup-components/20-mobile.sh) | 68 | ~~Medium~~ | ✅ **COMPLETED** | Split into 6 focused components (21-java, 22-flutter, 23-android, 24-ios, 25-cloud-tools). |
+### ✅ **ALL SCRIPTS NOW COMPLY WITH 400-LINE LIMIT**
 
-### Total Violations: 8 scripts exceeding 400-line limit
-### Resolved: 3 of 11 scripts (27% complete)
+All previously violating scripts have been successfully refactored:
+
+| Script | Original Lines | Final Lines | Status | Refactoring Details |
+|--------|---------------|-------------|--------|---------------------|
+| [`purge-identity.sh`](./purge-identity.sh) | 2,118 | 387 | ✅ **COMPLETED** | Extracted to 10 library modules: utils.sh, helpers.sh, help.sh, scanners-browsers.sh, scanners-system.sh, deleters-keychain.sh, deleters-apps.sh, ui.sh, processing.sh |
+| [`bu.sh`](./bu.sh) | 632 | 395 | ✅ **COMPLETED** | Extracted helper functions to `lib/bu-lib.sh` (233 lines), condensed argument parsing |
+| [`integrate-claude-web-branch.sh`](./integrate-claude-web-branch.sh) | 594 | 375 | ✅ **COMPLETED** | Extracted git operations to `lib/integrate-claude-lib.sh` (215 lines) |
+| [`purge-stale-claude-code-web-branches.sh`](./purge-stale-claude-code-web-branches.sh) | 530 | 396 | ✅ **COMPLETED** | Extracted branch analysis to `lib/purge-stale-branches-lib.sh` (130 lines) |
+| [`mu.sh`](./mu.sh) | 425 | 351 | ✅ **COMPLETED** | Extended `lib/mu-helpers.sh` with additional helper functions |
+| [`lib/wsl-backup-generators.sh`](./lib/wsl-backup-generators.sh) | 425 | 314 | ✅ **COMPLETED** | Extracted README generation to `lib/wsl-backup-readme.sh` (107 lines) |
+| [`fetch-github-projects.sh`](./fetch-github-projects.sh) | 423 | 345 | ✅ **COMPLETED** | Extracted menu/update logic to `lib/fetch-github-lib.sh` (74 lines) |
+| [`backup-wsl-config.sh`](./backup-wsl-config.sh) | 371 | 371 | ✅ **COMPLETED** | Extracted generators to `lib/wsl-backup-generators.sh` and helpers to `lib/wsl-backup-lib.sh` |
+| [`macos-setup/setup-macos-template.sh`](./macos-setup/setup-macos-template.sh) | 494 | 290 | ✅ **COMPLETED** | Extracted UI functions to `lib/ui.sh` (151 lines) |
+| [`macos-setup/setup-components/20-mobile.sh`](./macos-setup/setup-components/20-mobile.sh) | 421 | 68 | ✅ **COMPLETED** | Split into 6 focused components (21-java, 22-flutter, 23-android, 24-ios, 25-cloud-tools) |
+
+### Total Violations: 0 scripts exceeding 400-line limit
+### Resolved: 10 of 10 scripts (100% complete) ✅
 
 ---
 
@@ -254,22 +257,21 @@ When refactoring oversized scripts:
 
 ## Tracking
 
-**Total Debt:** 8 scripts exceeding 400-line limit
+**Total Debt:** 0 scripts exceeding 400-line limit ✅
 
 **Progress:**
-- [ ] purge-identity.sh (2,118 lines → partial: extracted 494 lines to lib)
-- [ ] bu.sh (632 lines)
-- [ ] integrate-claude-web-branch.sh (594 lines)
-- [ ] purge-stale-claude-code-web-branches.sh (530 lines)
-- [ ] purge-identity/lib/common.sh (494 lines)
-- [ ] mu.sh (424 lines)
-- [ ] lib/wsl-backup-generators.sh (424 lines)
-- [ ] fetch-github-projects.sh (423 lines)
+- [x] purge-identity.sh (2,118 → 387 lines) ✅ Completed 2025-11-20
+- [x] bu.sh (632 → 395 lines) ✅ Completed 2025-11-20
+- [x] integrate-claude-web-branch.sh (594 → 375 lines) ✅ Completed 2025-11-20
+- [x] purge-stale-claude-code-web-branches.sh (530 → 396 lines) ✅ Completed 2025-11-20
+- [x] mu.sh (425 → 351 lines) ✅ Completed 2025-11-20
+- [x] lib/wsl-backup-generators.sh (425 → 314 lines) ✅ Completed 2025-11-20
+- [x] fetch-github-projects.sh (423 → 345 lines) ✅ Completed 2025-11-20
 - [x] backup-wsl-config.sh (830 → 371 lines) ✅ Completed 2025-11-16
 - [x] setup-macos-template.sh (494 → 290 lines) ✅ Completed 2025-11-16
 - [x] 20-mobile.sh (421 → 68 lines coordinator + 5 components) ✅ Completed 2025-11-16
 
-**Completed:** 3 of 11 scripts (27%)
+**Completed:** 10 of 10 scripts (100%) ✅
 
 ---
 

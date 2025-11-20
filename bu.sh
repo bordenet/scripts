@@ -1,290 +1,53 @@
 #!/bin/bash
 [[ "$(uname -s)" != "Darwin" ]] && { echo "Error: This script requires macOS" >&2; exit 1; }
 # -----------------------------------------------------------------------------
-#
 # Script Name: bu.sh
-#
-# Description: This script performs a comprehensive system update and cleanup
-#              for a macOS environment. It updates Homebrew, npm, mas (Mac App
-#              Store), and pip. It also cleans up Homebrew installations and
-#              triggers a macOS software update.
-#
-# Platform:    macOS only
-#
+# Description: Comprehensive macOS system update and cleanup
+# Platform: macOS only
 # Usage: ./bu.sh [-v|--verbose]
-#
-# Dependencies:
-#   - Homebrew: For managing packages.
-#   - npm: For managing Node.js packages.
-#   - mas: For managing Mac App Store applications.
-#   - pip: For managing Python packages.
-#
-# Last Updated: 2025-11-18
-#
 # -----------------------------------------------------------------------------
 
 # Do NOT exit on error - we want to continue through failures
 set -u  # Exit on undefined variables
 set -o pipefail  # Catch errors in pipes
 
-# --- Colors for Output ---
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
+# Source library functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/bu-lib.sh
+source "$SCRIPT_DIR/lib/bu-lib.sh"
 
-# --- Global Variables ---
-FAILED_TASKS=()
-SUCCEEDED_TASKS=()
-SKIPPED_TASKS=()
-MAX_RETRIES=3
-RETRY_DELAY=5
-VERBOSE=false
+# --- Colors for Output (exported for library use) ---
+export RED='\033[0;31m'
+export GREEN='\033[0;32m'
+export YELLOW='\033[1;33m'
+export BLUE='\033[0;34m'
+export BOLD='\033[1m'
+export NC='\033[0m' # No Color
 
-# ANSI cursor control
-ERASE_LINE='\033[2K'
-SAVE_CURSOR='\033[s'
-RESTORE_CURSOR='\033[u'
-TIMER_PID=""
+# --- Global Variables (exported for library use) ---
+export FAILED_TASKS=()
+export SUCCEEDED_TASKS=()
+export SKIPPED_TASKS=()
+export MAX_RETRIES=3
+export RETRY_DELAY=5
+export VERBOSE=false
+
+# ANSI cursor control (exported for library use)
+export ERASE_LINE='\033[2K'
+export SAVE_CURSOR='\033[s'
+export RESTORE_CURSOR='\033[u'
+export TIMER_PID=""
 
 # --- Helper Functions ---
 
-# Display timer in top right corner
-show_timer() {
-    local elapsed=$(($(date +%s) - start_time))
-    local minutes=$((elapsed / 60))
-    local seconds=$((elapsed % 60))
-    local cols
-    cols=$(tput cols 2>/dev/null || echo 80)
-    local timer_text
-    timer_text=$(printf "%02d:%02d" "$minutes" "$seconds")
-    local timer_pos=$((cols - 6))
-
-    # Save cursor, move to top right, print timer with background, restore cursor
-    echo -ne "${SAVE_CURSOR}\033[1;${timer_pos}H\033[43;30m ${timer_text} ${NC}${RESTORE_CURSOR}"
-}
-
-# Timer background process
-timer_loop() {
-    while kill -0 $$ 2>/dev/null; do
-        show_timer
-        sleep 1
-    done
-}
-
-# Start timer in background
-start_timer() {
-    if [ "$VERBOSE" = false ]; then
-        timer_loop &
-        TIMER_PID=$!
-    fi
-}
-
-# Stop timer
-stop_timer() {
-    if [ -n "$TIMER_PID" ] && kill -0 "$TIMER_PID" 2>/dev/null; then
-        kill "$TIMER_PID" 2>/dev/null
-        wait "$TIMER_PID" 2>/dev/null
-    fi
-}
-
-# Update current line with spinner
-update_status() {
-    if [ "$VERBOSE" = false ]; then
-        echo -ne "${ERASE_LINE}\r$*"
-    fi
-}
-
-# Complete current line
-complete_status() {
-    if [ "$VERBOSE" = false ]; then
-        echo -e "${ERASE_LINE}\r$*"
-    fi
-}
-
-# Log functions
-log_info() {
-    if [ "$VERBOSE" = true ]; then
-        echo -e "${BLUE}[INFO]${NC} $*"
-    fi
-}
-
-log_success() {
-    if [ "$VERBOSE" = true ]; then
-        echo -e "${GREEN}[SUCCESS]${NC} $*"
-    fi
-}
-
-log_warning() {
-    if [ "$VERBOSE" = true ]; then
-        echo -e "${YELLOW}[WARNING]${NC} $*"
-    fi
-}
-
-log_error() {
-    if [ "$VERBOSE" = true ]; then
-        echo -e "${RED}[ERROR]${NC} $*"
-    fi
-}
-
-# Execute command with retry logic
-# Usage: retry_command "Task name" "Spinner text" command [args...]
-retry_command() {
-    local task_name=$1
-    local spinner_text=$2
-    shift 2
-    local attempt=1
-    local max_attempts=$MAX_RETRIES
-
-    log_info "Starting: $task_name"
-
-    while [ $attempt -le $max_attempts ]; do
-        if [ $attempt -gt 1 ]; then
-            update_status "${YELLOW}↻${NC} $spinner_text (retry $attempt/$max_attempts)..."
-            log_warning "Retry attempt $attempt of $max_attempts for: $task_name"
-            sleep $RETRY_DELAY
-        else
-            update_status "  $spinner_text..."
-        fi
-
-        # Execute command and capture output
-        local output
-        if output=$("$@" 2>&1); then
-            complete_status "${GREEN}✓${NC} $spinner_text"
-            log_success "$task_name completed"
-            SUCCEEDED_TASKS+=("$task_name")
-            return 0
-        fi
-
-        local exit_code=$?
-        log_warning "$task_name failed (attempt $attempt/$max_attempts, exit code: $exit_code)"
-
-        if [ $attempt -eq $max_attempts ]; then
-            complete_status "${RED}✗${NC} $spinner_text"
-            log_error "$task_name failed after $max_attempts attempts"
-            if [ "$VERBOSE" = true ]; then
-                log_error "Last error output:"
-                echo "$output" | sed 's/^/  /' >&2
-            fi
-            FAILED_TASKS+=("$task_name")
-            return 1
-        fi
-
-        ((attempt++))
-    done
-}
-
-# Execute command without retries but with error handling
-# Usage: safe_command "Task name" "Spinner text" command [args...]
-safe_command() {
-    local task_name=$1
-    local spinner_text=$2
-    shift 2
-
-    log_info "Starting: $task_name"
-    update_status "  $spinner_text..."
-
-    local output
-    if output=$("$@" 2>&1); then
-        complete_status "${GREEN}✓${NC} $spinner_text"
-        log_success "$task_name completed"
-        SUCCEEDED_TASKS+=("$task_name")
-        return 0
-    else
-        local exit_code=$?
-        complete_status "${RED}✗${NC} $spinner_text"
-        log_error "$task_name failed (exit code: $exit_code)"
-        if [ "$VERBOSE" = true ]; then
-            log_error "Error output:"
-            echo "$output" | sed 's/^/  /' >&2
-        fi
-        FAILED_TASKS+=("$task_name")
-        return 1
-    fi
-}
-
-# Check if command exists
-command_exists() {
-    command -v "$1" &> /dev/null
-}
-
-# --- Help Function ---
-show_help() {
-    cat << EOF
-NAME
-    bu.sh - Comprehensive macOS system update and cleanup
-
-SYNOPSIS
-    bu.sh [OPTIONS]
-
-DESCRIPTION
-    Performs a comprehensive system update and cleanup for macOS. Updates Homebrew,
-    npm, mas (Mac App Store), and pip packages. Cleans up Homebrew installations
-    and triggers macOS software updates.
-
-    By default, shows minimal output with inline status updates. Use --verbose
-    for detailed progress information.
-
-    This script includes comprehensive error handling and retry logic to ensure
-    maximum reliability even when individual operations fail.
-
-OPTIONS
-    -v, --verbose
-        Show detailed progress information and command output
-
-    -h, --help
-        Display this help message and exit
-
-PLATFORM
-    macOS only - Script will exit with error on other platforms
-
-DEPENDENCIES
-    • Homebrew - Package manager
-    • npm - Node.js package manager
-    • mas - Mac App Store CLI
-    • pip - Python package manager
-
-EXAMPLES
-    # Run with minimal output (default)
-    ./bu.sh
-
-    # Run with verbose output
-    ./bu.sh --verbose
-
-NOTES
-    This script requires sudo privileges and will request them at startup.
-    All sudo operations have a 10-minute timeout to prevent hanging if no one
-    is available to dismiss the sudo dialog, allowing unattended background runs.
-    The script will continue even if individual tasks fail, showing a summary
-    at the end.
-
-AUTHOR
-    Matt J Bordenet
-
-SEE ALSO
-    brew(1), npm(1), mas(1), pip(1), softwareupdate(8)
-
-EOF
-    exit 0
-}
+# Helper functions now in lib/bu-lib.sh
 
 # Parse arguments
 while [ $# -gt 0 ]; do
     case "$1" in
-        -h|--help)
-            show_help
-            ;;
-        -v|--verbose)
-            VERBOSE=true
-            shift
-            ;;
-        *)
-            echo "Unknown option: $1" >&2
-            echo "Use -h or --help for usage information" >&2
-            exit 1
-            ;;
+        -h|--help) show_help ;;
+        -v|--verbose) VERBOSE=true; shift ;;
+        *) echo "Unknown option: $1" >&2; echo "Use -h or --help for usage information" >&2; exit 1 ;;
     esac
 done
 
