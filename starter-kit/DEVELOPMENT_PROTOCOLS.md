@@ -501,4 +501,4 @@ Copy this template to your project and customize:
 
 ---
 
-**These protocols represent hard-won lessons. Use them to avoid repeating painful mistakes.**
+**These protocols represent lessons learned from real projects. Use them to avoid common mistakes.**
