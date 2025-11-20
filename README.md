@@ -1,6 +1,25 @@
 # Scripts
 
-A collection of utility scripts for various tasks.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Shell](https://img.shields.io/badge/Shell-Bash%204.0%2B-green.svg)](https://www.gnu.org/software/bash/)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/bordenet/scripts)
+[![ShellCheck](https://img.shields.io/badge/ShellCheck-passing-success.svg)](https://www.shellcheck.net/)
+[![Code Style](https://img.shields.io/badge/Code%20Style-Google-blue.svg)](./STYLE_GUIDE.md)
+
+A collection of utility scripts for macOS and Linux systems.
+
+## Table of Contents
+
+- [Git & GitHub](#git--github)
+- [System & Environment](#system--environment)
+- [Security & Analysis](#security--analysis)
+- [Xcode](#xcode)
+- [AI Assistant](#ai-assistant)
+- [Engineering Starter Kit](#engineering-starter-kit)
+- [macOS Development Environment Setup](#macos-development-environment-setup)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Git & GitHub
 
@@ -92,3 +111,31 @@ See **[`macos-setup/`](./macos-setup/README.md)** for reusable template system w
 cp -r macos-setup/lib your-project/scripts/
 cp -r macos-setup/setup-components your-project/scripts/
 cp macos-setup/setup-macos-template.sh your-project/scripts/setup-macos.sh
+```
+
+---
+
+## Documentation
+
+- **[STYLE_GUIDE.md](./STYLE_GUIDE.md)** - Shell script coding standards
+- **[TECHNICAL_DEBT.md](./TECHNICAL_DEBT.md)** - Known issues and refactoring plans
+- **[CLAUDE.md](./CLAUDE.md)** - Guidelines for AI assistants working in this repository
+- **[docs/](./docs/)** - Additional documentation for specific scripts
+
+## Contributing
+
+This repository follows strict quality standards:
+
+1. **All scripts must pass shellcheck** with zero warnings
+2. **No script may exceed 400 lines** (see [STYLE_GUIDE.md](./STYLE_GUIDE.md))
+3. **All scripts must include `--help` documentation**
+4. **Test all changes** before committing
+5. **Follow the style guide** without exception
+
+See [STYLE_GUIDE.md](./STYLE_GUIDE.md) for complete coding standards.
+
+## License
+
+MIT License - see [LICENSE](./LICENSE) file for details.
+
+Copyright (c) 2025 Matt J Bordenet
