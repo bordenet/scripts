@@ -7,6 +7,11 @@
 
 set -uo pipefail
 
+# Source library functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/integrate-claude-lib.sh
+source "$SCRIPT_DIR/lib/integrate-claude-lib.sh"
+
 # --- Colors for Output ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -28,242 +33,18 @@ PR_NUMBER=""
 WHAT_IF=false
 CREATE_ONLY=false
 
-# --- Helper Functions ---
-
-# Display timer in top right corner
-show_timer() {
-    local elapsed=$(($(date +%s) - start_time))
-    local minutes=$((elapsed / 60))
-    local seconds=$((elapsed % 60))
-    local cols
-    cols=$(tput cols 2>/dev/null || echo 80)
-    local timer_text
-    timer_text=$(printf "%02d:%02d" "$minutes" "$seconds")
-    local timer_pos=$((cols - 6))
-
-    # Save cursor, move to top right, print timer with background, restore cursor
-    echo -ne "${SAVE_CURSOR}\033[1;${timer_pos}H\033[43;30m ${timer_text} ${NC}${RESTORE_CURSOR}"
-}
-
-# Timer background process
-timer_loop() {
-    while kill -0 $$ 2>/dev/null; do
-        show_timer
-        sleep 1
-    done
-}
-
-# Start timer in background
-start_timer() {
-    timer_loop &
-    TIMER_PID=$!
-}
-
-# Stop timer
-stop_timer() {
-    if [ -n "$TIMER_PID" ] && kill -0 "$TIMER_PID" 2>/dev/null; then
-        kill "$TIMER_PID" 2>/dev/null
-        wait "$TIMER_PID" 2>/dev/null
-    fi
-}
-
-# Update current line with status
-update_status() {
-    echo -ne "${ERASE_LINE}\r$*"
-}
-
-# Complete current line
-complete_status() {
-    echo -e "${ERASE_LINE}\r$*"
-}
-
-# List available Claude branches with details
-list_available_branches() {
-    echo
-    echo "Available claude/* branches:"
-
-    # Get all remote claude branches with commit info
-    local branches
-    branches=$(git branch -r | grep "origin/claude/" | sed 's|origin/||' | sort)
-
-    if [ -z "$branches" ]; then
-        echo "  (none found)"
-        return
-    fi
-
-    # Show each branch with age and last commit subject
-    while IFS= read -r branch; do
-        if [ -n "$branch" ]; then
-            # Get last commit timestamp and subject
-            local timestamp subject age
-            timestamp=$(git log -1 --format='%ct' "origin/$branch" 2>/dev/null)
-            subject=$(git log -1 --format='%s' "origin/$branch" 2>/dev/null | cut -c1-60)
-
-            if [ -n "$timestamp" ]; then
-                local now diff
-                now=$(date +%s)
-                diff=$((now - timestamp))
-
-                # Calculate human-readable age
-                local minutes hours days weeks
-                minutes=$((diff / 60))
-                hours=$((diff / 3600))
-                days=$((diff / 86400))
-                weeks=$((diff / 604800))
-
-                if [ $minutes -lt 60 ]; then
-                    age="${minutes}m ago"
-                elif [ $hours -lt 24 ]; then
-                    age="${hours}h ago"
-                elif [ $days -lt 7 ]; then
-                    age="${days}d ago"
-                else
-                    age="${weeks}w ago"
-                fi
-
-                printf "  ${BLUE}%-60s${NC} ${YELLOW}%8s${NC} %s\n" "$branch" "$age" "$subject"
-            else
-                printf "  ${BLUE}%s${NC}\n" "$branch"
-            fi
-        fi
-    done <<< "$branches"
-}
-
-# --- Help Function ---
-show_help() {
-    cat << EOF
-NAME
-    integrate-claude-web-branch.sh - Integrate Claude Code web branches via PR
-
-SYNOPSIS
-    integrate-claude-web-branch.sh [OPTIONS] <branch-name>
-    integrate-claude-web-branch.sh -h|--help
-
-DESCRIPTION
-    Integrates a Claude Code web branch (remote-only) into main via PR workflow.
-
-    TWO MODES:
-
-    1. CREATE-ONLY MODE (--create-only flag):
-       • Creates PR and shows URL
-       • Exits without merging
-       • Use when you want to review PR manually in browser
-
-    2. FULL AUTO-MERGE MODE (default, no flags):
-       • Creates PR
-       • Checks mergability
-       • Shows PR URL with 90-second countdown
-       • Auto-merges after countdown (cancellable with Ctrl+C or 'n')
-       • Pulls merged changes
-       • Complete end-to-end integration
-
-    WORKFLOW STEPS:
-    1. Fetches latest from origin (including remote Claude branch)
-    2. Validates the remote branch exists
-    3. Pulls latest main branch
-    4. Creates a pull request from remote branch
-    5. [CREATE-ONLY: exits here] OR [FULL: continues below]
-    6. Verifies PR can be merged (no conflicts, checks passing)
-    7. Shows PR URL with 90-second countdown before auto-merge
-    8. Merges the pull request
-    9. Pulls merged changes into local main
-    10. Leaves remote branch intact (use purge script to clean up later)
-
-    Features live timer and inline status updates for clean, minimal output.
-
-ARGUMENTS
-    branch-name
-        The Claude Code web branch name to integrate
-        Example: claude/review-project-plan-011r6RivoGzbqxC2cSGVMceH
-
-OPTIONS
-    --create-only
-        Create the PR but don't merge it. Shows PR URL and exits.
-        Use this when you want to review the PR manually before merging.
-
-    --what-if
-        Dry-run mode: show what would happen without making any changes.
-        No branches will be pushed, no PRs created or merged.
-
-    -h, --help
-        Display this help message and exit
-
-PLATFORM
-    Cross-platform (macOS, Linux, WSL)
-
-DEPENDENCIES
-    • git - Version control system
-    • gh - GitHub CLI (for PR operations)
-
-EXAMPLES
-    # Create PR only (don't merge) - for manual review
-    ./integrate-claude-web-branch.sh --create-only claude/feature-branch-name
-
-    # Integrate a Claude Code web branch (full workflow with auto-merge)
-    ./integrate-claude-web-branch.sh claude/review-project-plan-011r6RivoGzbqxC2cSGVMceH
-
-    # Dry-run to see what would happen
-    ./integrate-claude-web-branch.sh --what-if claude/review-project-plan-011r6RivoGzbqxC2cSGVMceH
-
-NOTES
-    This script requires:
-    - Must be run from within the target git repository
-    - GitHub CLI (gh) must be installed and authenticated
-    - Branch must exist on origin (created by Claude Code web)
-    - User must have merge permissions to the repository
-    - After 90 seconds, PR will auto-merge unless cancelled (Ctrl+C or 'n')
-
-AUTHOR
-    Matt J Bordenet
-
-SEE ALSO
-    git(1), gh(1), git-pull(1), git-merge(1)
-
-EOF
-    exit 0
-}
-
 # --- Argument Parsing ---
-if [ $# -eq 0 ]; then
-    echo -e "${RED}Error:${NC} Branch name required"
-    echo "Usage: $0 [--what-if] <branch-name>"
-    echo "Try '$0 --help' for more information"
-    exit 1
-fi
-
-# Parse options
+[ $# -eq 0 ] && { echo -e "${RED}Error:${NC} Branch name required\nUsage: $0 [--what-if] <branch-name>\nTry '$0 --help' for more information"; exit 1; }
 while [ $# -gt 0 ]; do
     case "$1" in
-        -h|--help)
-            show_help
-            ;;
-        --create-only)
-            CREATE_ONLY=true
-            shift
-            ;;
-        --what-if)
-            WHAT_IF=true
-            shift
-            ;;
-        -*)
-            echo -e "${RED}Error:${NC} Unknown option: $1"
-            echo "Try '$0 --help' for more information"
-            exit 1
-            ;;
-        *)
-            BRANCH_NAME="$1"
-            shift
-            ;;
+        -h|--help) show_help ;;
+        --create-only) CREATE_ONLY=true; shift ;;
+        --what-if) WHAT_IF=true; shift ;;
+        -*) echo -e "${RED}Error:${NC} Unknown option: $1\nTry '$0 --help' for more information"; exit 1 ;;
+        *) BRANCH_NAME="$1"; shift ;;
     esac
 done
-
-# Validate branch name was provided
-if [ -z "$BRANCH_NAME" ]; then
-    echo -e "${RED}Error:${NC} Branch name required"
-    echo "Usage: $0 [--what-if] <branch-name>"
-    echo "Try '$0 --help' for more information"
-    exit 1
-fi
+[ -z "$BRANCH_NAME" ] && { echo -e "${RED}Error:${NC} Branch name required\nUsage: $0 [--what-if] <branch-name>\nTry '$0 --help' for more information"; exit 1; }
 
 # --- Validation ---
 start_time=$(date +%s)
