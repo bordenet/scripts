@@ -32,6 +32,7 @@ A collection of utility scripts for macOS and Linux systems.
 | [`get-active-repos.sh`](./get-active-repos.sh) | Identifies and lists active GitHub repositories within a specified organization. |
 | [`list-dormant-repos.sh`](./list-dormant-repos.sh) | Identifies and lists dormant GitHub repositories within a specified organization. |
 | [`reset-all-repos.sh`](./reset-all-repos.sh) | Automates the process of resetting multiple Git repositories to match their remote main/master branch. |
+| [`scorch-repo.sh`](./scorch-repo.sh) | Removes build cruft by deleting files matching .gitignore patterns while protecting .env* files. Supports recursive processing, interactive mode, and what-if previews. |
 | [`scrub-git-history.sh`](./scrub-git-history.sh) | Uses 'git-filter-repo' to rewrite the Git repository history, permanently removing specified files or directories from all commits. |
 | [`squash-commits.sh`](./squash-commits.sh) | Interactively squash a range of commits in a Git repository. |
 | [`squash-last-n.sh`](./squash-last-n.sh) | Squashes the last <N> commits into a single new commit using git reset --soft. |
