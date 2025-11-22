@@ -183,6 +183,13 @@ fi
 
 start_time=$(date +%s)
 
+# Resolve TARGET_DIR to absolute path before any directory changes
+if [ ! -d "$TARGET_DIR" ]; then
+    echo "Error: Directory not found: $TARGET_DIR"
+    exit 1
+fi
+TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
+
 # --- Self-Update Check ---
 # Check if this script's own repo needs updating
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -208,14 +215,9 @@ if [ -d "$SCRIPT_DIR/.git" ]; then
     popd > /dev/null || exit
 fi
 
-if [ ! -d "$TARGET_DIR" ]; then
-    echo "Error: Directory not found: $TARGET_DIR"
-    exit 1
-fi
-
 cd "$TARGET_DIR" || exit
 
-# Get absolute path for display
+# Get absolute path for display (TARGET_DIR is already absolute, but use pwd for consistency)
 DISPLAY_DIR="$(pwd)"
 
 # Start output
@@ -273,7 +275,7 @@ if [ "$MENU_MODE" = true ]; then
     stop_timer
     # Clear entire screen and redisplay header without timer
     clear
-    echo -e "${BOLD}Git Repository Updates${NC}: $TARGET_DIR\n"
+    echo -e "${BOLD}Git Repository Updates${NC}: $DISPLAY_DIR\n"
 
     echo "Select a repository to update:"
     for i in "${!repos[@]}"; do
