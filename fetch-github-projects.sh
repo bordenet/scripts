@@ -215,9 +215,12 @@ fi
 
 cd "$TARGET_DIR" || exit
 
+# Get absolute path for display
+DISPLAY_DIR="$(pwd)"
+
 # Start output
 clear
-echo -e "${BOLD}Git Repository Updates${NC}: $TARGET_DIR\n"
+echo -e "${BOLD}Git Repository Updates${NC}: $DISPLAY_DIR\n"
 start_timer
 
 # Ensure timer stops on exit
