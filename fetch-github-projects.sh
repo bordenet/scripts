@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # -----------------------------------------------------------------------------
 # Quiet GitHub fetcher — updates all repos in a directory with minimal output
 # Platform: Cross-platform
