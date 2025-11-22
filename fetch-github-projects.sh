@@ -132,8 +132,8 @@ update_repo() {
         return 0
     fi
 
-    # Pull quietly
-    if OUTPUT=$(git pull origin "$DEFAULT_BRANCH" 2>&1); then
+    # Pull quietly (fast-forward only to avoid merge conflicts)
+    if OUTPUT=$(git pull --ff-only origin "$DEFAULT_BRANCH" 2>&1); then
         if grep -q "Already up to date" <<< "$OUTPUT"; then
             complete_status "${BLUE}•${NC} ${repo_name}"
         else
