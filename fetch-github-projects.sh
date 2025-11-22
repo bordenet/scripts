@@ -165,15 +165,15 @@ if [ $# -gt 0 ]; then
             MENU_MODE=false
             TARGET_DIR="${2:-$HOME/GitHub}"
             ;;
-        ...)
+        -r|--recursive)
             MENU_MODE=false
             RECURSIVE_MODE=true
             TARGET_DIR="${2:-.}"
             ;;
         *)
             TARGET_DIR="$1"
-            # Check if second argument is ...
-            if [ "${2:-}" = "..." ]; then
+            # Check if second argument is -r or --recursive
+            if [ "${2:-}" = "-r" ] || [ "${2:-}" = "--recursive" ]; then
                 MENU_MODE=false
                 RECURSIVE_MODE=true
             fi
