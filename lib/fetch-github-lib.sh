@@ -25,6 +25,9 @@ DESCRIPTION
 
     By default, searches up to 2 levels deep. Use ... for unlimited recursion.
 
+    Uses 'git pull --ff-only' to safely update repositories. Repositories with
+    divergent branches will be reported as failed and require manual intervention.
+
     Checks if the script's own repository needs updating before processing other
     repos to prevent running outdated versions.
 
@@ -48,6 +51,7 @@ ARGUMENTS
 
 PLATFORM
     Cross-platform (macOS, Linux, WSL)
+    Compatible with Bash 3.2+ (macOS default)
 
 EXAMPLES
     # Interactive menu mode (default)
@@ -79,13 +83,14 @@ EOF
 }
 
 # Recursively finds all git repositories
+# Note: Uses eval for Bash 3.2 compatibility (macOS default)
 find_repos_recursive() {
     local search_dir=$1
-    local -n result_array=$2
+    local array_name=$2
 
     while IFS= read -r -d '' git_dir; do
         repo_dir="${git_dir%/.git}"
-        result_array+=("$repo_dir")
+        eval "$array_name+=(\"$repo_dir\")"
     done < <(find "$search_dir" -name ".git" -type d -print0 2>/dev/null)
 }
 
