@@ -15,15 +15,16 @@ NAME
 SYNOPSIS
     fetch-github-projects.sh [OPTIONS] [DIRECTORY]
     fetch-github-projects.sh --all [DIRECTORY]
-    fetch-github-projects.sh ... [DIRECTORY]
-    fetch-github-projects.sh [DIRECTORY] ...
+    fetch-github-projects.sh -r|--recursive [DIRECTORY]
+    fetch-github-projects.sh [DIRECTORY] -r|--recursive
 
 DESCRIPTION
     Updates all Git repositories in a directory with minimal output. By default,
     presents an interactive menu to select which repository to update. Can also
     update all repositories automatically.
 
-    By default, searches up to 2 levels deep. Use ... for unlimited recursion.
+    By default, searches up to 2 levels deep. Use -r or --recursive for unlimited
+    recursion through all subdirectories.
 
     Uses 'git pull --ff-only' to safely update repositories. Repositories with
     divergent branches will be reported as failed and require manual intervention.
@@ -38,7 +39,7 @@ OPTIONS
         Skip interactive menu and update all repositories automatically.
         Searches up to 2 levels deep (*/  and */*/).
 
-    ...
+    -r, --recursive
         Recursive mode: searches all subdirectories for git repositories.
         Can be used as first argument or second argument after directory.
 
@@ -64,10 +65,11 @@ EXAMPLES
     ./fetch-github-projects.sh --all /path/to/repos
 
     # Recursively update all repos in current directory
-    ./fetch-github-projects.sh ... .
+    ./fetch-github-projects.sh -r
 
     # Recursively update all repos in custom directory
-    ./fetch-github-projects.sh /path/to/repos ...
+    ./fetch-github-projects.sh --recursive /path/to/repos
+    ./fetch-github-projects.sh /path/to/repos -r
 
     # Interactive menu for custom directory
     ./fetch-github-projects.sh /path/to/repos
