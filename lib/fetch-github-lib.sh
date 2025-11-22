@@ -41,6 +41,7 @@ OPTIONS
 
     -r, --recursive
         Recursive mode: searches all subdirectories for git repositories.
+        Still shows interactive menu unless combined with --all.
         Can be used as first argument or second argument after directory.
 
     -h, --help
@@ -55,24 +56,19 @@ PLATFORM
     Compatible with Bash 3.2+ (macOS default)
 
 EXAMPLES
-    # Interactive menu mode (default)
+    # Interactive menu mode (default, 2 levels deep)
     ./fetch-github-projects.sh
 
-    # Update all repos in default directory (2 levels deep)
-    ./fetch-github-projects.sh --all
-
-    # Update all repos in custom directory (2 levels deep)
-    ./fetch-github-projects.sh --all /path/to/repos
-
-    # Recursively update all repos in current directory
+    # Interactive menu with recursive search
     ./fetch-github-projects.sh -r
-
-    # Recursively update all repos in custom directory
-    ./fetch-github-projects.sh --recursive /path/to/repos
     ./fetch-github-projects.sh /path/to/repos -r
 
-    # Interactive menu for custom directory
-    ./fetch-github-projects.sh /path/to/repos
+    # Update all repos automatically (2 levels deep)
+    ./fetch-github-projects.sh --all
+
+    # Update all repos recursively without menu
+    ./fetch-github-projects.sh --all -r
+    ./fetch-github-projects.sh --all /path/to/repos -r
 
 AUTHOR
     Matt J Bordenet
