@@ -152,33 +152,39 @@ update_repo() {
 
 # Default to menu mode
 MENU_MODE=true
-TARGET_DIR="$HOME/GitHub"
+TARGET_DIR=""
 RECURSIVE_MODE=false
 
 # Parse arguments
-if [ $# -gt 0 ]; then
+while [ $# -gt 0 ]; do
     case "$1" in
         -h|--help)
             show_help
             ;;
         --all)
             MENU_MODE=false
-            TARGET_DIR="${2:-$HOME/GitHub}"
+            shift
             ;;
         -r|--recursive)
-            MENU_MODE=false
             RECURSIVE_MODE=true
-            TARGET_DIR="${2:-.}"
+            shift
             ;;
         *)
             TARGET_DIR="$1"
-            # Check if second argument is -r or --recursive
-            if [ "${2:-}" = "-r" ] || [ "${2:-}" = "--recursive" ]; then
-                MENU_MODE=false
-                RECURSIVE_MODE=true
-            fi
+            shift
             ;;
     esac
+done
+
+# Set default TARGET_DIR if not specified
+if [ -z "$TARGET_DIR" ]; then
+    if [ "$MENU_MODE" = false ]; then
+        # --all without directory defaults to $HOME/GitHub
+        TARGET_DIR="$HOME/GitHub"
+    else
+        # Menu mode without directory defaults to current directory
+        TARGET_DIR="."
+    fi
 fi
 
 start_time=$(date +%s)
