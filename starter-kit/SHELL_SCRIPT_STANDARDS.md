@@ -6,6 +6,21 @@
 
 ---
 
+## Important Note
+
+This document is part of the **portable starter-kit** for new projects. It provides a simplified, project-agnostic version of shell script standards.
+
+**If you're working in the scripts repository**, use the authoritative [STYLE_GUIDE.md](../STYLE_GUIDE.md) instead, which includes:
+- Mandatory 400-line limit enforcement
+- Comprehensive validation checklist
+- Platform-specific requirements (Apple Silicon, BSD tools)
+- Display requirements (ANSI escape codes, timers)
+- Detailed enforcement procedures
+
+**If you're copying this starter-kit to a new project**, customize this document for your project's needs and establish it as your project's standard.
+
+---
+
 ## Table of Contents
 
 1. [Quick Start](#quick-start)

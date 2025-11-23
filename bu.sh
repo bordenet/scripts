@@ -46,7 +46,6 @@ export RESTORE_CURSOR='\033[u'
 export TIMER_PID=""
 
 # --- Helper Functions ---
-
 # Helper functions now in lib/bu-lib.sh
 
 # Parse arguments
@@ -67,7 +66,6 @@ if [ "$VERBOSE" = true ]; then
     echo "  macOS System Update & Cleanup"
     echo "========================================================================"
     log_info "Starting the system update and cleanup process..."
-    echo
 else
     echo -e "${BOLD}System Update & Cleanup${NC}"
 fi
