@@ -2,6 +2,21 @@
 
 This document contains project-specific guidelines and lessons learned for Claude Code when working in this repository.
 
+**CRITICAL**: This document supplements [STYLE_GUIDE.md](./STYLE_GUIDE.md). Read both documents before making any changes.
+
+## Quick Start for AI Assistants
+
+Before making any changes:
+
+1. ✅ Read [STYLE_GUIDE.md](./STYLE_GUIDE.md) - Authoritative coding standards
+2. ✅ Read this document (CLAUDE.md) - Platform-specific gotchas and workflows
+3. ✅ Review [TECHNICAL_DEBT.md](./TECHNICAL_DEBT.md) - Known issues and refactoring status
+4. ✅ Check [docs/](./docs/) - Script-specific documentation
+
+**Golden Rule**: When in doubt, consult STYLE_GUIDE.md. It is the source of truth.
+
+---
+
 ## User Environment
 
 - **All hardware is Apple Silicon** (ARM64 architecture)
@@ -11,6 +26,7 @@ This document contains project-specific guidelines and lessons learned for Claud
   - BSD awk does NOT support `match()` with array capture
   - Use `grep | sed` pipelines instead of complex awk
   - Test all regex/text processing commands before committing
+  - See [STYLE_GUIDE.md § Platform Compatibility](./STYLE_GUIDE.md#platform-compatibility) for details
 
 
 ## Quality Standards for Code Delivery
@@ -94,12 +110,20 @@ All code changes should be tested, validated, and linted before committing.
 
 ### Before Creating a PR:
 
-1. All linter warnings addressed
-2. Syntax validated
-3. Edge cases considered and documented
-4. Error handling tested where possible
-5. Code follows project conventions
-6. Commit messages are descriptive
+Use the comprehensive checklist from [STYLE_GUIDE.md § Enforcement](./STYLE_GUIDE.md#enforcement):
+
+1. ✅ All linter warnings addressed (zero warnings)
+2. ✅ Syntax validated (`bash -n script.sh`)
+3. ✅ Edge cases considered and documented
+4. ✅ Error handling tested where possible
+5. ✅ Code follows project conventions
+6. ✅ Commit messages are descriptive
+7. ✅ All scripts < 400 lines
+8. ✅ Help text is comprehensive (man-page style)
+9. ✅ Timer and display requirements met
+10. ✅ Platform-specific code tested
+
+**See [STYLE_GUIDE.md § Comprehensive Pre-Commit Validation Checklist](./STYLE_GUIDE.md#comprehensive-pre-commit-validation-checklist) for complete list.**
 
 ### Creating Pull Requests:
 

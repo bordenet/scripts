@@ -136,7 +136,7 @@ For macOS development environment setup:
 ./scripts/macos-setup/setup-macos.sh
 \`\`\`
 
-See [scripts/macos-setup/README.md](./scripts/macos-setup/README.md) for details.
+See [macos-setup/README.md](./README.md) for details.
 ```
 
 ---

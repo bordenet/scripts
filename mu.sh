@@ -13,21 +13,65 @@ set -o pipefail
 ################################################################################
 
 LOG_DIR="/tmp"
-LOG_RETENTION_HOURS=24
 ERRORS=()
 SKIP_WINDOWS_UPDATE=false
+
+# Show help
+show_help() {
+    cat << 'EOF'
+NAME
+    mu.sh - Matt's Update - System update script for WSL + Windows
+
+SYNOPSIS
+    mu.sh [OPTIONS]
+
+DESCRIPTION
+    Performs system updates for WSL/Linux environment and optionally Windows.
+    Updates package managers (apt, npm, pip), Windows packages (winget), and
+    optionally triggers Windows Update.
+
+    Designed for daily manual execution. Provides detailed progress reporting
+    and comprehensive error summary at completion.
+
+OPTIONS
+    --skip-windows-update
+        Skip Windows Update (only update packages via winget)
+
+    -h, --help
+        Display this help message and exit
+
+EXAMPLES
+    # Full system update (Linux + Windows packages + Windows Update)
+    ./mu.sh
+
+    # Update packages only (skip Windows Update)
+    ./mu.sh --skip-windows-update
+
+DEPENDENCIES
+    - apt (Linux package manager)
+    - npm (Node.js package manager)
+    - pip (Python package manager)
+    - winget (Windows package manager)
+    - PowerShell (for Windows Update)
+
+PLATFORM
+    WSL/Linux + Windows
+
+LOGS
+    Logs are stored in /tmp with 24-hour retention
+
+SEE ALSO
+    bu.sh - macOS system update script
+
+EOF
+}
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         --skip-windows-update) SKIP_WINDOWS_UPDATE=true; shift ;;
-        -h|--help)
-            echo "Usage: $0 [--skip-windows-update]"
-            echo "Options:"
-            echo "  --skip-windows-update    Skip Windows Update"
-            echo "  -h, --help              Show help"
-            exit 0 ;;
-        *) echo "Unknown option: $1"; exit 1 ;;
+        -h|--help) show_help; exit 0 ;;
+        *) echo "Unknown option: $1"; echo "Use --help for usage information"; exit 1 ;;
     esac
 done
 
