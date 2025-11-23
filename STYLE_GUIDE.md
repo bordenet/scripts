@@ -1,10 +1,44 @@
 # Shell Script Style Guide
 
-**Version:** 1.1
-**Last Updated:** 2025-11-17
-**Target Audience:** Claude Code, Google Gemini, Human Developers
+**Version:** 1.2
+**Last Updated:** 2025-11-22
+**Target Audience:** Claude Code, Google Gemini, ChatGPT, Human Developers
 
 This is the authoritative style guide for all shell scripts in this repository. These standards are **non-negotiable** and must be followed without exception.
+
+---
+
+## Quick Reference Card
+
+**Essential Rules** (memorize these):
+
+1. ✅ **400-line limit** - No script exceeds 400 lines (extract to lib/)
+2. ✅ **Zero shellcheck warnings** - `shellcheck --severity=warning` must pass
+3. ✅ **Mandatory flags** - Every script implements `-h/--help` and `-v/--verbose`
+4. ✅ **Wall clock timer** - Yellow on black, top-right corner, updates every second
+5. ✅ **Error handling** - Use `set -euo pipefail`, check return codes, use `trap` for cleanup
+6. ✅ **Input validation** - Validate and sanitize ALL user input
+7. ✅ **Platform detection** - Use `is_macos`/`is_linux`, handle BSD vs GNU tools
+8. ✅ **Test before commit** - Lint, validate syntax, test with sample data
+
+**Common Mistakes to Avoid**:
+
+- ❌ `local var=$(cmd)` - Masks exit code (use separate declare and assign)
+- ❌ `for file in $(find ...)` - Breaks on spaces (use `while read -r -d ''`)
+- ❌ `eval "$user_input"` - Command injection (use case statements or functions)
+- ❌ Raw `echo` for output - Use `log_info`, `log_success`, etc.
+- ❌ Hardcoded paths - Use `get_repo_root`, `SCRIPT_DIR`
+- ❌ Ignoring errors - Check return codes, don't use `|| true` without reason
+
+**Quick Validation**:
+
+```bash
+# Before committing
+shellcheck script.sh                    # Must pass with zero warnings
+bash -n script.sh                       # Must pass syntax check
+./script.sh --help                      # Must show comprehensive help
+./script.sh -v                          # Must show verbose output
+```
 
 ---
 
@@ -1257,7 +1291,10 @@ require_var() {
 
 ### Complete Script Example
 
-See [`examples/template-script.sh`](examples/template-script.sh) for a complete, production-ready script template.
+For complete, production-ready script examples, see:
+- [`bu.sh`](./bu.sh) - macOS system update script with library usage
+- [`scorch-repo.sh`](./scorch-repo.sh) - Build cruft removal with modular design
+- [`purge-identity.sh`](./purge-identity.sh) - Identity purge tool with comprehensive error handling
 
 ### Library Usage Example
 
@@ -1300,34 +1337,110 @@ main "$@"
 
 ## Enforcement
 
-### Pre-Commit Checklist
+### Comprehensive Pre-Commit Validation Checklist
 
-Before creating a pull request, verify:
+Before creating a pull request, **EVERY** item must be verified:
 
-- [ ] All scripts pass `shellcheck` with zero warnings
-- [ ] No script exceeds 400 lines
-- [ ] All functions have documentation
-- [ ] Error handling is comprehensive
-- [ ] Input validation is present
-- [ ] Code has been tested on target platform
-- [ ] Temporary files/resources are cleaned up
-- [ ] Commit messages are descriptive
+#### 1. Code Quality
+
+- [ ] All scripts pass `shellcheck --severity=warning` with **zero warnings**
+- [ ] All scripts pass `bash -n <script>` syntax validation
+- [ ] No script exceeds 400 lines (including comments and blank lines)
+- [ ] All functions have complete documentation (purpose, parameters, returns, side effects)
+- [ ] No unused variables (or documented with `# shellcheck disable=SC2034` and reason)
+- [ ] No hardcoded paths (use `get_repo_root`, `SCRIPT_DIR`, etc.)
+
+#### 2. Error Handling & Safety
+
+- [ ] Script uses `set -euo pipefail` (or documents why not)
+- [ ] All critical operations check return codes
+- [ ] Error messages are actionable (tell user what to do)
+- [ ] Cleanup handlers registered with `trap` for temp files/resources
+- [ ] No use of `eval` with user input
+- [ ] No command injection vulnerabilities
+
+#### 3. Input Validation
+
+- [ ] All user input validated before use
+- [ ] Email/URL/path formats validated with regex
+- [ ] Dangerous characters sanitized from user input
+- [ ] File/directory existence checked before operations
+- [ ] Required commands checked with `require_command` or equivalent
+
+#### 4. Display & UX Requirements
+
+- [ ] Script implements `-h` and `--help` flags (man-page style)
+- [ ] Script implements `-v` or `--verbose` flag
+- [ ] Running wall clock timer displayed in top-right corner (yellow on black)
+- [ ] Total execution time displayed at script end
+- [ ] Non-verbose mode uses compact, overwriting display (ANSI escape codes)
+- [ ] INFO-level messages only shown in verbose mode
+
+#### 5. Platform Compatibility
+
+- [ ] Platform-specific code uses `is_macos` / `is_linux` detection
+- [ ] BSD vs GNU tool differences handled (sed, awk, grep)
+- [ ] Apple Silicon paths used (`/opt/homebrew/` not `/usr/local/`)
+- [ ] All awk/sed/grep commands tested on target platform
+
+#### 6. Documentation
+
+- [ ] Script header includes PURPOSE, USAGE, PLATFORM, DEPENDENCIES
+- [ ] Help text includes NAME, SYNOPSIS, DESCRIPTION, OPTIONS, EXAMPLES
+- [ ] Inline comments explain "why", not "what"
+- [ ] Non-obvious behavior documented
+- [ ] Related scripts cross-referenced in help text
+
+#### 7. Testing
+
+- [ ] Script tested with valid inputs
+- [ ] Script tested with invalid/edge case inputs
+- [ ] Script tested from different working directories
+- [ ] Error handling tested (missing files, failed commands)
+- [ ] Cleanup verified (no temp files left behind)
+- [ ] Platform-specific features tested on target OS
+
+#### 8. Git & Commits
+
+- [ ] Commit messages use imperative mood ("Add feature" not "Added feature")
+- [ ] Commit messages are specific and descriptive
+- [ ] No "WIP" or "Updates" commit messages
+- [ ] All changes related to commit message
+
+### Automated Validation
+
+Use the compliance validation script to check your work:
+
+```bash
+# Validate a single script
+./validate-script-compliance.sh path/to/script.sh
+
+# Validate all scripts in repository
+./validate-script-compliance.sh --all
+
+# Generate compliance report
+./validate-script-compliance.sh --all --report
+```
 
 ### AI Assistant Instructions
 
-**Claude Code / Google Gemini:**
+**Claude Code / Google Gemini / ChatGPT:**
 
 When writing or modifying shell scripts in this repository:
 
-1. Read and internalize this entire style guide
-2. Follow ALL rules without exception
-3. Lint your code with shellcheck before claiming completion
-4. Test your code with sample data where possible
-5. If a script approaches 350 lines, refactor immediately
-6. Never commit code that doesn't pass linting
-7. Ask questions if platform-specific behavior is unclear
+1. **Read this entire style guide** before making any changes
+2. **Follow ALL rules without exception** - no shortcuts, no "good enough"
+3. **Lint with shellcheck** before claiming work is complete
+4. **Test with sample data** where possible - don't just assume it works
+5. **Refactor at 350 lines** - if a script approaches this limit, extract to libraries immediately
+6. **Never commit unlinted code** - zero warnings is mandatory
+7. **Ask questions** if platform-specific behavior is unclear
+8. **Use the validation checklist** above before marking work complete
+9. **Cross-reference CLAUDE.md** for additional AI-specific protocols
 
 **If you violate these standards, your code will be rejected.**
+
+**Remember**: These standards exist because of real production failures. They are non-negotiable.
 
 ---
 
@@ -1335,6 +1448,7 @@ When writing or modifying shell scripts in this repository:
 
 | Version | Date       | Changes                                              |
 |---------|------------|------------------------------------------------------|
+| 1.2     | 2025-11-22 | Add comprehensive validation checklist, quick reference card, automated validation script reference |
 | 1.1     | 2025-11-17 | Add mandatory display requirements (ANSI, timer)    |
 | 1.0     | 2025-11-16 | Initial style guide creation                         |
 
