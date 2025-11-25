@@ -41,6 +41,9 @@ OPTIONS
     -h, --help
         Display this help message and exit.
 
+    --what-if
+        Show what would be done without making any changes (dry-run mode).
+
 PLATFORM
     Cross-platform (macOS, Linux, WSL)
 
@@ -50,6 +53,9 @@ DEPENDENCIES
 EXAMPLES
     # Run interactive cleanup
     ./cleanup-npm-global.sh
+
+    # Preview what would be cleaned up (dry-run)
+    ./cleanup-npm-global.sh --what-if
 
 NOTES
     This script provides interactive prompts before making any changes.
@@ -66,11 +72,21 @@ EOF
 }
 
 # Parse arguments
-case "${1:-}" in
-    -h|--help)
-        show_help
-        ;;
-esac
+WHAT_IF=false
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        --what-if)
+            WHAT_IF=true
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
 
 # --- Script Setup ---
 start_time=$(date +%s)
@@ -78,6 +94,9 @@ LOG_FILE="/tmp/npm-global-cleanup-$(date +%Y%m%d-%H%M%S).log"
 touch "$LOG_FILE"
 
 echo "--- NPM Global Package Cleanup ---"
+if $WHAT_IF; then
+    echo "🔍 WHAT-IF MODE: No changes will be made"
+fi
 echo "Full log will be saved to: ${LOG_FILE}"
 echo ""
 
@@ -110,11 +129,15 @@ if [[ "$UNINSTALL_CONFIRM" =~ ^[Yy]$ ]]; then
   if [ -n "$TO_REMOVE" ]; then
     for pkg in $TO_REMOVE; do
       echo "---"
-      echo "Attempting to uninstall '$pkg'..." | tee -a "$LOG_FILE"
-      if npm uninstall -g "$pkg"; then
-        echo "✅ Successfully uninstalled '$pkg'" | tee -a "$LOG_FILE"
+      if $WHAT_IF; then
+        echo "[WHAT-IF] Would uninstall '$pkg'" | tee -a "$LOG_FILE"
       else
-        echo "❌ Failed to uninstall '$pkg'. It may not be installed or another error occurred." | tee -a "$LOG_FILE"
+        echo "Attempting to uninstall '$pkg'..." | tee -a "$LOG_FILE"
+        if npm uninstall -g "$pkg"; then
+          echo "✅ Successfully uninstalled '$pkg'" | tee -a "$LOG_FILE"
+        else
+          echo "❌ Failed to uninstall '$pkg'. It may not be installed or another error occurred." | tee -a "$LOG_FILE"
+        fi
       fi
     done
   else
@@ -126,21 +149,25 @@ fi
 
 # 4. Interactive Reinstall of Core Tools
 echo ""
-read -r -p "🔁 Reinstall a core set of tools (typescript, npm, aws-cdk)? [y/N] " REINSTALL_CONFIRM
-if [[ "$REINSTALL_CONFIRM" =~ ^[Yy]$ ]]; then
-  CORE_TOOLS=(typescript npm aws-cdk)
-  echo "---"
-  echo "Reinstalling core tools..."
-  for tool in "${CORE_TOOLS[@]}"; do
-    echo "Installing '$tool'..." | tee -a "$LOG_FILE"
-    if npm install -g "$tool"; then
-      echo "✅ Successfully installed '$tool'" | tee -a "$LOG_FILE"
-    else
-      echo "❌ Failed to install '$tool'" | tee -a "$LOG_FILE"
-    fi
-  done
+if $WHAT_IF; then
+  echo "[WHAT-IF] Would prompt to reinstall core tools (typescript, npm, aws-cdk)" | tee -a "$LOG_FILE"
 else
-  echo "🚫 Skipping reinstall step." | tee -a "$LOG_FILE"
+  read -r -p "🔁 Reinstall a core set of tools (typescript, npm, aws-cdk)? [y/N] " REINSTALL_CONFIRM
+  if [[ "$REINSTALL_CONFIRM" =~ ^[Yy]$ ]]; then
+    CORE_TOOLS=(typescript npm aws-cdk)
+    echo "---"
+    echo "Reinstalling core tools..."
+    for tool in "${CORE_TOOLS[@]}"; do
+      echo "Installing '$tool'..." | tee -a "$LOG_FILE"
+      if npm install -g "$tool"; then
+        echo "✅ Successfully installed '$tool'" | tee -a "$LOG_FILE"
+      else
+        echo "❌ Failed to install '$tool'" | tee -a "$LOG_FILE"
+      fi
+    done
+  else
+    echo "🚫 Skipping reinstall step." | tee -a "$LOG_FILE"
+  fi
 fi
 
 # --- Completion ---
