@@ -2,7 +2,7 @@
 
 **Date:** 2025-11-21 (Updated: 2025-11-25)
 **Auditor:** Claude Code
-**Standard:** STYLE_GUIDE.md v1.2
+**Standard:** STYLE_GUIDE.md v2.0
 
 ## Executive Summary
 
