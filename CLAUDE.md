@@ -29,8 +29,7 @@ Before making any changes:
 
 1. ✅ Read [STYLE_GUIDE.md](./STYLE_GUIDE.md) - Authoritative coding standards
 2. ✅ Read this document (CLAUDE.md) - Platform-specific gotchas and workflows
-3. ✅ Review [TECHNICAL_DEBT.md](./TECHNICAL_DEBT.md) - Known issues and refactoring status
-4. ✅ Check [docs/](./docs/) - Script-specific documentation
+3. ✅ Check [docs/](./docs/) - Script-specific documentation
 
 **Golden Rule**: When in doubt, consult STYLE_GUIDE.md. It is the source of truth.
 
@@ -164,3 +163,129 @@ When in Web mode (where `gh` CLI is unavailable):
 ```text
 https://github.com/bordenet/scripts/compare/main...claude/feature-branch?expand=1
 ```
+
+---
+
+## Critical Workflow: Impact Analysis Before ANY Change
+
+**MANDATORY**: Before making ANY change (especially deletions), perform complete impact analysis.
+
+### When Deleting or Renaming Files
+
+**ALWAYS follow this exact sequence:**
+
+1. **Search for ALL references FIRST** (before any changes):
+   ```bash
+   # Search across all files
+   grep -r "FILENAME" --include="*.md" --include="*.sh" .
+
+   # Check for broken links that will result
+   ./validate-cross-references.sh
+   ```
+
+2. **Identify ALL affected files**:
+   - Documentation files (README.md, CLAUDE.md, STYLE_GUIDE.md, docs/*)
+   - Scripts that source or reference the file
+   - Configuration files
+   - CI/CD workflows
+
+3. **Plan atomic commit**:
+   - List ALL files that need updates
+   - Ensure all changes happen in ONE commit
+   - Never commit a deletion without updating all references
+
+4. **Make ALL changes together**:
+   - Delete/rename the target file
+   - Update ALL referencing files
+   - Fix ALL broken links
+   - Update related documentation
+
+5. **Validate BEFORE committing**:
+   ```bash
+   # Verify file is gone (if deleting)
+   test -f FILENAME && echo "ERROR: Still exists" || echo "OK: Deleted"
+
+   # Verify no references remain
+   grep -r "FILENAME" --include="*.md" --include="*.sh" . || echo "OK: No references"
+
+   # Run validation scripts
+   ./validate-cross-references.sh
+   ./validate-script-compliance.sh
+   ```
+
+6. **Only then commit**
+
+### When Updating Documentation
+
+**ALWAYS verify completeness:**
+
+1. **Before editing README.md**, check what's missing:
+   ```bash
+   # List all root-level scripts
+   ls -1 *.sh 2>/dev/null | sort
+
+   # Compare against README.md
+   grep "\.sh" README.md | grep -o '[a-z0-9-]*\.sh' | sort
+   ```
+
+2. **Identify gaps**:
+   - Scripts not documented
+   - Outdated descriptions
+   - Broken links
+   - Missing categories
+
+3. **Fix everything in one commit**:
+   - Add missing scripts
+   - Update descriptions
+   - Fix broken links
+   - Ensure alphabetical ordering within categories
+
+### Validation Tools in This Repository
+
+**USE THESE BEFORE EVERY COMMIT:**
+
+- `./validate-cross-references.sh` - Validates all markdown links and cross-references
+- `./validate-script-compliance.sh` - Validates scripts against STYLE_GUIDE.md
+- `./ci-quality-gates.sh` - Runs all CI checks locally
+
+**Example pre-commit workflow:**
+
+```bash
+# 1. Make your changes
+# 2. Validate everything
+./validate-cross-references.sh
+./validate-script-compliance.sh
+
+# 3. Check for broken references to files you changed
+grep -r "CHANGED_FILENAME" --include="*.md" --include="*.sh" .
+
+# 4. Only then commit
+git add -A
+git commit -m "Description"
+```
+
+### Lessons Learned: Real Failures
+
+**Failure Case 1: Incomplete deletion (2025-11-25)**
+- **What happened**: Deleted TECHNICAL_DEBT.md without checking references
+- **Impact**: Left broken links in README.md and CLAUDE.md
+- **Root cause**: Didn't search for references before deletion
+- **Prevention**: ALWAYS `grep -r "FILENAME"` before deleting
+
+**Failure Case 2: Incomplete documentation (2025-11-25)**
+- **What happened**: Updated README.md without checking completeness
+- **Impact**: 5 user-facing scripts undocumented
+- **Root cause**: Didn't compare `ls *.sh` against README.md
+- **Prevention**: ALWAYS audit completeness when editing documentation
+
+### The Golden Rule of Changes
+
+**NEVER make a change in isolation. ALWAYS:**
+
+1. ✅ Search for ALL impacts FIRST
+2. ✅ Plan ALL related changes
+3. ✅ Make ALL changes atomically
+4. ✅ Validate BEFORE committing
+5. ✅ Run validation scripts
+
+**If you skip any step, you WILL create broken references, incomplete documentation, or inconsistent state.**

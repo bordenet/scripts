@@ -41,11 +41,15 @@ A collection of utility scripts for macOS and Linux systems.
 
 | Script | Description |
 |---|---|
+| [`backup-wsl-config.sh`](./backup-wsl-config.sh) | Backs up WSL configuration files and settings into a timestamped archive with interactive restore script. |
 | [`bu.sh`](./bu.sh) | Performs a comprehensive system update and cleanup for a macOS environment. |
-| [`flush-dns-cache.sh`](./flush-dns-cache.sh) | Flushes the DNS cache on macOS. |
+| [`clone-brew.sh`](./clone-brew.sh) | Homebrew environment cloner - export and import brew packages and casks for macOS. |
 | [`cleanup-npm-global.sh`](./cleanup-npm-global.sh) | Helps manage and clean up globally installed npm packages. |
+| [`flush-dns-cache.sh`](./flush-dns-cache.sh) | Flushes the DNS cache on macOS. |
+| [`mu.sh`](./mu.sh) | Matt's Update - Comprehensive system update script for WSL + Windows environments. |
 | [`purge-identity.sh`](./purge-identity.sh) | Comprehensive macOS identity purge tool that discovers and permanently removes all traces of specified email identities from the system (keychain, browsers, Mail.app, SSH keys, cloud storage). |
 | [`setup-podman-for-terraform.sh`](./setup-podman-for-terraform.sh) | Automates the setup and configuration of Podman to be used as a Docker-compatible environment for Terraform. |
+| [`start-ollama.sh`](./start-ollama.sh) | Ollama LAN server bootstrap - auto-detects LAN IP and starts Ollama bound to that address. |
 
 ## Security & Analysis
 
@@ -78,6 +82,7 @@ A collection of utility scripts for macOS and Linux systems.
 |---|---|
 | [`resume-claude.sh`](./resume-claude.sh) | Automates the process of resuming an AI assistant session with "Claude" within VS Code. |
 | [`schedule-claude.sh`](./schedule-claude.sh) | Schedules the execution of the 'resume-claude.sh' script after a specified delay. |
+| [`tell-vscode-at.sh`](./tell-vscode-at.sh) | Send messages to VS Code instances at specified times using AppleScript. [Docs](./docs/tell-vscode-at.md) |
 
 ## Engineering Starter Kit
 
@@ -119,7 +124,6 @@ cp macos-setup/setup-macos-template.sh your-project/scripts/setup-macos.sh
 ## Documentation
 
 - **[STYLE_GUIDE.md](./STYLE_GUIDE.md)** - Shell script coding standards
-- **[TECHNICAL_DEBT.md](./TECHNICAL_DEBT.md)** - Known issues and refactoring plans
 - **[CLAUDE.md](./CLAUDE.md)** - Guidelines for AI assistants working in this repository
 - **[docs/](./docs/)** - Additional documentation for specific scripts
 
@@ -147,7 +151,6 @@ cp macos-setup/setup-macos-template.sh your-project/scripts/setup-macos.sh
 
 - **[STYLE_GUIDE.md](./STYLE_GUIDE.md)** - Authoritative coding standards (read this first)
 - **[CLAUDE.md](./CLAUDE.md)** - AI assistant guidelines and platform-specific gotchas
-- **[TECHNICAL_DEBT.md](./TECHNICAL_DEBT.md)** - Known issues and refactoring status
 
 ## Contributing
 
