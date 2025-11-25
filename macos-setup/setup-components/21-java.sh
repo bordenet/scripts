@@ -13,6 +13,9 @@
 ################################################################################
 
 # Component metadata
+
+set -euo pipefail
+
 COMPONENT_NAME="Java Development Kit"
 
 # Installation function (called by main script)

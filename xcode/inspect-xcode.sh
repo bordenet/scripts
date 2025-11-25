@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # ==============================================================================
 #
@@ -25,6 +25,46 @@
 # ==============================================================================
 
 # --- Colors for output ---
+
+set -euo pipefail
+
+# Display help information
+show_help() {
+    cat << EOF
+NAME
+    $(basename "$0") - Script functionality
+
+SYNOPSIS
+    $(basename "$0") [OPTIONS]
+
+DESCRIPTION
+    Script functionality
+
+OPTIONS
+    -h, --help
+        Display this help message and exit
+
+EXIT STATUS
+    0   Success
+    1   Error
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'

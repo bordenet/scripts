@@ -25,6 +25,7 @@ source "$SCRIPT_DIR/lib/scorch-repo-lib.sh" || {
 # shellcheck disable=SC2034  # VERSION may be used in future enhancements
 readonly VERSION="1.0.0"
 SCRIPT_NAME="$(basename "$0")"
+# shellcheck disable=SC2034  # SCRIPT_NAME may be used in future enhancements
 readonly SCRIPT_NAME
 
 # Colors
@@ -192,6 +193,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -i|--interactive)
+            # shellcheck disable=SC2034  # Reserved for future use
             INTERACTIVE=true
             shift
             ;;

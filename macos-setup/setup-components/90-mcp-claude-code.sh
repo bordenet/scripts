@@ -14,6 +14,9 @@
 ################################################################################
 
 # Component metadata
+
+set -euo pipefail
+
 COMPONENT_NAME="MCP servers for Claude Code CLI"
 
 # Installation function (called by main script)

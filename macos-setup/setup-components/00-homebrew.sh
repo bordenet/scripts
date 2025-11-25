@@ -12,6 +12,9 @@
 ################################################################################
 
 # Component metadata
+
+set -euo pipefail
+
 COMPONENT_NAME="Package manager"
 
 # Installation function (called by main script)

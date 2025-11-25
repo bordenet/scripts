@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Script: schedule-claude.sh
 # Description: This script schedules the execution of the 'resume-claude.sh' script
@@ -17,6 +17,9 @@
 #!/bin/bash
 
 # --- Configuration ---
+
+set -euo pipefail
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESUME_SCRIPT="$SCRIPT_DIR/resume-claude.sh"
 DRY_RUN=false
