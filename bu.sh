@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 [[ "$(uname -s)" != "Darwin" ]] && { echo "Error: This script requires macOS" >&2; exit 1; }
 # -----------------------------------------------------------------------------
 # Script Name: bu.sh

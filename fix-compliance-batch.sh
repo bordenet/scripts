@@ -17,7 +17,7 @@ echo "   ✓ Updated shebangs to #!/usr/bin/env bash"
 
 # Add set -euo pipefail where missing (after shebang, before any other code)
 echo "2. Adding error handling (set -euo pipefail)..."
-for script in $(find . -type f -name "*.sh" ! -path "*/.*" ! -path "*/lib/*"); do
+while IFS= read -r -d '' script; do
     # Skip if already has error handling
     if grep -q "set -euo pipefail\|set -eo pipefail" "$script" 2>/dev/null; then
         continue
@@ -42,9 +42,9 @@ for script in $(find . -type f -name "*.sh" ! -path "*/.*" ! -path "*/lib/*"); d
         }
         { print }
     ' "$script" > "$script.tmp" && mv "$script.tmp" "$script"
-    
+
     echo "   ✓ Added to $(basename "$script")"
-done
+done < <(find . -type f -name "*.sh" ! -path "*/.*" ! -path "*/lib/*" -print0)
 
 echo
 echo "=== Compliance fixes applied ==="

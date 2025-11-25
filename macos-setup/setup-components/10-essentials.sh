@@ -13,6 +13,9 @@
 ################################################################################
 
 # Component metadata
+
+set -euo pipefail
+
 COMPONENT_NAME="Essential development tools"
 
 # Installation function (called by main script)

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # -----------------------------------------------------------------------------
 #
 # Script Name: enumerate-gh-repos.sh
@@ -30,6 +30,9 @@
 # -----------------------------------------------------------------------------
 
 # Exit immediately if a command exits with a non-zero status.
+
+set -euo pipefail
+
 set -e
 
 # --- Help Function ---

@@ -20,6 +20,9 @@
 ################################################################################
 
 # Component metadata
+
+set -euo pipefail
+
 COMPONENT_NAME="Mobile development environment"
 
 # Get the directory where this script lives

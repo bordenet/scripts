@@ -4,6 +4,9 @@
 # Platform: Cross-platform
 # -----------------------------------------------------------------------------
 
+
+set -euo pipefail
+
 set -uo pipefail
 
 # Source library functions

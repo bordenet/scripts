@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # -----------------------------------------------------------------------------
 #
 # Script Name: list-dormant-repos.sh
@@ -28,6 +28,9 @@
 # -----------------------------------------------------------------------------
 
 # Exit immediately if a command exits with a non-zero status.
+
+set -euo pipefail
+
 set -e
 
 # --- Help Function ---

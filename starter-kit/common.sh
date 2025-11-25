@@ -8,6 +8,9 @@
 ################################################################################
 
 # Color codes (ANSI escape sequences)
+
+set -euo pipefail
+
 readonly COLOR_RED='\033[0;31m'
 readonly COLOR_GREEN='\033[0;32m'
 readonly COLOR_YELLOW='\033[1;33m'

@@ -14,6 +14,9 @@
 ################################################################################
 
 # Component metadata
+
+set -euo pipefail
+
 COMPONENT_NAME="Android development environment"
 
 # Installation function (called by main script)

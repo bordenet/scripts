@@ -1,28 +1,104 @@
-#!/bin/bash
-# -----------------------------------------------------------------------------
-#
+#!/usr/bin/env bash
+################################################################################
 # Script Name: start-pcap-rotate.sh
-#
-# Description: This script starts a rotating packet capture using tcpdump.
-#              It checks for available disk space, ensures no other instance is
-#              running, and logs the output.
-#
-# Usage: ./start-pcap-rotate.sh [interface] [capture-dir] [duration] [keep-files] [filter]
-#
-#   - interface: Network interface to capture on (default: eth0)
-#   - capture-dir: Directory to store capture files (default: ./captures)
-#   - duration: Seconds per capture file (default: 600)
-#   - keep-files: Number of capture files to keep (default: 48)
-#   - filter: tcpdump filter expression (default: "(host 1.1.1.1 or host 8.8.8.8) and (tcp[tcpflags] & (tcp-rst|tcp-fin) != 0 or icmp or arp)")
-#
+# Description: Start rotating packet capture using tcpdump
+# Platform: macOS/Linux
 # Author: Matt J Bordenet
-#
-# Last Updated: 2025-10-08
-#
-# -----------------------------------------------------------------------------
+# Last Updated: 2025-11-21
+################################################################################
 
-# Exit immediately if a command exits with a non-zero status.
-set -e
+set -euo pipefail
+
+# Display help information
+show_help() {
+    cat << EOF
+NAME
+    $(basename "$0") - Start rotating packet capture using tcpdump
+
+SYNOPSIS
+    $(basename "$0") [INTERFACE] [CAPTURE_DIR] [DURATION] [KEEP_FILES] [FILTER]
+    $(basename "$0") [OPTIONS]
+
+DESCRIPTION
+    Starts a rotating packet capture using tcpdump. Checks for available disk
+    space, ensures no other instance is running, and logs output.
+
+    Captures rotate automatically based on duration, keeping only the most
+    recent files. Useful for continuous network monitoring.
+
+ARGUMENTS
+    INTERFACE
+        Network interface to capture on (default: eth0)
+
+    CAPTURE_DIR
+        Directory to store capture files (default: ./captures)
+
+    DURATION
+        Seconds per capture file (default: 600 = 10 minutes)
+
+    KEEP_FILES
+        Number of capture files to keep (default: 48 = 8 hours at 10min each)
+
+    FILTER
+        tcpdump filter expression
+        (default: "(host 1.1.1.1 or host 8.8.8.8) and (tcp[tcpflags] & (tcp-rst|tcp-fin) != 0 or icmp or arp)")
+
+OPTIONS
+    -h, --help
+        Display this help message and exit
+
+EXAMPLES
+    # Start with defaults (eth0, ./captures, 10min rotation, keep 48 files)
+    $(basename "$0")
+
+    # Capture on en0 interface
+    $(basename "$0") en0
+
+    # Custom directory and duration
+    $(basename "$0") en0 /var/captures 300 96
+
+    # Custom filter
+    $(basename "$0") en0 ./captures 600 48 "port 80 or port 443"
+
+EXIT STATUS
+    0   Success
+    1   Error (insufficient disk space, already running, etc.)
+
+FILES
+    \$CAPTURE_DIR/tcpdump-rotate.pid
+        PID file for running capture process
+
+    \$CAPTURE_DIR/tcpdump-rotate.log
+        Log file for capture output
+
+    \$CAPTURE_DIR/capture-YYYY-MM-DD_HH-MM-SS.pcap
+        Captured packet files
+
+NOTES
+    - Requires root/sudo privileges
+    - Minimum 5GB free disk space required
+    - Only one instance can run per capture directory
+    - Files automatically rotate based on duration
+    - Oldest files deleted when KEEP_FILES limit reached
+
+SEE ALSO
+    stop-pcap-rotate.sh(1), capture.sh(1), tcpdump(8)
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
 
 # Start timer
 start_time=$(date +%s)

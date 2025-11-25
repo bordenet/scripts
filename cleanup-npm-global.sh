@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # -----------------------------------------------------------------------------
 #
 # Script Name: cleanup-npm-global.sh

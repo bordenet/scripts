@@ -1,9 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # -----------------------------------------------------------------------------
 # Claude Code Web Branch Cleanup Tool
 # Interactive deletion of stale Claude Code web branches with safety confirmations
 # Platform: Cross-platform (macOS, Linux, WSL)
 # -----------------------------------------------------------------------------
+
+
+set -euo pipefail
 
 set -uo pipefail
 

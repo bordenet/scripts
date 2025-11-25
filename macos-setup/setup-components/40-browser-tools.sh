@@ -13,6 +13,9 @@
 ################################################################################
 
 # Component metadata
+
+set -euo pipefail
+
 COMPONENT_NAME="Browser automation and testing tools"
 
 # Installation function (called by main script)
