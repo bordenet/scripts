@@ -48,7 +48,7 @@ Implement `purge-identity.sh` following the design specifications exactly. This 
 
 **Success Criteria:**
 - Script discovers identities across all specified locations
-- `--what-if` mode works perfectly (shows menu then exits)
+- `--what-if` mode works correctly (shows menu then exits)
 - Deletion works with proper confirmations and warnings
 - Error handling is comprehensive
 - Exit report is clear and actionable

@@ -50,7 +50,7 @@
 **ARM64 Hybrid Approach:**
 
 **WSL (Primary - Native Version Managers):**
-- **apt:** System utilities and base packages (excellent ARM64 support)
+- **apt:** System utilities and base packages (good ARM64 support)
 - **nvm:** Node.js version management (better ARM64 support than Homebrew)
 - **rbenv:** Ruby version management (native ARM64 builds)
 - **rustup:** Rust toolchain (official ARM64 support)
