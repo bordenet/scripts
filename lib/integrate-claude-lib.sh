@@ -10,16 +10,17 @@
 show_timer() {
     # shellcheck disable=SC2154  # start_time is set in calling script
     local elapsed=$(($(date +%s) - start_time))
-    local minutes=$((elapsed / 60))
+    local hours=$((elapsed / 3600))
+    local minutes=$(((elapsed % 3600) / 60))
     local seconds=$((elapsed % 60))
     local cols
     cols=$(tput cols 2>/dev/null || echo 80)
     local timer_text
-    timer_text=$(printf "%02d:%02d" "$minutes" "$seconds")
-    local timer_pos=$((cols - 6))
+    timer_text=$(printf "[%02d:%02d:%02d]" "$hours" "$minutes" "$seconds")
+    local timer_pos=$((cols - ${#timer_text}))
 
-    # Save cursor, move to top right, print timer with background, restore cursor
-    echo -ne "${SAVE_CURSOR}\033[1;${timer_pos}H\033[43;30m ${timer_text} ${NC}${RESTORE_CURSOR}"
+    # Save cursor, move to top right, print timer (yellow on black), restore cursor
+    echo -ne "${SAVE_CURSOR}\033[1;${timer_pos}H\033[33;40m${timer_text}\033[0m${RESTORE_CURSOR}"
 }
 
 timer_loop() {
