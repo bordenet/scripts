@@ -1,1487 +1,332 @@
-# Shell Script Style Guide
-
-**Version:** 1.2
-**Last Updated:** 2025-11-22
-**Target Audience:** Claude Code, Google Gemini, ChatGPT, Human Developers
-
-This is the authoritative style guide for all shell scripts in this repository. These standards are **non-negotiable** and must be followed without exception.
-
----
-
-## Quick Reference Card
-
-**Essential Rules** (memorize these):
-
-1. ✅ **400-line limit** - No script exceeds 400 lines (extract to lib/)
-2. ✅ **Zero shellcheck warnings** - `shellcheck --severity=warning` must pass
-3. ✅ **Mandatory flags** - Every script implements `-h/--help` and `-v/--verbose`
-4. ✅ **Wall clock timer** - Yellow on black, top-right corner, for scripts >10s or with deferred actions
-5. ✅ **Error handling** - Use `set -euo pipefail`, check return codes, use `trap` for cleanup
-6. ✅ **Input validation** - Validate and sanitize ALL user input
-7. ✅ **Platform detection** - Use `is_macos`/`is_linux`, handle BSD vs GNU tools
-8. ✅ **Test before commit** - Lint, validate syntax, test with sample data
-
-**Common Mistakes to Avoid**:
-
-- ❌ `local var=$(cmd)` - Masks exit code (use separate declare and assign)
-- ❌ `for file in $(find ...)` - Breaks on spaces (use `while read -r -d ''`)
-- ❌ `eval "$user_input"` - Command injection (use case statements or functions)
-- ❌ Raw `echo` for output - Use `log_info`, `log_success`, etc.
-- ❌ Hardcoded paths - Use `get_repo_root`, `SCRIPT_DIR`
-- ❌ Ignoring errors - Check return codes, don't use `|| true` without reason
-
-**Quick Validation**:
-
-```bash
-# Before committing
-shellcheck script.sh                    # Must pass with zero warnings
-bash -n script.sh                       # Must pass syntax check
-./script.sh --help                      # Must show comprehensive help
-./script.sh -v                          # Must show verbose output
-```
-
----
-
-## Table of Contents
-
-1. [Script Length Limits](#script-length-limits)
-2. [File Structure](#file-structure)
-3. [Shell Configuration](#shell-configuration)
-4. [Documentation](#documentation)
-5. [Naming Conventions](#naming-conventions)
-6. [Error Handling](#error-handling)
-7. [Input Validation](#input-validation)
-8. [Code Organization](#code-organization)
-9. [Logging and Output](#logging-and-output)
-10. [Testing and Linting](#testing-and-linting)
-11. [Platform Compatibility](#platform-compatibility)
-12. [Security](#security)
-13. [Command-Line Interface](#command-line-interface)
-14. [Common Patterns](#common-patterns)
-15. [Code Examples](#code-examples)
-
----
-
-## Script Length Limits
-
-### Maximum Script Length: 400 Lines
-
-**ABSOLUTE RULE:** No single script file shall exceed **400 lines** of code.
-
-**Rationale:**
-- Maintainability: Shorter scripts are easier to understand and modify
-- Reusability: Forces extraction of common functionality into libraries
-- Testing: Smaller units are easier to test
-- Debugging: Reduces cognitive load when troubleshooting
-
-**Enforcement:**
-- Count includes comments, blank lines, and all content
-- If a script approaches 350 lines, refactor immediately
-- Extract common functions to `lib/` directories
-- Break complex workflows into multiple coordinated scripts
-
-**How to Refactor Oversized Scripts:**
-1. Extract common functions to `lib/common.sh` or domain-specific libraries
-2. Break workflows into logical phases (setup, execute, cleanup)
-3. Create separate scripts for each phase
-4. Use a main orchestrator script to coordinate phases
-5. Move complex help/usage functions to separate files if needed
-
----
-
-## File Structure
-
-### Standard Script Template
-
-```bash
-#!/usr/bin/env bash
-################################################################################
-# Script Name: script-name.sh
-################################################################################
-# PURPOSE: Brief one-line description of what this script does
-# USAGE: ./script-name.sh [OPTIONS] <ARGUMENTS>
-# PLATFORM: macOS | Linux | Cross-platform
-################################################################################
-
-# Strict error handling
-set -euo pipefail
-
-# Source common library (if applicable)
-# SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# source "$SCRIPT_DIR/lib/common.sh"
+## Shell Script Style Guide
 
-################################################################################
-# Constants
-################################################################################
+Version: 2.0  
+Last Updated: 2025-11-25  
+Audience: AI coding assistants (Claude Code, Gemini, ChatGPT) and human developers
+Source: https://github.com/bordenet/scripts/blob/main/STYLE_GUIDE.md
 
-readonly VERSION="1.0.0"
-readonly SCRIPT_NAME="$(basename "$0")"
+This style guide is the single source of truth for all shell scripts in this repository. The goal is simple: every script should be safe, readable, predictable, and a pleasure to use and extend. These standards are mandatory for all contributors.
 
-################################################################################
-# Functions
-################################################################################
+***
 
-# Function: show_help
-# Description: Display help information
-show_help() {
-    cat << EOF
-NAME
-    ${SCRIPT_NAME} - Brief description
-
-SYNOPSIS
-    ${SCRIPT_NAME} [OPTIONS] <ARGUMENTS>
+## Quick Reference
 
-DESCRIPTION
-    Detailed description of what the script does.
-
-OPTIONS
-    -h, --help      Display this help message
-    -v, --verbose   Enable verbose output
-
-EXAMPLES
-    ${SCRIPT_NAME} example-arg
-
-SEE ALSO
-    related-script.sh
-
-EOF
-}
-
-################################################################################
-# Main Script
-################################################################################
-
-main() {
-    # Parse arguments
-    # Validate inputs
-    # Execute logic
-    # Handle cleanup
-    :
-}
-
-# Execute main function
-main "$@"
-```
-
-### Directory Structure for Complex Scripts
-
-```
-script-project/
-├── README.md                 # Documentation
-├── main-script.sh           # Entry point (< 400 lines)
-├── lib/                     # Shared libraries
-│   ├── common.sh           # Common functions
-│   └── domain-specific.sh  # Domain logic
-├── scripts/                 # Sub-scripts
-│   ├── phase1-setup.sh
-│   ├── phase2-execute.sh
-│   └── phase3-cleanup.sh
-└── tests/                   # Test files
-    └── test-main.sh
-```
-
----
-
-## Shell Configuration
-
-### Required Settings
-
-Every script **MUST** include:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-```
-
-**Explanation:**
-- `set -e`: Exit immediately if any command exits with non-zero status
-- `set -u`: Treat unset variables as errors
-- `set -o pipefail`: Return failure if any command in pipeline fails
-
-### Optional Settings (Use When Appropriate)
-
-```bash
-set -x          # Debug mode (print commands before execution)
-shopt -s nullglob  # Globs that match nothing expand to nothing
-```
-
----
-
-## Documentation
-
-### Header Requirements
-
-Every script **MUST** have a header block containing:
-
-1. **Purpose**: What the script does (one line)
-2. **Usage**: How to invoke it
-3. **Platform**: Target operating system(s)
-4. **Dependencies**: External commands/tools required
-5. **Author** (optional): Creator/maintainer
-6. **Last Updated**: Date of last significant change
-
-### Inline Comments
-
-- **DO**: Explain *why* code exists, not *what* it does
-- **DO**: Document non-obvious behavior or edge cases
-- **DO**: Add TODO/FIXME comments with context
-- **DON'T**: State the obvious (`i++  # increment i`)
-- **DON'T**: Leave commented-out code in production
-
-**Good Example:**
-```bash
-# macOS uses BSD sed, which requires backup extension for -i flag
-if is_macos; then
-    sed -i '' 's/pattern/replacement/' "$file"
-else
-    sed -i 's/pattern/replacement/' "$file"
-fi
-```
-
-**Bad Example:**
-```bash
-# Set variable to 10
-count=10
-```
-
-### Function Documentation
-
-Document functions with:
-- Purpose
-- Parameters
-- Return value/exit code
-- Side effects (if any)
-
-```bash
-# Function: validate_email
-# Description: Validates email address format and sanitizes input
-# Parameters:
-#   $1 - Email address to validate
-# Returns:
-#   0 - Valid email
-#   1 - Invalid format
-# Side effects: Writes error to stderr on failure
-validate_email() {
-    local email="$1"
-    [[ "$email" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]
-}
-```
-
----
-
-## Naming Conventions
-
-### Files
-
-- Use **lowercase** with **hyphens** for word separation
-- Use `.sh` extension for shell scripts
-- Be descriptive but concise
-
-**Good:**
-- `setup-environment.sh`
-- `backup-database.sh`
-- `analyze-logs.sh`
-
-**Bad:**
-- `SetupEnvironment.sh`
-- `setup_environment.sh`
-- `script1.sh`
-
-### Variables
-
-```bash
-# Global constants: SCREAMING_SNAKE_CASE
-readonly MAX_RETRIES=3
-readonly CONFIG_DIR="/etc/myapp"
-
-# Global variables: SCREAMING_SNAKE_CASE (avoid when possible)
-GLOBAL_STATE="initialized"
-
-# Local variables: snake_case
-local retry_count=0
-local config_file="config.ini"
-
-# Environment variables: SCREAMING_SNAKE_CASE
-export DATABASE_URL="postgresql://localhost/mydb"
-```
-
-### Functions
-
-- Use **snake_case** for function names
-- Use verb prefixes: `get_`, `set_`, `is_`, `has_`, `validate_`, `check_`
-- Be descriptive
-
-**Good:**
-```bash
-get_user_input()
-validate_configuration()
-is_file_writable()
-log_error()
-```
-
-**Bad:**
-```bash
-GetUserInput()     # Wrong case
-validate()         # Too vague
-check()            # Too vague
-func1()            # Non-descriptive
-```
-
----
-
-## Error Handling
-
-### Required Practices
-
-1. **Always check return codes for critical operations**
-2. **Provide actionable error messages**
-3. **Clean up resources before exit**
-4. **Use trap for cleanup handlers**
-
-### SC2155 - Declare and Assign Separately
-
-**NEVER** combine variable declaration with command substitution:
-
-```bash
-# WRONG - Masks command exit code
-local result=$(dangerous_command)
-
-# CORRECT - Preserves exit code
-local result
-result=$(dangerous_command) || {
-    log_error "dangerous_command failed"
-    return 1
-}
-```
-
-### Error Message Quality
-
-**Bad:**
-```bash
-echo "Error" >&2
-```
-
-**Good:**
-```bash
-log_error "Failed to connect to database at ${DB_HOST}:${DB_PORT}"
-log_error "Please check: 1) Database is running 2) Credentials are correct 3) Network is accessible"
-```
-
-### Cleanup Handlers
-
-```bash
-# Set up cleanup trap
-cleanup() {
-    log_info "Cleaning up temporary files..."
-    rm -rf "$TEMP_DIR"
-    # Restore original state
-    # Close open connections
-}
-trap cleanup EXIT
-
-# For error-specific cleanup
-error_cleanup() {
-    log_error "Script failed at line $LINENO"
-    cleanup
-}
-trap error_cleanup ERR
-```
-
----
-
-## Input Validation
-
-### Always Validate and Sanitize User Input
-
-**NEVER** trust user input. **ALWAYS** validate format and sanitize for security.
-
-### Required Validations
-
-1. **Check argument count**
-2. **Validate format** (emails, URLs, paths, numbers)
-3. **Sanitize for command injection**
-4. **Check file/directory existence**
-5. **Verify permissions**
-
-### Example: Email Validation
-
-```bash
-validate_email() {
-    local email="$1"
-
-    # Validate format
-    if [[ ! "$email" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-        log_error "Invalid email format: $email"
-        return 1
-    fi
-
-    # Sanitize dangerous characters
-    email="${email//[;<>\`\$\(\)]/}"
-
-    echo "$email"
-    return 0
-}
-```
-
-### Example: Path Validation
-
-```bash
-validate_path() {
-    local path="$1"
-
-    # Check if exists
-    if [[ ! -e "$path" ]]; then
-        log_error "Path does not exist: $path"
-        return 1
-    fi
-
-    # Check if writable (if needed)
-    if [[ ! -w "$path" ]]; then
-        log_error "Path is not writable: $path"
-        return 1
-    fi
-
-    return 0
-}
-```
-
-### Command Injection Prevention
-
-```bash
-# DANGEROUS - Command injection vulnerability
-user_input="$1"
-eval "$user_input"  # NEVER DO THIS
-
-# SAFE - Use array and proper quoting
-files=()
-while IFS= read -r -d '' file; do
-    files+=("$file")
-done < <(find . -type f -print0)
-
-for file in "${files[@]}"; do
-    process_file "$file"
-done
-```
-
----
-
-## Code Organization
-
-### Function Ordering
-
-1. **Helper/utility functions** (top)
-2. **Validation functions**
-3. **Core logic functions**
-4. **Main/orchestration function** (bottom)
-
-### Group Related Functions
-
-```bash
-################################################################################
-# Validation Functions
-################################################################################
-
-validate_email() { ... }
-validate_path() { ... }
-validate_url() { ... }
-
-################################################################################
-# Database Functions
-################################################################################
-
-connect_database() { ... }
-query_database() { ... }
-close_database() { ... }
-
-################################################################################
-# Main Logic
-################################################################################
-
-main() { ... }
-```
-
----
-
-## Logging and Output
-
-### Use Consistent Logging Functions
-
-Prefer using standardized logging functions from `lib/common.sh`:
-
-```bash
-log_info "Starting backup process..."
-log_success "Backup completed successfully"
-log_warning "Disk space is running low"
-log_error "Failed to connect to remote server"
-log_debug "Variable value: $important_var"
-```
-
-### Color Usage
-
-- **Use colors for terminal output**
-- **Detect if output is to a terminal** (disable colors for pipes/redirects)
-- **Use standard color codes from common.sh**
-
-```bash
-# Check if output is a terminal
-if [[ -t 1 ]]; then
-    # Colors enabled
-    readonly COLOR_RED='\033[0;31m'
-    readonly COLOR_RESET='\033[0m'
-else
-    # Colors disabled (output is redirected)
-    readonly COLOR_RED=''
-    readonly COLOR_RESET=''
-fi
-```
-
-### Log Levels
-
-- `INFO`: General information
-- `SUCCESS`: Successful operations
-- `WARNING`: Non-fatal issues
-- `ERROR`: Fatal errors (write to stderr)
-- `DEBUG`: Detailed debugging (only when `DEBUG=1`)
-
-### Display Requirements (MANDATORY)
-
-**ABSOLUTE RULE:** All scripts **MUST** optimize for minimum vertical space in the console.
-
-#### Minimum Vertical Space with ANSI Escape Codes
-
-Scripts must use ANSI escape codes to keep display height to a minimum:
-
-- **INFO-level output** should ONLY appear with `-v | --verbose` flag
-- **Without verbose mode**, output must be compact and overwrite itself as sections complete
-- Use `\r` (carriage return) and ANSI positioning to update lines in-place
-- Clear completed sections to reduce visual clutter
-
-**Example of verbose vs non-verbose:**
-
-```bash
-# VERBOSE MODE (-v | --verbose)
-[INFO] Running in auto-confirm mode
-[INFO] macOS version: 26.1
-[✓] System requirements check passed
-[INFO] Homebrew already installed: Homebrew 5.0.1
-[INFO] Update Homebrew? [auto-confirmed]
-[INFO] Updating Homebrew...
-[✓] Homebrew updated
-
-# NON-VERBOSE MODE (default)
-▶ Checking System Requirements     [✓]
-▶ Installing Homebrew              [✓]
-▶ Installing Python                [✓]
-```
-
-#### ANSI Escape Code Examples
-
-```bash
-# Move cursor up N lines
-echo -e "\033[${N}A"
-
-# Clear from cursor to end of line
-echo -e "\033[K"
-
-# Clear entire line
-echo -e "\033[2K"
-
-# Move cursor to beginning of line (carriage return)
-echo -ne "\r"
-
-# Save cursor position
-echo -ne "\033[s"
-
-# Restore cursor position
-echo -ne "\033[u"
-
-# Move cursor to specific position (row, col)
-echo -e "\033[${row};${col}H"
-
-# Example: Overwriting progress in place
-for i in {1..100}; do
-    echo -ne "\rProgress: ${i}%  "
-    sleep 0.1
-done
-echo -e "\rProgress: Complete! ✓\033[K"
-```
-
-#### Running Wall Clock Timer (MANDATORY for Long-Running Scripts)
-
-**ABSOLUTE RULE:** Scripts that run longer than 10 seconds OR have deferred actions **MUST** display a running wall clock time in the top-right corner of the terminal.
-
-**Applies to:**
-- Scripts with expected runtime > 10 seconds
-- Scripts with countdown timers or delays
-- Scripts that schedule deferred actions (e.g., `schedule-claude.sh`, `tell-vscode-at.sh`)
-- Scripts that wait for external events or user input
-
-**Does NOT apply to:**
-- Quick utility scripts (< 10 seconds runtime)
-- Simple read-only scripts (list, get, inspect, status)
-- Library files (sourced by other scripts)
-
-**Requirements:**
-- Display format: `[00:00:15]` (hours:minutes:seconds)
-- Location: Top-right corner of terminal
-- Color: **Yellow text on black background** (`\033[33;40m`)
-- Must update throughout script execution (at least every second)
-- Use background process or function to update timer
-
-**Implementation Example:**
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-# Timer variables
-SCRIPT_START_TIME=$(date +%s)
-TIMER_PID=""
-
-# Function: Update wall clock timer
-update_timer() {
-    local start_time="$1"
-    local cols
-
-    while true; do
-        cols=$(tput cols 2>/dev/null || echo 80)
-        local elapsed=$(($(date +%s) - start_time))
-        local hours=$((elapsed / 3600))
-        local minutes=$(((elapsed % 3600) / 60))
-        local seconds=$((elapsed % 60))
-
-        # Format timer: [HH:MM:SS]
-        local timer_text
-        printf -v timer_text "[%02d:%02d:%02d]" "$hours" "$minutes" "$seconds"
-
-        # Move to top-right corner (row 1, col = terminal_width - timer_length)
-        local timer_col=$((cols - ${#timer_text}))
-
-        # Yellow on black, position, print timer, reset
-        echo -ne "\033[s"                          # Save cursor position
-        echo -ne "\033[1;${timer_col}H"            # Move to top-right
-        echo -ne "\033[33;40m${timer_text}\033[0m" # Yellow on black
-        echo -ne "\033[u"                          # Restore cursor position
-
-        sleep 1
-    done
-}
-
-# Function: Start timer
-start_timer() {
-    update_timer "$SCRIPT_START_TIME" &
-    TIMER_PID=$!
-}
-
-# Function: Stop timer
-stop_timer() {
-    if [[ -n "$TIMER_PID" ]]; then
-        kill "$TIMER_PID" 2>/dev/null || true
-        wait "$TIMER_PID" 2>/dev/null || true
-    fi
-}
-
-# Cleanup trap
-cleanup() {
-    stop_timer
-}
-trap cleanup EXIT
-
-# Start timer at script start
-start_timer
-
-# Main script logic
-main() {
-    echo "Doing work..."
-    sleep 5
-    echo "More work..."
-    sleep 3
-}
-
-main "$@"
-
-# Stop timer and show total time
-stop_timer
-elapsed=$(($(date +%s) - SCRIPT_START_TIME))
-hours=$((elapsed / 3600))
-minutes=$(((elapsed % 3600) / 60))
-seconds=$((elapsed % 60))
-printf "\nTotal execution time: %02d:%02d:%02d\n" "$hours" "$minutes" "$seconds"
-```
-
-#### Total Execution Time (MANDATORY)
-
-At the end of script execution, **MUST** display total time taken:
-
-```bash
-# At script end
-SCRIPT_END_TIME=$(date +%s)
-TOTAL_ELAPSED=$((SCRIPT_END_TIME - SCRIPT_START_TIME))
-
-hours=$((TOTAL_ELAPSED / 3600))
-minutes=$(((TOTAL_ELAPSED % 3600) / 60))
-seconds=$((TOTAL_ELAPSED % 60))
-
-echo ""
-echo "========================================="
-printf "Total execution time: %02d:%02d:%02d\n" "$hours" "$minutes" "$seconds"
-echo "========================================="
-```
-
-#### Verbose Flag Implementation
-
-Every script must support verbose output control:
-
-```bash
-# Default to non-verbose
-VERBOSE=false
-
-# Parse arguments
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -v|--verbose)
-            VERBOSE=true
-            shift
-            ;;
-        # ... other options
-    esac
-done
-
-# Logging functions that respect verbose flag
-log_info() {
-    if [[ "$VERBOSE" == true ]]; then
-        echo "[INFO] $*"
-    fi
-}
-
-log_section() {
-    # Always show sections, but format differently based on verbose
-    if [[ "$VERBOSE" == true ]]; then
-        echo ""
-        echo "▶ $*"
-        echo ""
-    else
-        # Compact format - will be overwritten
-        echo -ne "\r\033[K▶ $*  "
-    fi
-}
-
-log_success() {
-    if [[ "$VERBOSE" == true ]]; then
-        echo "[✓] $*"
-    else
-        # Update in-place
-        echo -e "\r\033[K▶ $*\t\t[✓]"
-    fi
-}
-```
-
-#### Summary of Display Requirements
-
-**Every script MUST:**
-
-1. ✅ Support `-v | --verbose` flag
-2. ✅ Show INFO-level messages ONLY in verbose mode
-3. ✅ Use compact, overwriting display in non-verbose mode
-4. ✅ Display running wall clock timer in top-right corner (yellow on black) - **if runtime >10s or has deferred actions**
-5. ✅ Show total execution time at script end
-6. ✅ Use ANSI escape codes to minimize vertical space
-
-**Enforcement:**
-
-- Scripts without these display features will be rejected in code review
-- Timer must be visible and updating during execution (for applicable scripts)
-- Non-verbose mode must be genuinely compact (< 10 lines for typical scripts)
-
----
-
-## Testing and Linting
-
-### ⚠️ MANDATORY PRE-COMMIT REQUIREMENTS ⚠️
-
-**YOU MUST TEST, VALIDATE, AND LINT ALL CODE CHANGES BEFORE COMMITTING**
-
-This is **NON-NEGOTIABLE**. Do not skip these steps. Do not wait to be asked.
-
-### Required Pre-Commit Steps
-
-Every script change **MUST** complete these steps before commit:
-
-1. ✅ **LINT** - Run shellcheck, fix ALL warnings
-2. ✅ **VALIDATE** - Check syntax with `bash -n`
-3. ✅ **TEST** - Run with sample data, test edge cases
-4. ✅ **VERIFY** - Confirm functionality works as expected
-
-**Zero exceptions. No shortcuts.**
-
-### MANDATORY: Lint Before Commit
-
-**EVERY** script **MUST** pass `shellcheck` with zero warnings before being committed.
-
-```bash
-# Lint a single script
-shellcheck script-name.sh
-
-# Lint all scripts in repository
-find . -type f -name "*.sh" -exec shellcheck {} +
-
-# Lint with specific severity level
-shellcheck --severity=warning script-name.sh
-```
-
-**Enforcement:**
-- **Zero linting errors/warnings allowed before commit**
-- Fix all warnings unless explicitly documented
-- Do not commit code that doesn't pass linting
-
-### Addressing ShellCheck Warnings
-
-- **Fix ALL warnings** unless you have a documented reason to disable
-- **Use inline directives sparingly** and document why:
-
-```bash
-# shellcheck disable=SC2034  # Variable used in sourced script
-EXPORTED_VAR="value"
-```
-
-### MANDATORY: Validate Before Commit
-
-**EVERY** script **MUST** pass syntax validation:
-
-```bash
-# Validate syntax
-bash -n script-name.sh
-
-# Validate all scripts
-find . -type f -name "*.sh" -exec bash -n {} \; -print
-```
-
-**What to validate:**
-- Syntax correctness (`bash -n`)
-- All sourced files exist and are accessible
-- All required commands/dependencies documented
-- Edge cases handled (empty inputs, special characters)
-
-### MANDATORY: Test Before Commit
-
-Before claiming a script is "done":
-
-1. ✅ **Run the script** with sample/test data
-2. ✅ **Test error cases** (invalid inputs, missing files, network failures)
-3. ✅ **Test on target platform** (macOS/Linux as appropriate)
-4. ✅ **Verify cleanup** (temp files removed, state restored)
-5. ✅ **Test edge cases** (filenames with spaces, empty inputs, etc.)
-6. ✅ **Verify all functions** work as expected
-
-**Testing Workflow:**
-
-```bash
-# 1. Syntax check
-bash -n my-script.sh
-
-# 2. Lint
-shellcheck my-script.sh
-
-# 3. Test with sample data
-echo "test input" | ./my-script.sh --dry-run
-
-# 4. Test error handling
-./my-script.sh /nonexistent/path  # Should fail gracefully
-
-# 5. Test on target platform
-if is_macos; then
-    # Test BSD-specific commands
-    echo "sample data" | sed -i '' 's/old/new/' /tmp/test.txt
-fi
-```
-
-### Platform-Specific Testing
-
-**macOS uses BSD tools, NOT GNU tools**. Always test platform-specific commands:
-
-```bash
-# Test awk/sed/grep commands in isolation BEFORE committing
-echo "sample data" | awk '{print $1}'
-echo "sample data" | sed 's/sample/test/'
-
-# macOS uses BSD tools - test before committing
-if is_macos; then
-    # BSD sed requires backup extension for -i flag
-    sed -i '' 's/pattern/replacement/' "$file"
-else
-    # GNU sed
-    sed -i 's/pattern/replacement/' "$file"
-fi
-
-# ALWAYS test awk/sed/grep with sample data first:
-echo "test123" | grep -o '[0-9]\+' # Test before using in script
-```
-
-**Testing Checklist:**
-
-- [ ] Script passes `shellcheck` with zero warnings
-- [ ] Script passes `bash -n` syntax check
-- [ ] Tested with valid sample data
-- [ ] Tested with invalid/edge case inputs
-- [ ] Tested on target platform (macOS/Linux)
-- [ ] Verified cleanup (no temp files left behind)
-- [ ] Documented any platform-specific behavior
-- [ ] All sourced files exist and are valid
-
-**DO NOT commit until ALL items are checked.**
-
----
+Memorize these rules before writing anything:
+
+1. 400-line limit  
+   - Any script approaching 350 lines must be refactored into libraries under lib/.  
+   - Short, focused scripts are easier to debug, test, and reuse.
+
+2. Zero ShellCheck noise  
+   - All scripts must pass ShellCheck with zero warnings at severity warning and above. [1][2][3]
+   - If a warning is intentionally suppressed, document why with a ShellCheck directive.
+
+3. Required flags (-h/--help, -v/--verbose)  
+   - Every script implements both -h/--help and -v/--verbose.  
+   - Help is man-page style, comprehensive, and callable without any other arguments.
+
+4. UX: Smart console output and timer  
+   - Non-verbose mode is compact and overwrites in place using ANSI escape codes. [4][5][6][7]
+   - Verbose mode shows rich INFO-level logs and detailed progress.  
+   - Scripts expected to run >10 seconds or with deferred actions must show a yellow-on-black wall clock timer in the top-right corner plus total execution time at exit.
+
+5. Defensive error handling  
+   - All scripts start with:  
+     - `#!/usr/bin/env bash`  
+     - `set -euo pipefail` [1][8][9]
+   - Critical operations must check return codes and use trap-based cleanup for temporary state.
+
+6. Relentless input validation  
+   - Validate argument count, types, formats, paths, and permissions.  
+   - Never trust user input; sanitize to prevent command injection.
+
+7. Platform-aware, portable by default  
+   - Use is_macos/is_linux helpers and handle BSD vs GNU differences explicitly (e.g., sed -i behavior). [1][8][10][9]
+   - Default to Apple Silicon macOS but keep Linux paths and differences well-documented.
+
+8. Always test before commit  
+   - shellcheck (zero warnings), bash -n, and functional testing with sample and edge-case data. [1][2][3]
+   - Scripts that are not tested are not considered “done.”
+
+Common mistakes to avoid:
+
+- Do not combine declaration and command substitution for locals (e.g., `local x=$(cmd)`).
+- Do not loop over `$(find ...)`; use `-print0` and `while read -r -d ''` instead.
+- Never pass user input to eval.  
+- Do not use raw echo for user-facing status; use logging helpers.
+- Avoid hardcoded paths; use SCRIPT_DIR and repo-root helpers.
+- Never silence errors with `|| true` unless there is a documented, explicit reason.
+
+***
+
+## Script Size and Structure
+
+Goal: Every script should read like a clear story, not a tangle.
+
+- Hard cap: 400 lines including comments and blank lines.  
+- At ~350 lines, refactor immediately into:  
+  - lib/common.sh for shared utilities.  
+  - lib/<domain>.sh for domain-specific helpers.  
+  - Small, focused sub-scripts for distinct workflow phases.
+
+Recommended layout for a “real” script:
+
+1. Shebang and strict mode (`#!/usr/bin/env bash`, `set -euo pipefail`).  
+2. Metadata constants (VERSION, SCRIPT_NAME).  
+3. Source common libraries (SCRIPT_DIR + lib/…).  
+4. Logging, UX, and timer helpers.  
+5. Validation helpers.  
+6. Core domain functions.  
+7. Argument parsing and CLI wiring.  
+8. main() as the orchestrator at the bottom.
+
+Use a project structure like:
+
+- main-script.sh (entry point, <400 lines)  
+- lib/ (shared logic)  
+- scripts/ (phase and utility scripts)  
+- tests/ (automated and manual test harnesses)
+
+This structure aligns with other professional shell style guides and makes it easy to onboard new contributors. [1][8][9]
+
+***
+
+## Shell Configuration and Safety Defaults
+
+Every script must start with:
+
+- `#!/usr/bin/env bash`  
+- `set -euo pipefail`
+
+These defaults:
+
+- Fail fast on errors.  
+- Treat unset variables as bugs instead of silently continuing.  
+- Propagate errors through pipelines.
+
+Optional but encouraged:
+
+- `set -x` when debugging locally (never committed enabled).  
+- `shopt -s nullglob` when globbing on possibly-empty patterns is expected.
+
+For scripts that intentionally relax strictness, document the rationale in comments near the configuration line.
+
+***
+
+## Documentation and Discoverability
+
+Every script is self-documenting and friendly for both humans and AI assistants.
+
+Header must include:
+
+- PURPOSE: one crisp sentence.  
+- USAGE: how to run the script.  
+- PLATFORM: macOS, Linux, or both.  
+- DEPENDENCIES: external tools (brew, git, jq, etc.).  
+- AUTHOR (optional) and Last Updated.
+
+Inline comments:
+
+- Focus on WHY and trade-offs, not obvious “what.”  
+- Document non-obvious platform differences (e.g., BSD sed vs GNU sed). [1][8][10]
+- Use TODO/FIXME with enough context for another contributor (or AI) to finish the work confidently.
+
+Functions:
+
+- Brief comment block for purpose, parameters, exit codes, and side effects.  
+- Make it easy for a reader to decide whether to call, modify, or extract the function.
+
+***
+
+## Naming and Conventions
+
+Names should be boring, predictable, and descriptive.
+
+- Files: lowercase-hyphen-separated, .sh extension.  
+- Constants and globals: SCREAMING_SNAKE_CASE with readonly where possible.  
+- Local variables and functions: snake_case.  
+- Environment variables: SCREAMING_SNAKE_CASE and exported explicitly.
+
+Prefer verb-based prefixes for functions: get_, set_, is_, has_, validate_, log_, require_, etc. This matches guidance from other shell style guides and reduces cognitive load when scanning. [1][8]
+
+***
+
+## Error Handling and Cleanup
+
+Error handling is explicit, intentional, and actionable.
+
+- Always check exit codes for critical operations.  
+- use trap-based cleanup (EXIT, ERR) for temporary files, directories, and state.  
+- Error messages must tell the user what went wrong and how to fix it, not just “Error.”
+
+Do not:
+
+- Hide exit codes by combining declaration + assignment from a command.  
+- Rely on `|| true` without very clear justification.  
+- Leave temporary files or partial state behind after failure.
+
+Where appropriate, differentiate between “recoverable warnings” and “hard failures,” and reflect that in both log levels and exit status.
+
+***
+
+## Input Validation and Security
+
+Treat all input as hostile until proven otherwise.
+
+- Validate argument count early; fail fast with helpful usage hints.  
+- Validate formats for emails, URLs, paths, and numeric values with regex or dedicated helpers.  
+- Sanitize input when used in shell commands to avoid injection.  
+- Never use eval on user input or untrusted data.  
+- Always handle filenames and paths safely using null-terminated lists and proper quoting.
+
+Use helpers like validate_email, validate_path, and sanitize_input to keep core logic focused and readable.
+
+***
+
+## Code Organization and Libraries
+
+Organize code for reuse and clarity:
+
+- Group related functions with section headers (validation, IO, domain logic, etc.).  
+- Keep helpers and utilities at the top, orchestration at the bottom.  
+- Extract reusable behavior (logging, timers, platform detection, input validation) into lib/common.sh or domain-specific libraries.
+
+This lets new scripts come together quickly by composing existing, well-tested helpers.
+
+***
+
+## Logging, Output, and Terminal UX
+
+Console output is opinionated and user-centric.
+
+- Default mode:
+  - Minimal, compact lines updated in place using ANSI escape codes. [4][5][6][7]
+  - Ideal for CI logs and repeated runs.  
+- Verbose mode (-v/--verbose):
+  - Rich INFO-level logs, details about decisions, and multi-line context.  
+  - Great for debugging, understanding flow, and AI-assisted troubleshooting.
+
+Core UX requirements:
+
+- Use shared logging helpers: log_info, log_success, log_warning, log_error, log_debug, log_section, etc.  
+- Detect whether output is a TTY; disable color when piping or redirecting. [1][8][4]
+- Use ANSI escape codes for:
+  - In-place progress updates.  
+  - Compact “dashboard-like” displays.  
+  - A top-right wall-clock timer for long-running or deferred scripts.
+
+All long-running scripts must:
+
+- Start a wall-clock timer process at script start.  
+- Display it as [HH:MM:SS] in yellow-on-black in the top-right corner.  
+- Stop it cleanly via trap, then print total execution time at exit.
+
+Choose ANSI sequences that are widely supported and avoid terminal-specific tricks where possible; rely on tools like tput where it improves portability. [4][5][6][7][11]
+
+***
+
+## Testing, Linting, and Pre-Commit Discipline
+
+Every change goes through the same predictable pipeline:
+
+1. Syntax: `bash -n script.sh`.  
+2. Lint: `shellcheck --severity=warning script.sh` with zero warnings. [1][2][3]
+3. Functional testing:
+   - With representative “happy path” inputs.  
+   - With edge cases (empty inputs, weird filenames, missing resources, network failures).  
+   - On target platforms (macOS vs Linux), particularly for sed/awk/grep. [1][8][10][9]
+
+Have a repeatable `validate-script-compliance.sh` helper that can validate a single script, all scripts, and emit a compliance report. Align its checks with this guide and with established shell standards. [1][8][9]
+
+Only commit after all checks pass. Scripts that do not lint, validate, and test cleanly are not eligible for code review.
+
+***
 
 ## Platform Compatibility
 
-### Apple Silicon (ARM64) Considerations
+Default to portability, then layer platform-specific behavior where necessary.
 
-This repository targets **Apple Silicon** (ARM64) hardware:
+- Always use is_macos and is_linux helpers before branching into platform-specific code.  
+- Handle BSD vs GNU tooling explicitly, particularly sed -i, date, and regex support. [1][8][10][9]
+- Assume Apple Silicon macOS for Homebrew paths (/opt/homebrew) and document any x86-only or Rosetta caveats.
 
-- Homebrew path: `/opt/homebrew/` (NOT `/usr/local/`)
-- Verify architecture: `uname -m` returns `arm64`
+When in doubt, test the exact sed/awk/grep incantation in isolation on the target platform before baking it into a script.
 
-### macOS vs Linux Differences
+***
 
-#### macOS Uses BSD Tools, NOT GNU
+## Security Expectations
 
-**Critical:** macOS ships with BSD versions of common tools that have different syntax than GNU versions.
+Security is a first-class concern, not an afterthought.
 
-**Common Gotchas:**
+- Never use eval with user-controlled data.  
+- Use mktemp for temporary files and directories, and ensure cleanup via trap.  
+- Avoid brittle constructs like `for file in $(find ...)` that break with spaces and special characters.  
+- Quote variables by default and only deviate when absolutely necessary and documented. [1][8][12]
 
-```bash
-# awk: BSD awk does NOT support match() with array capture
-# BAD (GNU-only)
-echo "test" | awk 'match($0, /t(e)st/, arr) {print arr[1]}'
+The goal is to make it very hard to introduce command injection, data leaks, or privilege escalation via these scripts.
 
-# GOOD (Portable)
-echo "test" | grep -o 'e' | head -1
+***
 
-# sed: BSD sed requires backup extension for in-place edit
-# macOS
-sed -i '' 's/old/new/' file.txt
+## Command-Line Interface Contract
 
-# Linux
-sed -i 's/old/new/' file.txt
+Every script behaves like a well-behaved CLI tool.
 
-# Portable solution
-if is_macos; then
-    sed -i '' 's/old/new/' "$file"
-else
-    sed -i 's/old/new/' "$file"
-fi
-```
+- -h and --help must:
+  - Be available without any other arguments.  
+  - Exit 0 and never modify state.  
+  - Provide man-style sections: NAME, SYNOPSIS, DESCRIPTION, OPTIONS, ARGUMENTS, EXAMPLES, EXIT STATUS, ENVIRONMENT, SEE ALSO, AUTHOR.  
+- -v and --verbose must:
+  - Control INFO and DEBUG visibility.  
+  - Enable detailed logs without changing semantics.
 
-### Use Platform Detection Functions
+Unknown options must:
 
-```bash
-is_macos() {
-    [[ "$(uname -s)" == "Darwin" ]]
-}
+- Produce a clear error message.  
+- Point the user to --help.  
+- Exit with a non-zero status.
 
-is_linux() {
-    [[ "$(uname -s)" == "Linux" ]]
-}
+This gives humans and AI assistants a consistent, discoverable interface across the entire script library.
 
-# Use in code
-if is_macos; then
-    # macOS-specific code
-elif is_linux; then
-    # Linux-specific code
-fi
-```
+***
 
----
+## Patterns, Examples, and Learning by Copying
 
-## Security
+Favor a small number of “golden” scripts as exemplars (bu.sh, scorch-repo.sh, purge-identity.sh, etc.) and keep them meticulously aligned with this guide. Contributors and AI tools should copy patterns from those scripts rather than improvising.
 
-### Input Sanitization
+Where appropriate, cross-link external references for deeper reading (e.g., Google Shell Style Guide, ShellCheck docs, and BSD vs GNU tool differences). [1][8][10][2][9]
 
-**ALWAYS** sanitize user input before using in commands:
+***
 
-```bash
-# Remove dangerous shell metacharacters
-sanitize_input() {
-    local input="$1"
-    # Remove: ; < > ` $ ( ) | & space
-    echo "${input//[;<>\`\$\(\)\|&[:space:]]/}"
-}
+## Enforcement and AI Assistant Instructions
 
-user_input=$(sanitize_input "$1")
-```
+For humans and AI assistants:
 
-### Avoid eval
+- Read this entire guide once, then refer to it often.  
+- Follow all rules without exception unless the guide itself is updated.  
+- Treat ShellCheck, bash -n, and the compliance script as non-negotiable gates. [1][2][3]
+- Ask questions (via issues, comments, or prompts) when platform or security behavior is unclear.  
+- When in doubt, choose the safer, more explicit, and more testable option.
 
-**NEVER** use `eval` with user input:
+This repository is designed so that anyone can clone, run, and extend these scripts with confidence. The style guide is the contract that makes that possible.
 
-```bash
-# DANGEROUS
-eval "$user_input"
-
-# SAFE - Use functions or case statements
-case "$user_input" in
-    start) start_service ;;
-    stop)  stop_service ;;
-    *)     log_error "Invalid command" ;;
-esac
-```
-
-### File Handling
-
-```bash
-# Handle filenames with spaces/special characters
-while IFS= read -r -d '' file; do
-    process_file "$file"
-done < <(find . -type f -print0)
-
-# NOT THIS (breaks on spaces)
-for file in $(find . -type f); do
-    process_file "$file"  # BREAKS
-done
-```
-
-### Temporary Files
-
-```bash
-# Use mktemp for temporary files
-TEMP_FILE=$(mktemp) || die "Failed to create temp file"
-trap 'rm -f "$TEMP_FILE"' EXIT
-
-# Use mktemp -d for temporary directories
-TEMP_DIR=$(mktemp -d) || die "Failed to create temp directory"
-trap 'rm -rf "$TEMP_DIR"' EXIT
-```
-
----
-
-## Command-Line Interface
-
-### MANDATORY: Help Flag Support
-
-**ABSOLUTE RULE:** Every script **MUST** implement `-h` and `--help` flags.
-
-**Requirements:**
-1. Both `-h` and `--help` must be supported
-2. Help output must follow man-page style format
-3. Help must be accessible without requiring other arguments
-4. Help flag must exit with status code 0
-5. Help must be comprehensive and include all options
-
-**Man-Page Style Format (MANDATORY):**
-
-```bash
-show_help() {
-    cat << EOF
-NAME
-    $(basename "$0") - Brief one-line description
-
-SYNOPSIS
-    $(basename "$0") [OPTIONS] <ARGUMENTS>
-
-DESCRIPTION
-    Detailed description of what the script does.
-    Can span multiple paragraphs if needed.
-
-OPTIONS
-    -h, --help
-        Display this help message and exit
-
-    -v, --verbose
-        Enable verbose output
-
-    -o, --output FILE
-        Specify output file (default: stdout)
-
-ARGUMENTS
-    INPUT_FILE
-        Path to input file (required)
-
-EXAMPLES
-    $(basename "$0") file.txt
-        Process file.txt with default options
-
-    $(basename "$0") --verbose --output result.txt input.txt
-        Process input.txt with verbose output to result.txt
-
-EXIT STATUS
-    0   Success
-    1   General error
-    2   Invalid arguments
-
-ENVIRONMENT
-    DEBUG=1
-        Enable debug output
-
-SEE ALSO
-    related-script.sh(1), documentation-url
-
-AUTHOR
-    Your Name or Organization
-
-EOF
-}
-```
-
-**Minimal Acceptable Format:**
-
-At minimum, help output must include:
-- NAME: Script name and brief description
-- SYNOPSIS: Usage syntax
-- DESCRIPTION: What the script does
-- OPTIONS: List of all options with descriptions
-- EXAMPLES: At least one usage example
-
-**Argument Parsing with Help:**
-
-```bash
-# Parse arguments - help must come first
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        -v|--verbose)
-            VERBOSE=true
-            shift
-            ;;
-        *)
-            echo "Error: Unknown option: $1" >&2
-            echo "Use --help for usage information" >&2
-            exit 1
-            ;;
-    esac
-done
-```
-
-**Testing Help Output:**
-
-```bash
-# Verify help is accessible
-./script.sh --help
-./script.sh -h
-
-# Should exit with 0
-echo $?  # Should be 0
-
-# Should not require other arguments
-./script.sh --help  # Works even without required args
-```
-
-**Enforcement:**
-- Scripts without help flags will be rejected in code review
-- Help output must be tested before committing
-- Use `show_help()` function for consistency
-- Keep help text up-to-date with script changes
-
----
-
-## Common Patterns
-
-### Argument Parsing
-
-```bash
-show_help() {
-    echo "Usage: $0 [OPTIONS] <arg>"
-    echo "Options:"
-    echo "  -h, --help     Show help"
-    echo "  -v, --verbose  Verbose output"
-}
-
-# Parse options
-VERBOSE=false
-
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        -v|--verbose)
-            VERBOSE=true
-            shift
-            ;;
-        -*)
-            log_error "Unknown option: $1"
-            show_help
-            exit 1
-            ;;
-        *)
-            # Positional argument
-            ARG="$1"
-            shift
-            ;;
-    esac
-done
-```
-
-### Progress Indicators
-
-```bash
-# Simple counter
-total=100
-for i in $(seq 1 $total); do
-    echo -ne "Processing: $i/$total\r"
-    # do work
-done
-echo ""  # New line after progress
-
-# Percentage
-current=0
-total=100
-while [[ $current -lt $total ]]; do
-    percentage=$((current * 100 / total))
-    echo -ne "Progress: ${percentage}%\r"
-    # do work
-    ((current++))
-done
-echo ""
-```
-
-### Retry Logic
-
-```bash
-retry_command() {
-    local max_attempts=3
-    local timeout=2
-    local attempt=1
-    local exit_code=0
-
-    while [[ $attempt -le $max_attempts ]]; do
-        if command_to_retry; then
-            return 0
-        else
-            exit_code=$?
-            log_warning "Attempt $attempt failed, retrying in ${timeout}s..."
-            sleep $timeout
-            ((attempt++))
-            timeout=$((timeout * 2))  # Exponential backoff
-        fi
-    done
-
-    log_error "Command failed after $max_attempts attempts"
-    return $exit_code
-}
-```
-
-### Configuration File Loading
-
-```bash
-load_config() {
-    local config_file="$1"
-
-    if [[ ! -f "$config_file" ]]; then
-        log_error "Config file not found: $config_file"
-        return 1
-    fi
-
-    # Source config with validation
-    # shellcheck source=/dev/null
-    source "$config_file" || {
-        log_error "Failed to load config: $config_file"
-        return 1
-    }
-
-    # Validate required variables
-    require_var "DATABASE_URL" || return 1
-    require_var "API_KEY" || return 1
-
-    return 0
-}
-
-require_var() {
-    local var_name="$1"
-    if [[ -z "${!var_name:-}" ]]; then
-        log_error "Required variable not set: $var_name"
-        return 1
-    fi
-}
-```
-
----
-
-## Code Examples
-
-### Complete Script Example
-
-For complete, production-ready script examples, see:
-- [`bu.sh`](./bu.sh) - macOS system update script with library usage
-- [`scorch-repo.sh`](./scorch-repo.sh) - Build cruft removal with modular design
-- [`purge-identity.sh`](./purge-identity.sh) - Identity purge tool with comprehensive error handling
-
-### Library Usage Example
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-# Source common library
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/lib/common.sh"
-
-main() {
-    log_header "Starting Application Setup"
-
-    # Validate prerequisites
-    require_command "git" "brew install git"
-    require_command "node" "brew install node"
-
-    # Check platform
-    if is_macos; then
-        log_info "Running on macOS"
-    else
-        die "This script requires macOS"
-    fi
-
-    # Execute with error handling
-    if ask_yes_no "Install dependencies?" "y"; then
-        log_section "Installing Dependencies"
-        npm install || die "npm install failed"
-        log_success "Dependencies installed"
-    fi
-
-    log_success "Setup complete!"
-}
-
-main "$@"
-```
-
----
-
-## Enforcement
-
-### Comprehensive Pre-Commit Validation Checklist
-
-Before creating a pull request, **EVERY** item must be verified:
-
-#### 1. Code Quality
-
-- [ ] All scripts pass `shellcheck --severity=warning` with **zero warnings**
-- [ ] All scripts pass `bash -n <script>` syntax validation
-- [ ] No script exceeds 400 lines (including comments and blank lines)
-- [ ] All functions have complete documentation (purpose, parameters, returns, side effects)
-- [ ] No unused variables (or documented with `# shellcheck disable=SC2034` and reason)
-- [ ] No hardcoded paths (use `get_repo_root`, `SCRIPT_DIR`, etc.)
-
-#### 2. Error Handling & Safety
-
-- [ ] Script uses `set -euo pipefail` (or documents why not)
-- [ ] All critical operations check return codes
-- [ ] Error messages are actionable (tell user what to do)
-- [ ] Cleanup handlers registered with `trap` for temp files/resources
-- [ ] No use of `eval` with user input
-- [ ] No command injection vulnerabilities
-
-#### 3. Input Validation
-
-- [ ] All user input validated before use
-- [ ] Email/URL/path formats validated with regex
-- [ ] Dangerous characters sanitized from user input
-- [ ] File/directory existence checked before operations
-- [ ] Required commands checked with `require_command` or equivalent
-
-#### 4. Display & UX Requirements
-
-- [ ] Script implements `-h` and `--help` flags (man-page style)
-- [ ] Script implements `-v` or `--verbose` flag
-- [ ] Running wall clock timer displayed in top-right corner (yellow on black) - **if runtime >10s or has deferred actions**
-- [ ] Total execution time displayed at script end
-- [ ] Non-verbose mode uses compact, overwriting display (ANSI escape codes)
-- [ ] INFO-level messages only shown in verbose mode
-
-#### 5. Platform Compatibility
-
-- [ ] Platform-specific code uses `is_macos` / `is_linux` detection
-- [ ] BSD vs GNU tool differences handled (sed, awk, grep)
-- [ ] Apple Silicon paths used (`/opt/homebrew/` not `/usr/local/`)
-- [ ] All awk/sed/grep commands tested on target platform
-
-#### 6. Documentation
-
-- [ ] Script header includes PURPOSE, USAGE, PLATFORM, DEPENDENCIES
-- [ ] Help text includes NAME, SYNOPSIS, DESCRIPTION, OPTIONS, EXAMPLES
-- [ ] Inline comments explain "why", not "what"
-- [ ] Non-obvious behavior documented
-- [ ] Related scripts cross-referenced in help text
-
-#### 7. Testing
-
-- [ ] Script tested with valid inputs
-- [ ] Script tested with invalid/edge case inputs
-- [ ] Script tested from different working directories
-- [ ] Error handling tested (missing files, failed commands)
-- [ ] Cleanup verified (no temp files left behind)
-- [ ] Platform-specific features tested on target OS
-
-#### 8. Git & Commits
-
-- [ ] Commit messages use imperative mood ("Add feature" not "Added feature")
-- [ ] Commit messages are specific and descriptive
-- [ ] No "WIP" or "Updates" commit messages
-- [ ] All changes related to commit message
-
-### Automated Validation
-
-Use the compliance validation script to check your work:
-
-```bash
-# Validate a single script
-./validate-script-compliance.sh path/to/script.sh
-
-# Validate all scripts in repository
-./validate-script-compliance.sh --all
-
-# Generate compliance report
-./validate-script-compliance.sh --all --report
-```
-
-### AI Assistant Instructions
-
-**Claude Code / Google Gemini / ChatGPT:**
-
-When writing or modifying shell scripts in this repository:
-
-1. **Read this entire style guide** before making any changes
-2. **Follow ALL rules without exception** - no shortcuts, no "good enough"
-3. **Lint with shellcheck** before claiming work is complete
-4. **Test with sample data** where possible - don't just assume it works
-5. **Refactor at 350 lines** - if a script approaches this limit, extract to libraries immediately
-6. **Never commit unlinted code** - zero warnings is mandatory
-7. **Ask questions** if platform-specific behavior is unclear
-8. **Use the validation checklist** above before marking work complete
-9. **Cross-reference CLAUDE.md** for additional AI-specific protocols
-
-**If you violate these standards, your code will be rejected.**
-
-**Remember**: These standards exist because of real production failures. They are non-negotiable.
-
----
-
-## Version History
-
-| Version | Date       | Changes                                              |
-|---------|------------|------------------------------------------------------|
-| 1.2     | 2025-11-22 | Add comprehensive validation checklist, quick reference card, automated validation script reference |
-| 1.1     | 2025-11-17 | Add mandatory display requirements (ANSI, timer)    |
-| 1.0     | 2025-11-16 | Initial style guide creation                         |
-
----
-
-## References
-
-- [ShellCheck](https://www.shellcheck.net/) - Shell script linting tool
-- [Google Shell Style Guide](https://google.github.io/styleguide/shellguide.html)
-- [Bash Reference Manual](https://www.gnu.org/software/bash/manual/)
-- [BSD vs GNU Tools](https://ponderthebits.com/2017/01/know-your-tools-linux-gnu-vs-mac-bsd-command-line-utilities-grep-strings-sed-and-find/)
-
----
-
-## Questions or Clarifications
-
-If you encounter edge cases not covered in this guide, please:
-
-1. Consult with the repository maintainer
-2. Document the decision in this guide
-3. Add examples for future reference
-
-**This is a living document. Keep it updated as new patterns emerge.**
+Sources
+[1] Shell Style Guide - Google https://google.github.io/styleguide/shellguide.html
+[2] ShellCheck – shell script analysis tool https://www.shellcheck.net
+[3] ShellCheck, a static analysis tool for shell scripts - GitHub https://github.com/koalaman/shellcheck
+[4] Standards for ANSI escape codes - Julia Evans https://jvns.ca/blog/2025/03/07/escape-code-standards/
+[5] Build your own Command Line with ANSI escape codes https://www.lihaoyi.com/post/BuildyourownCommandLinewithANSIescapecodes.html
+[6] Terminal escape codes are awesome, here's why - Orel Fichman https://orelfichman.com/blog/terminal-escape-codes-are-awesome
+[7] ANSI Escape Codes - BIT-101 [2017-2023] https://www.bit-101.com/2017/2022/11/ansi-escape-codes/
+[8] Shell Style Guide - GoatStyles https://styles.goatbytes.io/lang/shell/
+[9] Shell scripting standards and style guidelines - GitLab Docs https://docs.gitlab.com/development/shell_scripting_guide/
+[10] 4. Google Shell Style Guide — IFS Shell Standard documentation https://sites.ecmwf.int/docs/ifs-arpege-coding-standards/shell/guidelines/google.html
+[11] ANSI escape code - Wikipedia https://en.wikipedia.org/wiki/ANSI_escape_code
+[12] SC2034 – foo appears unused. Verify it or export it. - ShellCheck https://www.shellcheck.net/wiki/SC2034
+[13] Tutorial style guide | Cloud Shell - Google Cloud Documentation https://docs.cloud.google.com/shell/docs/cloud-shell-tutorials/style-guide
+[14] Google's bash style guide : r/programming - Reddit https://www.reddit.com/r/programming/comments/8jm85w/googles_bash_style_guide/
+[15] Bash Script BEST Practices You Need to Know, According to Google https://www.youtube.com/watch?v=Y_erZnIhgKg
+[16] How to suppress irrelevant ShellCheck messages? - Stack Overflow https://stackoverflow.com/questions/52659038/how-to-suppress-irrelevant-shellcheck-messages
+[17] Google Style Guides | styleguide https://google.github.io/styleguide/
+[18] When do you disagree with ShellCheck? : r/bash - Reddit https://www.reddit.com/r/bash/comments/w66500/when_do_you_disagree_with_shellcheck/
+[19] Everything you never wanted to know about ANSI escape codes https://www.reddit.com/r/programming/comments/lbmbnm/everything_you_never_wanted_to_know_about_ansi/
+[20] Personal Bash coding style guide - foo.zone https://foo.zone/gemfeed/2021-05-16-personal-bash-coding-style-guide.html
