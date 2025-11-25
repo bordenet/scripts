@@ -1,25 +1,88 @@
-#!/bin/bash
-# -----------------------------------------------------------------------------
-#
+#!/usr/bin/env bash
+################################################################################
 # Script Name: compress-pcap-zstd.sh
-#
-# Description: This script compresses .pcap files in a specified directory
-#              using zstd. It logs the compression progress and execution time.
-#
-# Usage: ./compress-pcap-zstd.sh
-#
+# Description: Compress .pcap files using zstd
+# Platform: macOS/Linux
 # Author: Matt J Bordenet
-#
-# Last Updated: 2025-10-08
-#
-# -----------------------------------------------------------------------------
+# Last Updated: 2025-11-21
+################################################################################
 
-# Exit immediately if a command exits with a non-zero status.
 set -euo pipefail
 
+# Display help information
+show_help() {
+    cat << EOF
+NAME
+    $(basename "$0") - Compress .pcap files using zstd
+
+SYNOPSIS
+    $(basename "$0") [SOURCE_DIR] [LOG_FILE]
+    $(basename "$0") [OPTIONS]
+
+DESCRIPTION
+    Compresses all .pcap files in a specified directory using zstd -19 (maximum
+    compression). Logs compression progress and execution time.
+
+    zstd typically provides better compression ratios and faster decompression
+    than gzip, making it ideal for archiving packet captures.
+
+ARGUMENTS
+    SOURCE_DIR
+        Directory containing .pcap files to compress
+        (default: \$HOME/network-diagnostics/captures)
+
+    LOG_FILE
+        Path to log file for compression progress
+        (default: /volume1/Network-Diagnostics/compression.log)
+
+OPTIONS
+    -h, --help
+        Display this help message and exit
+
+EXAMPLES
+    # Compress with defaults
+    $(basename "$0")
+
+    # Compress specific directory
+    $(basename "$0") /var/captures
+
+    # Custom directory and log file
+    $(basename "$0") /var/captures /var/log/compression.log
+
+EXIT STATUS
+    0   Success
+    1   Error (directory not found, zstd not installed, etc.)
+
+NOTES
+    - Uses zstd -19 for maximum compression
+    - Original .pcap files are removed (--rm flag)
+    - Compression is logged to LOG_FILE
+    - Shows before/after directory sizes
+    - Progress counter shows files processed
+    - Requires zstd to be installed at /opt/bin/zstd
+
+SEE ALSO
+    compress-pcap-gzip.sh(1), zstd(1), tcpdump(8)
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
 # --- Configuration ---
-SOURCE_DIR="$HOME/network-diagnostics/captures"
-LOG_FILE="/volume1/Network-Diagnostics/compression.log"
+SOURCE_DIR="${1:-$HOME/network-diagnostics/captures}"
+LOG_FILE="${2:-/volume1/Network-Diagnostics/compression.log}"
 
 # --- Start ---
 start_time=$(date +%s)

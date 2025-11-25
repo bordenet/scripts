@@ -13,6 +13,9 @@
 ################################################################################
 
 # Component metadata
+
+set -euo pipefail
+
 COMPONENT_NAME="Additional utilities"
 
 # Installation function (called by main script)

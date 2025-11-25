@@ -14,6 +14,9 @@
 ################################################################################
 
 # Component metadata
+
+set -euo pipefail
+
 COMPONENT_NAME="Environment configuration"
 
 # Installation function (called by main script)

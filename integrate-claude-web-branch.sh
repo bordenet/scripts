@@ -1,9 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # -----------------------------------------------------------------------------
 # Claude Code Web Branch Integration Tool
 # Integrates Claude Code web branches via PR workflow with minimal output
 # Platform: Cross-platform (macOS, Linux, WSL)
 # -----------------------------------------------------------------------------
+
+
+set -euo pipefail
 
 set -uo pipefail
 
@@ -22,11 +25,11 @@ NC='\033[0m' # No Color
 
 # ANSI cursor control
 ERASE_LINE='\033[2K'
-SAVE_CURSOR='\033[s'
-RESTORE_CURSOR='\033[u'
+# Unused: SAVE_CURSOR='\033[s'
+# Unused: RESTORE_CURSOR='\033[u'
 
 # --- Global Variables ---
-TIMER_PID=""
+export TIMER_PID=""  # Used in lib
 BRANCH_NAME=""
 MAIN_BRANCH=""
 PR_NUMBER=""
