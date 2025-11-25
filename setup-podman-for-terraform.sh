@@ -33,6 +33,9 @@ OPTIONS
     -h, --help
         Display this help message and exit.
 
+    --what-if
+        Show what would be done without making any changes (dry-run mode).
+
 PLATFORM
     macOS only - Script will exit with error on other platforms
 
@@ -44,6 +47,9 @@ DEPENDENCIES
 EXAMPLES
     # Setup Podman for Terraform
     ./setup-podman-for-terraform.sh
+
+    # Preview what would be done (dry-run)
+    ./setup-podman-for-terraform.sh --what-if
 
 NOTES
     Sets DOCKER_HOST environment variable to enable Terraform's Docker provider
@@ -57,11 +63,26 @@ EOF
 }
 
 # Parse arguments
-case "${1:-}" in
-    -h|--help)
-        show_help
-        ;;
-esac
+WHAT_IF=false
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        --what-if)
+            WHAT_IF=true
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if $WHAT_IF; then
+  echo "🔍 WHAT-IF MODE: Showing what would be done"
+  echo ""
+fi
 
 echo "🔧 Checking for Homebrew..."
 if ! command -v brew >/dev/null 2>&1; then
@@ -71,10 +92,24 @@ fi
 
 echo "📦 Checking for Podman..."
 if ! command -v podman >/dev/null 2>&1; then
-  echo "📥 Installing Podman via Homebrew..."
-  brew install podman
+  if $WHAT_IF; then
+    echo "[WHAT-IF] Would install Podman via Homebrew"
+  else
+    echo "📥 Installing Podman via Homebrew..."
+    brew install podman
+  fi
 else
   echo "✅ Podman is already installed."
+fi
+
+if $WHAT_IF; then
+  echo "[WHAT-IF] Would initialize Podman VM"
+  echo "[WHAT-IF] Would start Podman VM"
+  echo "[WHAT-IF] Would verify Podman connection"
+  echo "[WHAT-IF] Would set DOCKER_HOST environment variable"
+  echo ""
+  echo "✅ WHAT-IF complete. No changes made."
+  exit 0
 fi
 
 echo "🧰 Initializing Podman VM..."
