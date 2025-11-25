@@ -80,7 +80,7 @@ This scripts repository has achieved industry-leading standards for shell script
 - **Library Pattern**: Consistent (lib/*.sh for shared code)
 
 **Strengths:**
-- STYLE_GUIDE.md (v1.2) provides clear, enforceable standards
+- STYLE_GUIDE.md (v2.0) provides clear, enforceable standards
 - Automated validation tooling (validate-script-compliance.sh, validate-cross-references.sh)
 - Consistent library extraction pattern across all refactored scripts
 - Platform detection standardized (docs/platform-detection-guide.md)
@@ -217,8 +217,8 @@ This scripts repository has achieved industry-leading standards for shell script
       "docs_index_exists": true
     },
     "standards": {
-      "style_guide_version": "1.2",
-      "style_guide_lines": 1361,
+      "style_guide_version": "2.0",
+      "style_guide_lines": 333,
       "validation_scripts": 2,
       "pre_commit_checklist": true
     },
