@@ -95,8 +95,18 @@ while [[ $SECONDS_LEFT -gt 0 ]]; do
   MINUTES_LEFT=$(( (SECONDS_LEFT % 3600) / 60 ))
   SECS_LEFT=$(( SECONDS_LEFT % 60 ))
 
-  # ANSI escape sequence to clear line and move cursor to beginning
+  # Get terminal width
+  COLS=$(tput cols 2>/dev/null || echo 80)
+
+  # Format timer text: [HH:MM:SS]
+  TIMER_TEXT=$(printf "[%02d:%02d:%02d]" "$HOURS_LEFT" "$MINUTES_LEFT" "$SECS_LEFT")
+  TIMER_POS=$((COLS - ${#TIMER_TEXT}))
+
+  # Display countdown in main area and timer in top-right corner
   printf "\r\033[K⏳ Time left: %02d:%02d:%02d" "$HOURS_LEFT" "$MINUTES_LEFT" "$SECS_LEFT"
+
+  # Save cursor, move to top-right, print timer (yellow on black), restore cursor
+  echo -ne "\033[s\033[1;${TIMER_POS}H\033[33;40m${TIMER_TEXT}\033[0m\033[u"
 
   sleep 1
   SECONDS_LEFT=$(( SECONDS_LEFT - 1 ))

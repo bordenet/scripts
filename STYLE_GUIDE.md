@@ -15,7 +15,7 @@ This is the authoritative style guide for all shell scripts in this repository. 
 1. ✅ **400-line limit** - No script exceeds 400 lines (extract to lib/)
 2. ✅ **Zero shellcheck warnings** - `shellcheck --severity=warning` must pass
 3. ✅ **Mandatory flags** - Every script implements `-h/--help` and `-v/--verbose`
-4. ✅ **Wall clock timer** - Yellow on black, top-right corner, updates every second
+4. ✅ **Wall clock timer** - Yellow on black, top-right corner, for scripts >10s or with deferred actions
 5. ✅ **Error handling** - Use `set -euo pipefail`, check return codes, use `trap` for cleanup
 6. ✅ **Input validation** - Validate and sanitize ALL user input
 7. ✅ **Platform detection** - Use `is_macos`/`is_linux`, handle BSD vs GNU tools
@@ -606,9 +606,20 @@ done
 echo -e "\rProgress: Complete! ✓\033[K"
 ```
 
-#### Running Wall Clock Timer (MANDATORY)
+#### Running Wall Clock Timer (MANDATORY for Long-Running Scripts)
 
-**ABSOLUTE RULE:** EVERY script **MUST** display a running wall clock time in the top-right corner of the terminal.
+**ABSOLUTE RULE:** Scripts that run longer than 10 seconds OR have deferred actions **MUST** display a running wall clock time in the top-right corner of the terminal.
+
+**Applies to:**
+- Scripts with expected runtime > 10 seconds
+- Scripts with countdown timers or delays
+- Scripts that schedule deferred actions (e.g., `schedule-claude.sh`, `tell-vscode-at.sh`)
+- Scripts that wait for external events or user input
+
+**Does NOT apply to:**
+- Quick utility scripts (< 10 seconds runtime)
+- Simple read-only scripts (list, get, inspect, status)
+- Library files (sourced by other scripts)
 
 **Requirements:**
 - Display format: `[00:00:15]` (hours:minutes:seconds)
@@ -768,16 +779,18 @@ log_success() {
 #### Summary of Display Requirements
 
 **Every script MUST:**
+
 1. ✅ Support `-v | --verbose` flag
 2. ✅ Show INFO-level messages ONLY in verbose mode
 3. ✅ Use compact, overwriting display in non-verbose mode
-4. ✅ Display running wall clock timer in top-right corner (yellow on black)
+4. ✅ Display running wall clock timer in top-right corner (yellow on black) - **if runtime >10s or has deferred actions**
 5. ✅ Show total execution time at script end
 6. ✅ Use ANSI escape codes to minimize vertical space
 
 **Enforcement:**
+
 - Scripts without these display features will be rejected in code review
-- Timer must be visible and updating during execution
+- Timer must be visible and updating during execution (for applicable scripts)
 - Non-verbose mode must be genuinely compact (< 10 lines for typical scripts)
 
 ---
@@ -1371,7 +1384,7 @@ Before creating a pull request, **EVERY** item must be verified:
 
 - [ ] Script implements `-h` and `--help` flags (man-page style)
 - [ ] Script implements `-v` or `--verbose` flag
-- [ ] Running wall clock timer displayed in top-right corner (yellow on black)
+- [ ] Running wall clock timer displayed in top-right corner (yellow on black) - **if runtime >10s or has deferred actions**
 - [ ] Total execution time displayed at script end
 - [ ] Non-verbose mode uses compact, overwriting display (ANSI escape codes)
 - [ ] INFO-level messages only shown in verbose mode

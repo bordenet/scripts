@@ -218,12 +218,26 @@ wait_until() {
             break
         fi
 
+        # Calculate time components
+        local hours=$((remaining / 3600))
+        local mins=$(( (remaining % 3600) / 60))
+        local secs=$((remaining % 60))
+
+        # Get terminal width
+        local cols
+        cols=$(tput cols 2>/dev/null || echo 80)
+
+        # Format timer text: [HH:MM:SS]
+        local timer_text
+        timer_text=$(printf "[%02d:%02d:%02d]" "$hours" "$mins" "$secs")
+        local timer_pos=$((cols - ${#timer_text}))
+
         if [[ "$VERBOSE" == true ]]; then
-            local hours=$((remaining / 3600))
-            local mins=$(( (remaining % 3600) / 60))
-            local secs=$((remaining % 60))
             printf "\r[%s] Waiting... %02d:%02d:%02d remaining" "$(date '+%H:%M:%S')" "$hours" "$mins" "$secs"
         fi
+
+        # Display timer in top-right corner (yellow on black)
+        echo -ne "\033[s\033[1;${timer_pos}H\033[33;40m${timer_text}\033[0m\033[u"
 
         sleep 1
     done
