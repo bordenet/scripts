@@ -118,6 +118,23 @@ export PRESERVED_PATTERNS=(
 )
 
 # -----------------------------------------------------------------------------
+# Source Library Functions
+# -----------------------------------------------------------------------------
+
+# Resolve symlinks to get actual script location
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+
+# Source common library (which sources all other libraries)
+# shellcheck source=purge-identity/lib/common.sh
+source "$SCRIPT_DIR/purge-identity/lib/common.sh"
+
+# -----------------------------------------------------------------------------
 # Logging Functions
 # -----------------------------------------------------------------------------
 
