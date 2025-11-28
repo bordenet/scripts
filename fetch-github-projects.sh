@@ -7,10 +7,15 @@
 
 set -euo pipefail
 
-set -uo pipefail
-
 # Source library functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve symlinks to get actual script location
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 # shellcheck source=lib/fetch-github-lib.sh
 source "$SCRIPT_DIR/lib/fetch-github-lib.sh"
 
@@ -201,7 +206,7 @@ TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 
 # --- Self-Update Check ---
 # Check if this script's own repo needs updating
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# SCRIPT_DIR already resolved with symlink handling at top of script
 if [ -d "$SCRIPT_DIR/.git" ]; then
     pushd "$SCRIPT_DIR" > /dev/null || exit
     git fetch origin > /dev/null 2>&1
