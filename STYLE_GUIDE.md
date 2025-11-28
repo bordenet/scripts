@@ -1,7 +1,7 @@
 ## Shell Script Style Guide
 
-Version: 2.0  
-Last Updated: 2025-11-25  
+Version: 2.1
+Last Updated: 2025-11-28
 Audience: AI coding assistants (Claude Code, Gemini, ChatGPT) and human developers
 Source: https://github.com/bordenet/scripts/blob/main/STYLE_GUIDE.md
 
@@ -52,9 +52,10 @@ Common mistakes to avoid:
 
 - Do not combine declaration and command substitution for locals (e.g., `local x=$(cmd)`).
 - Do not loop over `$(find ...)`; use `-print0` and `while read -r -d ''` instead.
-- Never pass user input to eval.  
+- Never pass user input to eval.
 - Do not use raw echo for user-facing status; use logging helpers.
 - Avoid hardcoded paths; use SCRIPT_DIR and repo-root helpers.
+- **Do not set SCRIPT_DIR without symlink resolution** if your script sources libraries (see "Library Sourcing and Symlink Resolution" section).
 - Never silence errors with `|| true` unless there is a documented, explicit reason.
 
 ***
@@ -71,13 +72,13 @@ Goal: Every script should read like a clear story, not a tangle.
 
 Recommended layout for a “real” script:
 
-1. Shebang and strict mode (`#!/usr/bin/env bash`, `set -euo pipefail`).  
-2. Metadata constants (VERSION, SCRIPT_NAME).  
-3. Source common libraries (SCRIPT_DIR + lib/…).  
-4. Logging, UX, and timer helpers.  
-5. Validation helpers.  
-6. Core domain functions.  
-7. Argument parsing and CLI wiring.  
+1. Shebang and strict mode (`#!/usr/bin/env bash`, `set -euo pipefail`).
+2. Metadata constants (VERSION, SCRIPT_NAME).
+3. Symlink resolution and library sourcing (SCRIPT_DIR with symlink resolution + lib/…).
+4. Logging, UX, and timer helpers.
+5. Validation helpers.
+6. Core domain functions.
+7. Argument parsing and CLI wiring.
 8. main() as the orchestrator at the bottom.
 
 Use a project structure like:
@@ -110,6 +111,93 @@ Optional but encouraged:
 - `shopt -s nullglob` when globbing on possibly-empty patterns is expected.
 
 For scripts that intentionally relax strictness, document the rationale in comments near the configuration line.
+
+***
+
+## Library Sourcing and Symlink Resolution
+
+**CRITICAL**: Scripts that source library files MUST resolve symlinks to find their actual location. This allows scripts to work correctly when called via symlinks or aliases from anywhere in the filesystem.
+
+### Required Pattern
+
+All scripts that source libraries must use this pattern **before** any `source` statements:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Source library functions
+# Resolve symlinks to get actual script location
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+
+# Now source libraries using resolved SCRIPT_DIR
+# shellcheck source=lib/my-lib.sh
+source "$SCRIPT_DIR/lib/my-lib.sh"
+```
+
+### Why This Matters
+
+Without symlink resolution, `SCRIPT_DIR` points to the symlink's location, not the actual script location. This breaks library sourcing when scripts are:
+
+- Symlinked from parent directories (common pattern for organizing nested repos)
+- Aliased in shell configuration
+- Called via symlinks in PATH directories
+- Invoked from different working directories
+
+### What This Pattern Does
+
+1. **Follows the symlink chain**: Resolves through multiple levels of symlinks
+2. **Handles relative symlinks**: Converts relative paths to absolute paths
+3. **Finds the real script**: Locates the actual script file, not the symlink
+4. **Sets SCRIPT_DIR correctly**: Points to the directory containing the real script
+
+### Examples
+
+```bash
+# ✅ CORRECT - Resolves symlinks before sourcing
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+
+# ❌ WRONG - Breaks when script is called via symlink
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+```
+
+### Testing Symlink Support
+
+Always test scripts via symlinks before committing:
+
+```bash
+# Create test symlink in /tmp
+cd /tmp
+ln -s /path/to/actual/script.sh test-script.sh
+
+# Test that library loading works
+bash test-script.sh --help
+
+# Should display help without "No such file or directory" errors
+```
+
+### Reference Implementation
+
+See these scripts for working examples:
+- `bu.sh`
+- `mu.sh`
+- `fetch-github-projects.sh`
+- `integrate-claude-web-branch.sh`
+- `scorch-repo.sh`
 
 ***
 
