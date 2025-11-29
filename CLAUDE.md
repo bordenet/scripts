@@ -52,46 +52,74 @@ Before making any changes:
 
 ### Pre-Commit Requirements
 
-All code changes should be tested, validated, and linted before committing.
+**MANDATORY**: All code changes MUST be tested, validated, and linted before committing. No exceptions.
 
 ### Standard Pre-Commit Checklist
 
+**CRITICAL: You MUST complete ALL steps before committing. Skipping verification = broken code in production.**
+
 1. **Lint the code**
-   - Run shellcheck for bash scripts
+   - Run shellcheck for bash scripts: `shellcheck -S warning script.sh`
    - Run appropriate linter for the language
    - Fix all warnings that aren't explicitly false positives
+   - **VERIFY**: `shellcheck -S warning script.sh` returns no output
    - Target: zero linting errors/warnings before commit
 
-2. **Test the code**
-   - Test commands with sample data before committing
-   - Test basic functionality where possible
-   - Run syntax checks at minimum
-   - Test awk/sed/grep commands in isolation with `echo "sample" | command`
-   - If you can't test on the target platform, explicitly document this
-   - Verify all functions work as expected
+2. **Test the code - MANDATORY**
+   - **RUN THE SCRIPT**: Actually execute it, don't just read it
+   - For scripts: `./script.sh --help` at minimum
+   - For libraries: Source them in a test shell and call functions
+   - Test with sample data before committing
+   - Test awk/sed/grep commands in isolation: `echo "sample" | command`
+   - **VERIFY**: Script runs without errors for basic operations
+   - If adding features: Test the new feature works
+   - If fixing bugs: Verify the bug is actually fixed
+   - If you can't test on the target platform, explicitly document this AND don't commit
 
 3. **Validate the code**
-   - Check syntax: `bash -n script.sh`
-   - Verify all sourced files exist
-   - Confirm all required commands/dependencies are available
+   - **VERIFY**: `bash -n script.sh` returns no errors
+   - **VERIFY**: All sourced files exist: `test -f lib/sourced-file.sh`
+   - **VERIFY**: All required commands available: `command -v required_command`
    - Test with edge cases (empty inputs, special characters, etc.)
 
-4. **Handle edge cases**
+4. **Verify variable exports - CRITICAL FOR LIBRARIES**
+   - If library uses variables from calling script, **VERIFY** they're exported
+   - Check for `set -u` (unbound variable) errors
+   - **TEST**: Source the library and call functions to catch missing exports
+   - **Example test**:
+     ```bash
+     # Create minimal test environment
+     bash -c 'export VAR1=val1 VAR2=val2; source lib/file.sh; function_name'
+     # If this fails with "unbound variable", you're missing an export
+     ```
+
+5. **Handle edge cases**
    - Filenames with spaces/special characters
    - Empty inputs
    - Command failures
    - Concurrent execution (file locking where needed)
 
-5. **Error handling**
+6. **Error handling**
    - Check return codes
    - Don't mask errors with `local var=$(cmd)` without checking
    - Provide actionable error messages
    - Log errors comprehensively
 
-6. **Input validation**
+7. **Input validation**
    - Sanitize user input
    - Validate formats (emails, paths, etc.)
    - Prevent command injection
+
+---
+
+## VERIFICATION FAILURES = DO NOT COMMIT
+
+If ANY of these checks fail:
+1. **FIX the code immediately**
+2. **Re-run ALL verification steps**
+3. **Do NOT commit until everything passes**
+
+Pushing broken code to main is unacceptable. The verification steps exist to prevent exactly this.
 
 ### Common Bash Pitfalls to Avoid
 
@@ -288,6 +316,17 @@ git commit -m "Description"
   - ALWAYS add `|| true` to `kill` and `wait` commands in cleanup functions
   - ALWAYS test scripts with simulated network failures
   - See [STYLE_GUIDE.md § Surviving `set -euo pipefail`](./STYLE_GUIDE.md#surviving-set--euo-pipefail) for patterns
+
+**Failure Case 4: Missing variable export breaks production (2025-11-29)**
+- **What happened**: Added real-time progress feature using `$CYAN` color variable in lib/bu-lib.sh
+- **Impact**: Script crashed immediately with "CYAN: unbound variable" when run with `set -u`
+- **Root cause**: Added code using `$CYAN` in library but failed to export `CYAN` in calling script (bu.sh)
+- **Prevention**:
+  - **MANDATORY**: Actually RUN the script before committing, don't just check syntax
+  - Test library changes: `bash -c 'export VAR1=val; source lib/file.sh; function_name'`
+  - With `set -u`, missing exports cause immediate failure - this is catchable by running the script
+  - **NO EXCEPTIONS**: If you modify a library, you MUST test it by actually calling it
+  - This failure was 100% preventable by running `./bu.sh --help` before committing
 
 ### The Golden Rule of Changes
 
