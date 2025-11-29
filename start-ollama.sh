@@ -41,7 +41,7 @@ echo "📡 Detected LAN IP: $LAN_IP"
 PID=$(lsof -iTCP:11434 -sTCP:LISTEN -t)
 if [ -n "$PID" ]; then
   echo "🛑 Killing existing Ollama process (PID $PID)"
-  kill -9 "$PID"
+  kill -9 "$PID" || true
 fi
 
 # Start Ollama bound to LAN IP

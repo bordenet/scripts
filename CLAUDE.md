@@ -278,6 +278,17 @@ git commit -m "Description"
 - **Root cause**: Didn't compare `ls *.sh` against README.md
 - **Prevention**: ALWAYS audit completeness when editing documentation
 
+**Failure Case 3: `set -euo pipefail` abort (2025-11-29)**
+- **What happened**: `fetch-github-projects.sh --all` aborted immediately after showing "Updating CallBox..."
+- **Impact**: Script terminated with non-zero exit code, user's workflow broken
+- **Root cause**: The pipeline `git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}'` failed silently when the network command failed. With `pipefail`, the entire script aborted.
+- **Similar issues found in**: 6 scripts with `stop_timer()` functions using bare `kill`/`wait` commands
+- **Prevention**:
+  - ALWAYS add `|| true` to network-dependent pipelines that shouldn't abort the script
+  - ALWAYS add `|| true` to `kill` and `wait` commands in cleanup functions
+  - ALWAYS test scripts with simulated network failures
+  - See [STYLE_GUIDE.md § Surviving `set -euo pipefail`](./STYLE_GUIDE.md#surviving-set--euo-pipefail) for patterns
+
 ### The Golden Rule of Changes
 
 **NEVER make a change in isolation. ALWAYS:**
@@ -289,3 +300,106 @@ git commit -m "Description"
 5. ✅ Run validation scripts
 
 **If you skip any step, you WILL create broken references, incomplete documentation, or inconsistent state.**
+
+---
+
+## Comprehensive Pre-Push Audit Checklist
+
+**MANDATORY**: Run this complete audit before pushing to `origin/main` or creating any pull request. This is a SCRIPTS repository - quality gates must be 100% clean.
+
+### When to Run This Audit
+
+- Before pushing to `origin/main`
+- After completing a major feature or refactor
+- After making changes that affect multiple scripts
+- When preparing for a release
+- **Periodically** (at least monthly) to catch drift
+
+### The Complete Audit Process
+
+```bash
+# 1. SYNTAX VALIDATION - Every script must parse correctly
+find . -type f -name "*.sh" -exec bash -n {} \; 2>&1
+# Expected: None (silence means success)
+# Fix syntax errors immediately if found
+
+# 2. SHELLCHECK VALIDATION - Zero warnings at -S warning level
+for script in $(find . -type f -name "*.sh"); do
+  shellcheck -S warning "$script" 2>&1 | grep -q "^In " && echo "FAIL: $script"
+done
+# Expected: None
+# Fix all shellcheck warnings if found
+
+# 3. CROSS-REFERENCE VALIDATION - All markdown links must be valid
+./validate-cross-references.sh
+# Expected: "All cross-references are valid"
+# Fix broken links atomically with changes
+
+# 4. LINE COUNT VALIDATION - No script > 400 lines
+find . -type f -name "*.sh" -exec wc -l {} + | awk '$1 > 400 {print "FAIL:", $2, "("$1" lines)"}'
+# Expected: None
+# Refactor oversized scripts into lib/ modules
+
+# 5. PIPEFAIL PATTERN VALIDATION - Network commands need || true
+grep -r "git remote show origin\|curl.*|" --include="*.sh" . | grep -v "|| true" | grep "set -euo pipefail"
+# Expected: None
+# Add || true to network-dependent pipelines
+
+# 6. KILL/WAIT VALIDATION - Cleanup functions need || true
+for script in $(grep -l "set -euo pipefail" *.sh **/*.sh 2>/dev/null); do
+  grep -H "kill \|wait " "$script" | grep -v "|| true" && echo "CHECK: $script"
+done
+# Expected: Only scripts without pipefail (mu.sh, lib files)
+# Add || true to kill/wait in pipefail scripts
+
+# 7. EXIT CODE CAPTURE VALIDATION - $? captured immediately
+grep -rn "exit_code=\$?" --include="*.sh" .
+# Manually verify: must be first statement after command
+# Fix if suspicious context
+
+# 8. SOURCED FILE VALIDATION - All libraries exist
+for script in $(find . -type f -name "*.sh"); do
+  grep "^source \|^\. " "$script" 2>/dev/null | while read -r line; do
+    file=$(echo "$line" | awk '{print $2}' | tr -d '"')
+    [ -f "$file" ] || echo "MISSING: $file (in $script)"
+  done
+done
+# Expected: None
+# Fix source paths or create libraries
+
+# 9. DOCUMENTATION COMPLETENESS - User scripts in README
+comm -23 <(ls -1 *.sh 2>/dev/null | sort) <(grep "\.sh" README.md | grep -o '[a-z0-9-]*\.sh' | sort)
+# Expected: Only lib/internal scripts
+# Add user-facing scripts to README.md
+
+# 10. TODO/FIXME AUDIT - All TODOs documented
+grep -rn "TODO\|FIXME" --include="*.sh" . | grep -v "git-rebase-todo"
+# Review each: explained? ticket? can fix now?
+```
+
+### What to Do When Checks Fail
+
+**DO NOT commit until ALL checks pass.** This is non-negotiable.
+
+1. **Fix the issue** - Don't work around it
+2. **Understand root cause** - Why did this happen?
+3. **Update checklist if needed** - Missing a pattern?
+4. **Re-run full audit** - Fixes can introduce new issues
+
+### Quick Validation During Development
+
+```bash
+# Fast check before each commit
+bash -n script.sh && shellcheck -S warning script.sh
+```
+
+### Recording Audit Results
+
+```bash
+# After successful audit, create timestamp
+date "+%Y-%m-%d %H:%M:%S" > .last-audit
+git add .last-audit
+git commit -m "chore: Complete pre-push audit - all gates pass"
+```
+
+---

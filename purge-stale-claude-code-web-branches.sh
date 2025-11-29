@@ -5,7 +5,6 @@
 # Platform: Cross-platform (macOS, Linux, WSL)
 # -----------------------------------------------------------------------------
 
-
 set -euo pipefail
 
 # Source library functions
@@ -78,9 +77,10 @@ start_timer() {
 # Stop timer
 stop_timer() {
     if [ -n "$TIMER_PID" ] && kill -0 "$TIMER_PID" 2>/dev/null; then
-        kill "$TIMER_PID" 2>/dev/null
-        wait "$TIMER_PID" 2>/dev/null
+        kill "$TIMER_PID" 2>/dev/null || true
+        wait "$TIMER_PID" 2>/dev/null || true
     fi
+    TIMER_PID=""
 }
 
 # Helper functions (calculate_age, format_timestamp, delete_branch) now in lib/purge-stale-branches-lib.sh
@@ -357,18 +357,14 @@ fi
 # --- Summary ---
 stop_timer
 echo -ne "\033[1;1H${ERASE_LINE}"  # Clear timer line
-echo
 
 end_time=$(date +%s)
 execution_time=$((end_time - start_time))
-
 echo
 echo -e "${BOLD}Summary${NC} (${execution_time}s)"
-echo
 
 if [ "$WHAT_IF" = true ] && [ ${#DELETED_BRANCHES[@]} -gt 0 ]; then
     echo -e "${YELLOW}DRY-RUN: No changes were made${NC}"
-    echo
 fi
 
 if [ ${#DELETED_BRANCHES[@]} -gt 0 ]; then

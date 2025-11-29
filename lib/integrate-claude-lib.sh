@@ -37,9 +37,10 @@ start_timer() {
 
 stop_timer() {
     if [ -n "$TIMER_PID" ] && kill -0 "$TIMER_PID" 2>/dev/null; then
-        kill "$TIMER_PID" 2>/dev/null
-        wait "$TIMER_PID" 2>/dev/null
+        kill "$TIMER_PID" 2>/dev/null || true
+        wait "$TIMER_PID" 2>/dev/null || true
     fi
+    TIMER_PID=""
 }
 
 # Status update functions
