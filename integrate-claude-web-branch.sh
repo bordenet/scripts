@@ -112,9 +112,9 @@ else
     exit 1
 fi
 
-# Detect main branch
+# Detect main branch (use || true to prevent pipefail from killing script)
 update_status "  Detecting main branch..."
-MAIN_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}')
+MAIN_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}' || true)
 if [ -z "$MAIN_BRANCH" ]; then
     if git show-ref --quiet refs/heads/main; then
         MAIN_BRANCH="main"

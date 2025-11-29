@@ -194,7 +194,11 @@ reset_git_repo() {
       branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's|^refs/remotes/origin/||' 2>/dev/null || echo "main")
 
       # Fetch and reset to the correct branch
-      git fetch origin >/dev/null
+      if ! git fetch origin >/dev/null 2>&1; then
+        log_message "Failed to fetch from origin: $repo_path"
+        popd > /dev/null || true
+        return 1
+      fi
       git reset --hard "origin/$branch" >/dev/null
       git clean -fdx >/dev/null
 

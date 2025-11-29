@@ -142,7 +142,7 @@ error_exit() {
 # Function to retrieve the list of repository clone URLs for the organization.
 get_repos() {
     log "Fetching repository list for organization: $GITHUB_ORG"
-    curl -s -H "Authorization: token $GITHUB_TOKEN" "$GITHUB_URL/api/v3/orgs/$GITHUB_ORG/repos" | jq -r '.[].clone_url'
+    curl -s -H "Authorization: token $GITHUB_TOKEN" "$GITHUB_URL/api/v3/orgs/$GITHUB_ORG/repos" | jq -r '.[].clone_url' || true
 }
 
 # Function to get the timestamp of the last push for a given repository.
@@ -150,7 +150,7 @@ get_latest_push() {
     local repo_url=$1
     local repo_name; repo_name=$(basename "$repo_url" .git)
     log "Getting last push time for: $repo_name"
-    curl -s -H "Authorization: token $GITHUB_TOKEN" "$GITHUB_URL/api/v3/repos/$GITHUB_ORG/$repo_name" | jq -r '.pushed_at'
+    curl -s -H "Authorization: token $GITHUB_TOKEN" "$GITHUB_URL/api/v3/repos/$GITHUB_ORG/$repo_name" | jq -r '.pushed_at' || true
 }
 
 # Function to clone a repository and count its lines of code.
