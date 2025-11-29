@@ -153,7 +153,7 @@ command_exists() {
     command -v "$1" &> /dev/null
 }
 
-# Execute command with retry logic
+# Execute command with retry logic and real-time progress
 retry_command() {
     local task_name=$1
     local spinner_text=$2
@@ -174,17 +174,81 @@ retry_command() {
             update_status "  $spinner_text..."
         fi
 
+        # Check if this is a brew upgrade command that needs real-time progress
+        local show_progress=false
+        if [[ "$*" =~ ^brew\ upgrade ]]; then
+            show_progress=true
+        fi
+
         # Execute command and capture output
         local output exit_code
-        if output=$("$@" 2>&1); then
-            # shellcheck disable=SC2154  # GREEN, NC, SUCCEEDED_TASKS are set in calling script
-            complete_status "${GREEN}✓${NC} $spinner_text"
-            log_success "$task_name completed"
-            SUCCEEDED_TASKS+=("$task_name")
-            return 0
-        else
+        if [ "$show_progress" = true ] && [ "$VERBOSE" = false ]; then
+            # Stream output with real-time inline updates for brew upgrade
+            local tmpfile logfile
+            tmpfile=$(mktemp)
+            logfile=$(mktemp)
+
+            # Run brew upgrade in background, streaming output
+            "$@" > "$tmpfile" 2>&1 &
+            local brew_pid=$!
+
+            # Monitor output and update status line in real-time
+            local current_package=""
+            while kill -0 $brew_pid 2>/dev/null; do
+                if [ -f "$tmpfile" ]; then
+                    # Look for package being upgraded
+                    local latest_package
+                    latest_package=$(tail -20 "$tmpfile" | grep -E "^==> (Upgrading|Installing|Downloading)" | tail -1 | sed -E 's/^==> (Upgrading|Installing|Downloading) //' | awk '{print $1}')
+
+                    if [ -n "$latest_package" ] && [ "$latest_package" != "$current_package" ]; then
+                        current_package="$latest_package"
+                        # shellcheck disable=SC2154
+                        update_status "  $spinner_text ${CYAN}$current_package${NC}"
+                    fi
+                fi
+                sleep 0.5
+            done
+
+            # Wait for brew to finish and get exit code
+            wait $brew_pid
             exit_code=$?
+            output=$(cat "$tmpfile")
+
+            # Clean up temp files
+            cat "$tmpfile" > "$logfile"
+            rm -f "$tmpfile"
+
+            # Parse output to show final summary
+            if [ $exit_code -eq 0 ]; then
+                local upgrade_count
+                upgrade_count=$(echo "$output" | grep -E "^==> (Upgrading|Installing)" | wc -l | tr -d ' ')
+                if [ "$upgrade_count" -gt 0 ]; then
+                    # shellcheck disable=SC2154
+                    complete_status "${GREEN}✓${NC} $spinner_text ($upgrade_count packages)"
+                else
+                    # shellcheck disable=SC2154
+                    complete_status "${GREEN}✓${NC} $spinner_text (up to date)"
+                fi
+                log_success "$task_name completed"
+                SUCCEEDED_TASKS+=("$task_name")
+                rm -f "$logfile"
+                return 0
+            else
+                rm -f "$logfile"
+            fi
+        else
+            # Original behavior for non-brew commands
+            if output=$("$@" 2>&1); then
+                # shellcheck disable=SC2154  # GREEN, NC, SUCCEEDED_TASKS are set in calling script
+                complete_status "${GREEN}✓${NC} $spinner_text"
+                log_success "$task_name completed"
+                SUCCEEDED_TASKS+=("$task_name")
+                return 0
+            else
+                exit_code=$?
+            fi
         fi
+
         log_warning "$task_name failed (attempt $attempt/$max_attempts, exit code: $exit_code)"
 
         if [ $attempt -eq $max_attempts ]; then
