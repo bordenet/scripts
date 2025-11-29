@@ -8,6 +8,7 @@ git_reset.log
 
 # Temporary/personal scripts
 resume-at-0801.sh
+delete-time-machine-snapshots.sh
 
 # Malware sandbox - security sensitive files
 analyze-malware-sandbox/id_rsa

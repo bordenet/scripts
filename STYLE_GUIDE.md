@@ -1,7 +1,7 @@
 ## Shell Script Style Guide
 
-Version: 2.1
-Last Updated: 2025-11-28
+Version: 2.2
+Last Updated: 2025-11-29
 Audience: AI coding assistants (Claude Code, Gemini, ChatGPT) and human developers
 Source: https://github.com/bordenet/scripts/blob/main/STYLE_GUIDE.md
 
@@ -254,6 +254,88 @@ Do not:
 - Leave temporary files or partial state behind after failure.
 
 Where appropriate, differentiate between “recoverable warnings” and “hard failures,” and reflect that in both log levels and exit status.
+
+### Surviving `set -euo pipefail`
+
+The `set -euo pipefail` directive is mandatory but introduces pitfalls that can cause scripts to abort unexpectedly. Master these patterns:
+
+**Network-dependent commands will kill your script:**
+
+```bash
+# ❌ DANGEROUS - network failure aborts script
+DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}')
+
+# ✅ SAFE - graceful degradation
+DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}' || true)
+[ -z "$DEFAULT_BRANCH" ] && DEFAULT_BRANCH="main"
+
+# ✅ ALSO SAFE - explicit error handling
+if ! DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}'); then
+    DEFAULT_BRANCH="main"
+fi
+```
+
+**Timer and process cleanup must be bulletproof:**
+
+```bash
+# ❌ DANGEROUS - already-exited process causes abort
+stop_timer() {
+    if [ -n "$TIMER_PID" ] && kill -0 "$TIMER_PID" 2>/dev/null; then
+        kill "$TIMER_PID" 2>/dev/null
+        wait "$TIMER_PID" 2>/dev/null
+    fi
+    TIMER_PID=""
+}
+
+# ✅ SAFE - cleanup never aborts script
+stop_timer() {
+    if [ -n "$TIMER_PID" ] && kill -0 "$TIMER_PID" 2>/dev/null; then
+        kill "$TIMER_PID" 2>/dev/null || true
+        wait "$TIMER_PID" 2>/dev/null || true
+    fi
+    TIMER_PID=""
+}
+```
+
+**Exit code capture must happen immediately:**
+
+```bash
+# ❌ WRONG - exit code is lost after intervening commands
+if timeout 600 some_command; then
+    complete_status "success"
+else
+    complete_status "failed"  # ← This command clobbers $?
+    exit_code=$?  # ← This captures complete_status's exit code, not some_command's!
+fi
+
+# ✅ CORRECT - capture exit code immediately
+if timeout 600 some_command; then
+    complete_status "success"
+else
+    exit_code=$?  # ← Must be first statement in else block
+    if [ $exit_code -eq 124 ]; then
+        complete_status "timeout"
+    fi
+fi
+
+# ✅ ALSO CORRECT - capture in else branch with command substitution
+local output exit_code
+if output=$("$@" 2>&1); then
+    echo "success"
+else
+    exit_code=$?  # ← Immediately after if test
+    echo "failed with code $exit_code"
+fi
+```
+
+**Commands that may legitimately fail need `|| true`:**
+
+- `git fetch origin` (network issues)
+- `git remote show origin` (network issues)
+- `curl` and `wget` (network issues)
+- `kill` and `wait` (process may have exited)
+- `grep` in pipelines (no matches is not an error)
+- `brew doctor` (warnings are informational, not fatal)
 
 ***
 

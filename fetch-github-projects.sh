@@ -74,9 +74,10 @@ start_timer() {
 # Stop timer
 stop_timer() {
     if [ -n "$TIMER_PID" ] && kill -0 "$TIMER_PID" 2>/dev/null; then
-        kill "$TIMER_PID" 2>/dev/null
-        wait "$TIMER_PID" 2>/dev/null
+        kill "$TIMER_PID" 2>/dev/null || true
+        wait "$TIMER_PID" 2>/dev/null || true
     fi
+    TIMER_PID=""
 }
 
 # Update current line with status
@@ -112,8 +113,8 @@ update_repo() {
         return 0
     fi
 
-    # Detect default branch
-    DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}')
+    # Detect default branch (use || true to prevent pipefail from killing script)
+    DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}' || true)
     if [ -z "$DEFAULT_BRANCH" ]; then
         if git show-ref --quiet refs/heads/main; then
             DEFAULT_BRANCH="main"

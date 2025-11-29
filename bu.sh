@@ -318,6 +318,7 @@ if timeout 600 sudo softwareupdate --all --install --force -R >/dev/null 2>&1; t
     complete_status "${GREEN}✓${NC} macOS software updates"
     log_success "macOS software updates completed"
 else
+    # Capture exit code immediately before any other commands
     exit_code=$?
     if [ $exit_code -eq 124 ]; then
         complete_status "${RED}✗${NC} macOS software updates (timed out after 10 minutes)"

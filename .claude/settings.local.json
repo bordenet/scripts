@@ -26,7 +26,19 @@
       "Bash(./bu.sh:*)",
       "Bash(timeout 30 ./bu.sh:*)",
       "Bash(chmod:*)",
-      "Bash(~/GitHub/Personal/scripts/integrate-claude-web-branch.sh:*)"
+      "Bash(~/GitHub/Personal/scripts/integrate-claude-web-branch.sh:*)",
+      "Skill(superpowers:using-superpowers)",
+      "Skill(superpowers:verification-before-completion)",
+      "Bash(for file in ./mu.sh ./schedule-claude.sh ./lib/mu-helpers.sh ./start-ollama.sh ./purge-identity/lib/utils.sh ./purge-identity/lib/common.sh)",
+      "Bash(do)",
+      "Bash(if grep -q \"set -euo pipefail\" \"$file\")",
+      "Bash(then)",
+      "Bash(else)",
+      "Bash(fi)",
+      "Bash(./validate-cross-references.sh:*)",
+      "Bash(./validate-script-compliance.sh:*)",
+      "Bash(./ci-quality-gates.sh:*)",
+      "Bash(timeout 30 bash:*)"
     ],
     "deny": [],
     "ask": []

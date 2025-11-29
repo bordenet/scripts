@@ -114,7 +114,7 @@ done
 echo ""
 
 # --- Execute resume script ---
-kill $CAFFEINATE_PID >/dev/null 2>&1
+kill $CAFFEINATE_PID >/dev/null 2>&1 || true
 
 if [[ -x "$RESUME_SCRIPT" ]]; then
   echo "🚀 Running $RESUME_SCRIPT -p \"$PROMPT\"..."

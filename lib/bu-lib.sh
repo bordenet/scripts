@@ -98,9 +98,10 @@ start_timer() {
 stop_timer() {
     # shellcheck disable=SC2154  # TIMER_PID is set in calling script
     if [ -n "$TIMER_PID" ] && kill -0 "$TIMER_PID" 2>/dev/null; then
-        kill "$TIMER_PID" 2>/dev/null
-        wait "$TIMER_PID" 2>/dev/null
+        kill "$TIMER_PID" 2>/dev/null || true
+        wait "$TIMER_PID" 2>/dev/null || true
     fi
+    TIMER_PID=""
 }
 
 # Status update functions
@@ -174,16 +175,16 @@ retry_command() {
         fi
 
         # Execute command and capture output
-        local output
+        local output exit_code
         if output=$("$@" 2>&1); then
             # shellcheck disable=SC2154  # GREEN, NC, SUCCEEDED_TASKS are set in calling script
             complete_status "${GREEN}✓${NC} $spinner_text"
             log_success "$task_name completed"
             SUCCEEDED_TASKS+=("$task_name")
             return 0
+        else
+            exit_code=$?
         fi
-
-        local exit_code=$?
         log_warning "$task_name failed (attempt $attempt/$max_attempts, exit code: $exit_code)"
 
         if [ $attempt -eq $max_attempts ]; then

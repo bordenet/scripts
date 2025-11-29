@@ -338,18 +338,10 @@ EOF
 # -----------------------------------------------------------------------------
 # Safety Functions
 # -----------------------------------------------------------------------------
-
-# Check if a file should be preserved (never deleted)
-# Helper functions now in purge-identity/lib/helpers.sh
-
-# -----------------------------------------------------------------------------
-# Discovery Functions
+# Helper functions in purge-identity/lib/helpers.sh
+# Processing functions in purge-identity/lib/processing.sh
 # -----------------------------------------------------------------------------
 
-# Add a discovered identity to the global arrays
-# Processing functions now in purge-identity/lib/processing.sh
-
-# -----------------------------------------------------------------------------
 # Main Execution
 # -----------------------------------------------------------------------------
 

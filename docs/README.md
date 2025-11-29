@@ -6,7 +6,6 @@ This directory contains detailed documentation for scripts and tools in this rep
 
 - [Script Documentation](#script-documentation)
 - [Guides & References](#guides--references)
-- [Planning Documents](#planning-documents)
 
 ---
 
@@ -40,21 +39,6 @@ Technical guides and reference materials:
 
 ---
 
-## Planning Documents
-
-Design documents and requirements for major features:
-
-Located in [`plans/`](./plans/) subdirectory:
-
-| Document | Date | Topic |
-|----------|------|-------|
-| [2025-01-10-mu-sh-cross-platform-update-script.md](./plans/2025-01-10-mu-sh-cross-platform-update-script.md) | 2025-01-10 | Cross-platform system update script design |
-| [2025-01-13-purge-identity-PROMPT.md](./plans/2025-01-13-purge-identity-PROMPT.md) | 2025-01-13 | Initial prompt for purge-identity tool |
-| [2025-01-13-purge-identity-requirements.md](./plans/2025-01-13-purge-identity-requirements.md) | 2025-01-13 | Requirements specification for purge-identity |
-| [2025-01-13-purge-identity-design.md](./plans/2025-01-13-purge-identity-design.md) | 2025-01-13 | Detailed design document for purge-identity |
-
----
-
 ## Related Documentation
 
 For repository-wide standards and guidelines, see:
@@ -62,7 +46,6 @@ For repository-wide standards and guidelines, see:
 - **[../README.md](../README.md)** - Repository overview and script catalog
 - **[../STYLE_GUIDE.md](../STYLE_GUIDE.md)** - Shell script coding standards (authoritative)
 - **[../CLAUDE.md](../CLAUDE.md)** - Guidelines for AI assistants working in this repository
-- **[../TECHNICAL_DEBT.md](../TECHNICAL_DEBT.md)** - Known issues and refactoring plans
 - **[../starter-kit/](../starter-kit/)** - Portable engineering best practices for new projects
 
 ---
@@ -107,5 +90,4 @@ All documentation in this repository follows these principles:
 
 ---
 
-**Last Updated**: 2025-11-22
-
+**Last Updated**: 2025-11-29
