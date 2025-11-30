@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
-# -----------------------------------------------------------------------------
-# Claude Code Web Branch Cleanup Tool
-# Interactive deletion of stale Claude Code web branches with safety confirmations
-# Platform: Cross-platform (macOS, Linux, WSL)
-# -----------------------------------------------------------------------------
-
+# Claude Code Web Branch Cleanup - Interactive deletion of stale web branches
 set -euo pipefail
 
 # Source library functions
@@ -45,8 +40,6 @@ VERBOSE=false
 declare -a BRANCHES
 
 # --- Helper Functions ---
-
-# Display timer in top right corner
 show_timer() {
     local elapsed=$(($(date +%s) - start_time))
     local minutes=$((elapsed / 60))
@@ -61,7 +54,6 @@ show_timer() {
     echo -ne "${SAVE_CURSOR}\033[1;${timer_pos}H\033[43;30m ${timer_text} ${NC}${RESTORE_CURSOR}"
 }
 
-# Timer background process
 timer_loop() {
     while kill -0 $$ 2>/dev/null; do
         show_timer
@@ -69,13 +61,11 @@ timer_loop() {
     done
 }
 
-# Start timer in background
 start_timer() {
     timer_loop &
     TIMER_PID=$!
 }
 
-# Stop timer
 stop_timer() {
     if [ -n "$TIMER_PID" ] && kill -0 "$TIMER_PID" 2>/dev/null; then
         kill "$TIMER_PID" 2>/dev/null || true
@@ -84,16 +74,11 @@ stop_timer() {
     TIMER_PID=""
 }
 
-# Helper functions (calculate_age, format_timestamp, delete_branch) now in lib/purge-stale-branches-lib.sh
-
-# Function to log verbose messages
 log_verbose() {
     if [ "$VERBOSE" = true ]; then
         echo "INFO: $*"
     fi
 }
-
-# --- Help Function (now in lib/purge-stale-branches-lib.sh) ---
 
 # --- Argument Parsing ---
 while [ $# -gt 0 ]; do
@@ -129,7 +114,6 @@ done
 # --- Validation ---
 start_time=$(date +%s)
 
-# Clear screen and start
 clear
 if [ "$WHAT_IF" = true ]; then
     echo -e "${BOLD}Claude Code Branch Cleanup${NC} ${YELLOW}[DRY-RUN]${NC}\n"
@@ -167,7 +151,6 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 echo -ne "  Discovering Claude Code branches..."
 log_verbose "Searching for local claude/* branches"
 
-# Get local claude/* branches
 while IFS='|' read -r refname timestamp author subject; do
     # Skip if this is the current branch
     [ "$refname" = "$CURRENT_BRANCH" ] && continue
@@ -189,7 +172,6 @@ while IFS='|' read -r refname timestamp author subject; do
 done < <(git for-each-ref --format='%(refname:short)|%(committerdate:unix)|%(authorname)|%(subject)' refs/heads/claude/ 2>/dev/null)
 
 log_verbose "Searching for remote origin/claude/* branches"
-# Get remote claude/* branches
 while IFS='|' read -r refname timestamp author subject; do
     # Remove 'origin/' prefix for comparison
     short_name="${refname#origin/}"
@@ -215,7 +197,6 @@ done < <(git for-each-ref --format='%(refname:short)|%(committerdate:unix)|%(aut
 
 echo -e "\r${ERASE_LINE}${GREEN}✓${NC} Found ${#BRANCHES[@]} Claude Code branches"
 log_verbose "Discovered ${#BRANCHES[@]} total branches (local/remote/both)"
-echo
 
 # Check if any branches found
 if [ ${#BRANCHES[@]} -eq 0 ]; then
@@ -378,7 +359,7 @@ echo -ne "\033[1;1H${ERASE_LINE}"  # Clear timer line
 
 end_time=$(date +%s)
 execution_time=$((end_time - start_time))
-echo
+
 echo -e "${BOLD}Summary${NC} (${execution_time}s)"
 
 if [ "$WHAT_IF" = true ] && [ ${#DELETED_BRANCHES[@]} -gt 0 ]; then
