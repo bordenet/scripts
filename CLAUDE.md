@@ -58,16 +58,26 @@ Before making any changes:
 
 **CRITICAL: You MUST complete ALL steps before committing. Skipping verification = broken code in production.**
 
-1. **Lint the code**
+1. **Verify STYLE_GUIDE.md compliance - DO THIS FIRST**
+   - **VERIFY**: Script has `-h/--help` flag that displays man-page style help
+   - **VERIFY**: Script has `-v/--verbose` flag that shows INFO-level logs
+   - **VERIFY**: Destructive scripts have `--what-if` flag for dry-run mode
+   - **VERIFY**: Script uses `set -euo pipefail` (except bu.sh/mu.sh)
+   - **VERIFY**: Script is under 400 lines
+   - **VERIFY**: ShellCheck passes with zero warnings: `shellcheck -S warning script.sh`
+   - **If ANY of these fail, STOP and fix before proceeding**
+
+2. **Lint the code**
    - Run shellcheck for bash scripts: `shellcheck -S warning script.sh`
    - Run appropriate linter for the language
    - Fix all warnings that aren't explicitly false positives
    - **VERIFY**: `shellcheck -S warning script.sh` returns no output
    - Target: zero linting errors/warnings before commit
 
-2. **Test the code - MANDATORY**
+3. **Test the code - MANDATORY**
    - **RUN THE SCRIPT**: Actually execute it, don't just read it
    - For scripts: `./script.sh --help` at minimum
+   - **VERIFY**: `./script.sh --verbose` works and shows INFO-level logs
    - For libraries: Source them in a test shell and call functions
    - Test with sample data before committing
    - Test awk/sed/grep commands in isolation: `echo "sample" | command`
@@ -76,13 +86,13 @@ Before making any changes:
    - If fixing bugs: Verify the bug is actually fixed
    - If you can't test on the target platform, explicitly document this AND don't commit
 
-3. **Validate the code**
+4. **Validate the code**
    - **VERIFY**: `bash -n script.sh` returns no errors
    - **VERIFY**: All sourced files exist: `test -f lib/sourced-file.sh`
    - **VERIFY**: All required commands available: `command -v required_command`
    - Test with edge cases (empty inputs, special characters, etc.)
 
-4. **Verify variable exports - CRITICAL FOR LIBRARIES**
+5. **Verify variable exports - CRITICAL FOR LIBRARIES**
    - If library uses variables from calling script, **VERIFY** they're exported
    - Check for `set -u` (unbound variable) errors
    - **TEST**: Source the library and call functions to catch missing exports
@@ -93,19 +103,19 @@ Before making any changes:
      # If this fails with "unbound variable", you're missing an export
      ```
 
-5. **Handle edge cases**
+6. **Handle edge cases**
    - Filenames with spaces/special characters
    - Empty inputs
    - Command failures
    - Concurrent execution (file locking where needed)
 
-6. **Error handling**
+7. **Error handling**
    - Check return codes
    - Don't mask errors with `local var=$(cmd)` without checking
    - Provide actionable error messages
    - Log errors comprehensively
 
-7. **Input validation**
+8. **Input validation**
    - Sanitize user input
    - Validate formats (emails, paths, etc.)
    - Prevent command injection
@@ -327,6 +337,21 @@ git commit -m "Description"
   - With `set -u`, missing exports cause immediate failure - this is catchable by running the script
   - **NO EXCEPTIONS**: If you modify a library, you MUST test it by actually calling it
   - This failure was 100% preventable by running `./bu.sh --help` before committing
+
+**Failure Case 5: Widespread STYLE_GUIDE.md non-compliance (2025-11-29)**
+- **What happened**: User discovered fetch-github-projects.sh lacked --verbose flag (STYLE_GUIDE.md requirement)
+- **Impact**: Audit revealed 24 out of 30 scripts (80%) lacked mandatory --verbose flag
+- **Root cause**:
+  - STYLE_GUIDE.md added --verbose requirement but never enforced retroactively
+  - CLAUDE.md pre-commit checklist didn't explicitly verify --verbose presence
+  - validate-script-compliance.sh didn't catch this violation
+  - Scripts were grandfathered in without compliance audit
+- **Prevention**:
+  - **MANDATORY**: Pre-commit checklist step 1 now verifies STYLE_GUIDE.md compliance
+  - Explicit checks for: `-h/--help`, `-v/--verbose`, `--what-if` (destructive scripts)
+  - When adding new requirements to STYLE_GUIDE.md, MUST audit ALL existing scripts
+  - When adding new requirements to STYLE_GUIDE.md, MUST update validate-script-compliance.sh
+  - **NO EXCEPTIONS**: New scripts MUST pass all STYLE_GUIDE.md requirements before first commit
 
 ### The Golden Rule of Changes
 
