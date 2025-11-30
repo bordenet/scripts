@@ -37,7 +37,15 @@ A collection of utility scripts for macOS and Linux systems.
 | [`squash-commits.sh`](./squash-commits.sh) | Interactively squash a range of commits in a Git repository. |
 | [`squash-last-n.sh`](./squash-last-n.sh) | Squashes the last <N> commits into a single new commit using git reset --soft. |
 
-## System & Environment
+## System & Environme
+
+
+
+
+
+
+
+
 
 | Script | Description |
 |---|---|
@@ -177,21 +185,19 @@ Copyright (c) 2025 Matt J Bordenet
 
 This repository includes Claude Code skills for automated enforcement of coding standards.
 
-### /enforce-style-guide Skill
+### enforce-style-guide Skill
 
-**Location**: `.claude/skills/enforce-style-guide.md`
+**Location**: `~/.claude/skills/skills/enforce-style-guide.md`
 
 **Purpose**: Ruthlessly enforces STYLE_GUIDE.md compliance before every commit.
 
-**How to Register**:
+**Installation**: Already installed globally at `~/.claude/skills/skills/enforce-style-guide.md`
 
-Claude Code automatically discovers skills in `.claude/skills/` directory. No manual registration needed.
+**Usage**: This skill activates automatically when Claude Code detects commit-related activity. You can also explicitly request it:
 
-**Usage**:
-
-```bash
-# In Claude Code chat
-/enforce-style-guide
+```
+User: "Use the enforce-style-guide skill to audit all scripts"
+User: "I'm ready to commit - check style guide compliance first"
 ```
 
 **What it does**:
