@@ -180,6 +180,7 @@ while [ $# -gt 0 ]; do
             ;;
         *)
             TARGET_DIR="$1"
+            MENU_MODE=false  # Directory argument disables menu mode
             shift
             ;;
     esac
