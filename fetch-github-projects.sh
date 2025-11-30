@@ -250,32 +250,44 @@ if [ "$RECURSIVE_MODE" = true ]; then
     find_repos_recursive "." repos
     complete_status "${BLUE}Found ${#repos[@]} repositories${NC}"
 elif [ "$MENU_MODE" = true ]; then
-    for dir in */; do
-        if [ -d "$dir/.git" ]; then
-            repos+=("$dir")
-        else
-            # Check second level if first level isn't a git repo
-            for subdir in "$dir"*/; do
-                if [ -d "$subdir/.git" ]; then
-                    repos+=("$subdir")
-                fi
-            done
-        fi
-    done
+    # First check if current directory itself is a git repo
+    if [ -d ".git" ]; then
+        repos+=(".")
+    else
+        # Look for git repos in subdirectories
+        for dir in */; do
+            if [ -d "$dir/.git" ]; then
+                repos+=("$dir")
+            else
+                # Check second level if first level isn't a git repo
+                for subdir in "$dir"*/; do
+                    if [ -d "$subdir/.git" ]; then
+                        repos+=("$subdir")
+                    fi
+                done
+            fi
+        done
+    fi
 else
     # --all mode (non-recursive)
-    for dir in */; do
-        if [ -d "$dir/.git" ]; then
-            repos+=("$dir")
-        else
-            # Check second level if first level isn't a git repo
-            for subdir in "$dir"*/; do
-                if [ -d "$subdir/.git" ]; then
-                    repos+=("$subdir")
-                fi
-            done
-        fi
-    done
+    # First check if current directory itself is a git repo
+    if [ -d ".git" ]; then
+        repos+=(".")
+    else
+        # Look for git repos in subdirectories
+        for dir in */; do
+            if [ -d "$dir/.git" ]; then
+                repos+=("$dir")
+            else
+                # Check second level if first level isn't a git repo
+                for subdir in "$dir"*/; do
+                    if [ -d "$subdir/.git" ]; then
+                        repos+=("$subdir")
+                    fi
+                done
+            fi
+        done
+    fi
 fi
 
 if [ ${#repos[@]} -eq 0 ]; then
