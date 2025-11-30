@@ -197,7 +197,6 @@ fi
 mkdir -p "$BACKUP_DIR"
 log_verbose "Created backup directory: $BACKUP_DIR"
 print_info "Backup directory: $BACKUP_DIR"
-echo
 
 # -----------------------------------------------------------------------------
 # System Configuration Files
@@ -221,8 +220,6 @@ fi
 if sudo test -d /etc/sudoers.d; then
     sudo cp -rp /etc/sudoers.d "$BACKUP_DIR/system/sudoers.d" 2>/dev/null && print_success "Sudoers.d directory" || print_warning "Sudoers.d directory (copy failed)"
 fi
-
-echo
 
 # -----------------------------------------------------------------------------
 # User Configuration Files
@@ -262,8 +259,6 @@ backup_dir "$HOME/.config/fish" "$BACKUP_DIR/user/config/fish" "Fish shell confi
 backup_file "$HOME/.inputrc" "$BACKUP_DIR/user/inputrc" "Readline configuration"
 backup_file "$HOME/.editorconfig" "$BACKUP_DIR/user/editorconfig" "Editor configuration"
 
-echo
-
 # -----------------------------------------------------------------------------
 # Development Environment Configurations
 # -----------------------------------------------------------------------------
@@ -288,8 +283,6 @@ backup_file "$HOME/.cargo/config.toml" "$BACKUP_DIR/dev/cargo-config.toml" "Carg
 
 # Docker (if using Docker Desktop for Windows)
 backup_file "$HOME/.docker/config.json" "$BACKUP_DIR/dev/docker-config.json" "Docker configuration"
-
-echo
 
 # -----------------------------------------------------------------------------
 # Package Lists and System Information
@@ -349,8 +342,6 @@ echo "$PATH" > "$BACKUP_DIR/system-info/path.txt" 2>/dev/null
 
 print_success "System information"
 
-echo
-
 # -----------------------------------------------------------------------------
 # Generate Documentation Files
 # -----------------------------------------------------------------------------
@@ -359,8 +350,6 @@ echo -e "${BLUE}Creating restoration script and documentation...${NC}"
 
 generate_restore_script "$BACKUP_DIR" && print_success "Restoration script created"
 generate_readme "$BACKUP_DIR" && print_success "README created"
-
-echo
 
 # -----------------------------------------------------------------------------
 # Create Archive
@@ -387,8 +376,6 @@ else
     print_error "Failed to create archive"
     exit 1
 fi
-
-echo
 
 # -----------------------------------------------------------------------------
 # Summary
