@@ -57,6 +57,9 @@ OPTIONS
     -f, --force
         REQUIRED to actually execute the reset. Includes final confirmation prompt.
 
+    -v, --verbose
+        Enable verbose logging to show detailed operations.
+
     -h, --help
         Display this help message and exit.
 
@@ -121,6 +124,7 @@ start_time=$(date +%s)
 WHAT_IF="true"  # DEFAULT to what-if mode
 FORCE=false
 SEARCH_DIR="."
+VERBOSE=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -131,6 +135,10 @@ while [[ $# -gt 0 ]]; do
     -f|--force)
       WHAT_IF=""
       FORCE=true
+      shift
+      ;;
+    -v|--verbose)
+      VERBOSE=true
       shift
       ;;
     -h|--help)
@@ -181,10 +189,18 @@ log_message() {
   echo "[$timestamp] $1" >> "$LOG_FILE"
 }
 
+# Logs verbose messages when --verbose flag is set.
+log_verbose() {
+  if [ "$VERBOSE" = true ]; then
+    echo "[VERBOSE] $1" >&2
+  fi
+}
+
 # Resets a single git repository.
 reset_git_repo() {
   local repo_path=$1
   log_message "Processing repository: $repo_path"
+  log_verbose "Entering repository: $repo_path"
 
   if [ -d "$repo_path/.git" ]; then
     if pushd "$repo_path" > /dev/null; then
@@ -192,14 +208,18 @@ reset_git_repo() {
 
       # Determine the default branch (main or master)
       branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's|^refs/remotes/origin/||' 2>/dev/null || echo "main")
+      log_verbose "Detected default branch: $branch for $repo_path"
 
       # Fetch and reset to the correct branch
+      log_verbose "Fetching from origin for $repo_path"
       if ! git fetch origin >/dev/null 2>&1; then
         log_message "Failed to fetch from origin: $repo_path"
         popd > /dev/null || true
         return 1
       fi
+      log_verbose "Resetting to origin/$branch for $repo_path"
       git reset --hard "origin/$branch" >/dev/null
+      log_verbose "Cleaning untracked files in $repo_path"
       git clean -fdx >/dev/null
 
       popd > /dev/null || return 1
@@ -236,8 +256,10 @@ true > "$LOG_FILE"
 log_message "Starting git reset script in directory: $SEARCH_DIR"
 
 # Find and count git repositories.
+log_verbose "Searching for git repositories in: $SEARCH_DIR"
 repo_list=$(find "$SEARCH_DIR" -type d -name ".git")
 repo_count=$(echo "$repo_list" | wc -l)
+log_verbose "Found $repo_count git repositories"
 
 # What-if mode (default)
 if [ "$WHAT_IF" = "true" ]; then

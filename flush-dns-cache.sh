@@ -22,6 +22,16 @@ set -euo pipefail
 
 set -e
 
+# Argument defaults
+VERBOSE=false
+
+# --- Logging Function ---
+log_verbose() {
+    if [[ "$VERBOSE" == true ]]; then
+        echo "[VERBOSE] $*" >&2
+    fi
+}
+
 # --- Help Function ---
 show_help() {
     cat << EOF
@@ -38,6 +48,9 @@ DESCRIPTION
 OPTIONS
     -h, --help
         Display this help message and exit.
+
+    -v, --verbose
+        Enable verbose output showing detailed execution steps.
 
 PLATFORM
     Cross-platform (macOS, Windows/WSL, Linux)
@@ -71,11 +84,22 @@ EOF
 }
 
 # Parse arguments
-case "${1:-}" in
-    -h|--help)
-        show_help
-        ;;
-esac
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        *)
+            echo "Error: Unknown option: $1" >&2
+            echo "Run with --help for usage information" >&2
+            exit 1
+            ;;
+    esac
+done
 
 # Start timer
 start_time=$(date +%s)
@@ -84,6 +108,7 @@ start_time=$(date +%s)
 detect_platform() {
     local os_type
     os_type="$(uname -s)"
+    log_verbose "Detecting platform from uname: $os_type"
 
     case "$os_type" in
         Darwin)
@@ -91,8 +116,10 @@ detect_platform() {
             ;;
         Linux)
             if grep -qi microsoft /proc/version 2>/dev/null; then
+                log_verbose "Detected WSL environment"
                 echo "wsl"
             else
+                log_verbose "Detected native Linux environment"
                 echo "linux"
             fi
             ;;
@@ -109,7 +136,9 @@ detect_platform() {
 
 flush_dns_macos() {
     echo "Flushing DNS cache on macOS..."
+    log_verbose "Running: sudo dscacheutil -flushcache"
     sudo dscacheutil -flushcache
+    log_verbose "Running: sudo killall -HUP mDNSResponder"
     sudo killall -HUP mDNSResponder
     echo "✓ macOS DNS cache flushed successfully."
 }
@@ -133,10 +162,12 @@ flush_dns_wsl() {
 
 flush_dns_linux() {
     echo "Flushing DNS cache on Linux..."
+    log_verbose "Checking for available DNS caching services"
 
     # Try systemd-resolved (Ubuntu 18.04+, Fedora, etc.)
     if command -v resolvectl &> /dev/null; then
         echo "Using systemd-resolved..."
+        log_verbose "Running: sudo resolvectl flush-caches"
         sudo resolvectl flush-caches
         echo "✓ systemd-resolved cache flushed."
     elif command -v systemd-resolve &> /dev/null; then
