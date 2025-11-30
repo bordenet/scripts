@@ -172,3 +172,45 @@ The pre-commit hook will automatically validate your changes. See [STYLE_GUIDE.m
 MIT License - see [LICENSE](./LICENSE) file for details.
 
 Copyright (c) 2025 Matt J Bordenet
+
+## Claude Code Skills
+
+This repository includes Claude Code skills for automated enforcement of coding standards.
+
+### /enforce-style-guide Skill
+
+**Location**: `.claude/skills/enforce-style-guide.md`
+
+**Purpose**: Ruthlessly enforces STYLE_GUIDE.md compliance before every commit.
+
+**How to Register**:
+
+Claude Code automatically discovers skills in `.claude/skills/` directory. No manual registration needed.
+
+**Usage**:
+
+```bash
+# In Claude Code chat
+/enforce-style-guide
+```
+
+**What it does**:
+1. Locates STYLE_GUIDE.md in repository root or docs/
+2. Audits ALL shell scripts against mandatory requirements
+3. Reports violations with file:line references
+4. Fixes violations systematically
+5. Re-audits until zero violations
+6. Prevents commits of non-compliant code
+
+**Enforcement Rules** (Shell Scripts):
+- ✅ Shebang: `#!/usr/bin/env bash`
+- ✅ Error handling: `set -euo pipefail`
+- ✅ Help flag: `-h|--help`
+- ✅ Verbose flag: `-v|--verbose`
+- ✅ Dry-run: `--what-if` (destructive scripts)
+- ✅ Line limit: Under 400 lines
+- ✅ ShellCheck: Zero warnings
+- ✅ Syntax: `bash -n` passes
+
+**Integration**: Implements MANDATORY Step 1 from CLAUDE.md pre-commit checklist.
+
