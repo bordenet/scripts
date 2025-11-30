@@ -21,6 +21,13 @@ set -euo pipefail
 # --- Defaults ---
 PROJECT_PATH="/Users/$(whoami)/GitHub/RecipeArchive"
 PROMPT="Proceed, noting I have made additions to CLAUDE.md which I need you to factor into the plan."
+VERBOSE=false
+
+log_verbose() {
+  if [[ "$VERBOSE" == "true" ]]; then
+    echo "[VERBOSE] $*" >&2
+  fi
+}
 
 show_help() {
   cat <<EOF
@@ -28,10 +35,12 @@ Usage: $0 [options]
 
 Options:
   -p, --prompt <text>   Prompt string to send to Claude
+  -v, --verbose         Enable verbose logging
   ?, --help             Show this help message
 
 Examples:
   $0 -p "Resume where we left off"
+  $0 --verbose
 EOF
 }
 
@@ -42,6 +51,10 @@ while [[ $# -gt 0 ]]; do
     -p|--prompt)
       PROMPT="$2"
       shift 2
+      ;;
+    -v|--verbose)
+      VERBOSE=true
+      shift
       ;;
     \?|--help)
       show_help
@@ -56,17 +69,23 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- Script Logic ---
+log_verbose "Starting resume-claude.sh with prompt: $PROMPT"
+log_verbose "Project path: $PROJECT_PATH"
+
 echo "Opening project in VS Code..."
 
 if pgrep -x "Code" >/dev/null; then
+  log_verbose "VS Code process found (PID: $(pgrep -x 'Code'))"
   echo "VS Code already running, opening folder..."
   code -r "$PROJECT_PATH"
 else
+  log_verbose "VS Code not running, starting fresh"
   echo "Starting VS Code fresh..."
   code "$PROJECT_PATH"
   sleep 5
 fi
 
+log_verbose "Initiating AppleScript automation sequence"
 echo "Activating VS Code and using integrated terminal..."
 osascript <<EOF
 tell application "Code"
@@ -106,4 +125,5 @@ tell application "System Events"
 end tell
 EOF
 
+log_verbose "AppleScript automation complete"
 echo "✅ Script finished."
