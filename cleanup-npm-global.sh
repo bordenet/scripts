@@ -41,6 +41,10 @@ OPTIONS
     -h, --help
         Display this help message and exit.
 
+    -v, --verbose
+        Verbose mode: shows detailed INFO-level logs.
+        Displays npm command output and operation details.
+
     --what-if
         Show what would be done without making any changes (dry-run mode).
 
@@ -73,10 +77,15 @@ EOF
 
 # Parse arguments
 WHAT_IF=false
+VERBOSE=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help)
             show_help
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
             ;;
         --what-if)
             WHAT_IF=true
@@ -88,10 +97,22 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Verbose logging function
+log_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo "INFO: $*"
+    fi
+}
+
 # --- Script Setup ---
 start_time=$(date +%s)
 LOG_FILE="/tmp/npm-global-cleanup-$(date +%Y%m%d-%H%M%S).log"
 touch "$LOG_FILE"
+
+log_verbose "Script start time: $(date)"
+log_verbose "What-if mode: $WHAT_IF"
+log_verbose "Verbose mode: $VERBOSE"
+log_verbose "Log file: $LOG_FILE"
 
 echo "--- NPM Global Package Cleanup ---"
 if $WHAT_IF; then
@@ -104,6 +125,7 @@ echo ""
 
 # 1. List globally installed packages
 echo "🔍 Checking globally installed npm packages..."
+log_verbose "Running: npm ls -g --depth=0"
 GLOBAL_LIST=$(npm ls -g --depth=0 || echo "⚠️ Failed to list global packages")
 echo "${GLOBAL_LIST}" | tee -a "${LOG_FILE}"
 
