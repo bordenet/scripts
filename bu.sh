@@ -359,13 +359,11 @@ fi
 end_time=$(date +%s)
 execution_time=$((end_time - start_time))
 
-echo
 if [ "$VERBOSE" = false ]; then
     echo -e "${BOLD}Summary${NC} (${execution_time}s)"
 else
     log_info "Total execution time: ${execution_time} seconds"
 fi
-echo
 
 # Display summary
 if [ "$VERBOSE" = true ]; then
