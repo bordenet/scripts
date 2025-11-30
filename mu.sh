@@ -8,10 +8,8 @@
 # DEPENDENCIES: apt, npm, pip, winget, PowerShell
 ################################################################################
 set -o pipefail
-################################################################################
-# Configuration
-################################################################################
 
+# --- Configuration ---
 LOG_DIR="/tmp"
 ERRORS=()
 SKIP_WINDOWS_UPDATE=false
@@ -116,14 +114,10 @@ fi
 # shellcheck source=lib/mu-helpers.sh
 source "$HELPER_LIB"
 
-################################################################################
-# Main Script
-################################################################################
-
+# --- Main Script ---
 echo "=================================================="
 echo "mu.sh - Matt's Update Script"
 echo "=================================================="
-echo ""
 log_verbose "Starting system update process"
 
 start_time=$(date +%s)
@@ -137,7 +131,6 @@ if sudo -v; then
 else
     echo "⚠ Sudo authentication failed"
 fi
-echo ""
 
 cleanup_old_logs
 log_verbose "Cleaned up old log files (>24 hours)"
@@ -339,12 +332,8 @@ if command -v pip &> /dev/null && [[ $(pip --version) == *"python 2"* ]]; then
 fi
 
 log_verbose "Completed Linux package updates"
-echo ""
 
-# -----------------------------------------------------------------------------
-# Phase 2: Windows Updates (via PowerShell)
-# -----------------------------------------------------------------------------
-
+# --- Phase 2: Windows Updates (via PowerShell) ---
 log_verbose "Starting Windows updates phase"
 echo "PHASE 2: Windows Updates"
 echo "--------------------------------------------------"
@@ -392,12 +381,7 @@ else
     echo "⊘ Not running in WSL - skipping Windows updates"
 fi
 
-echo ""
-
-# -----------------------------------------------------------------------------
-# Summary
-# -----------------------------------------------------------------------------
-
+# --- Summary ---
 # Kill sudo keeper process if it exists
 if [ -n "$SUDO_KEEPER_PID" ]; then
     kill $SUDO_KEEPER_PID 2>/dev/null || true
