@@ -371,14 +371,11 @@ fi
 # Stop timer and show summary
 stop_timer
 echo -ne "\033[1;1H${ERASE_LINE}"  # Clear timer line
-echo
 
 end_time=$(date +%s)
 execution_time=$((end_time - start_time))
 
-echo
 echo -e "${BOLD}Summary${NC} (${execution_time}s)"
-echo
 if [ "$WHAT_IF" = true ]; then
     echo -e "${YELLOW}DRY-RUN:${NC} No changes were made"
     echo
@@ -399,6 +396,5 @@ else
     echo "Remote branch 'origin/$BRANCH_NAME' remains intact."
     echo "Use purge-stale-claude-code-web-branches.sh to clean up when ready."
 fi
-echo
 
 exit 0
