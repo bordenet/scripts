@@ -36,6 +36,9 @@ OPTIONS
     --what-if
         Show what would be done without making any changes (dry-run mode).
 
+    -v, --verbose
+        Enable verbose logging.
+
 PLATFORM
     macOS only - Script will exit with error on other platforms
 
@@ -64,6 +67,14 @@ EOF
 
 # Parse arguments
 WHAT_IF=false
+VERBOSE=false
+
+log_verbose() {
+  if [[ "$VERBOSE" == "true" ]]; then
+    echo "[VERBOSE] $*" >&2
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help)
@@ -71,6 +82,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --what-if)
             WHAT_IF=true
+            shift
+            ;;
+        -v|--verbose)
+            VERBOSE=true
             shift
             ;;
         *)
@@ -84,14 +99,19 @@ if $WHAT_IF; then
   echo ""
 fi
 
+log_verbose "Starting setup-podman-for-terraform.sh"
+log_verbose "What-if mode: $WHAT_IF"
+
 echo "🔧 Checking for Homebrew..."
 if ! command -v brew >/dev/null 2>&1; then
   echo "❌ Homebrew not found. Please install it from https://brew.sh"
   exit 1
 fi
+log_verbose "Homebrew found at: $(command -v brew)"
 
 echo "📦 Checking for Podman..."
 if ! command -v podman >/dev/null 2>&1; then
+  log_verbose "Podman not found, needs installation"
   if $WHAT_IF; then
     echo "[WHAT-IF] Would install Podman via Homebrew"
   else
@@ -100,6 +120,8 @@ if ! command -v podman >/dev/null 2>&1; then
   fi
 else
   echo "✅ Podman is already installed."
+  log_verbose "Podman found at: $(command -v podman)"
+  log_verbose "Podman version: $(podman --version)"
 fi
 
 if $WHAT_IF; then
@@ -134,9 +156,11 @@ if [ -z "$SOCKET" ]; then
   echo "❌ Could not find Docker-compatible socket."
   exit 1
 fi
+log_verbose "Found Podman socket: $SOCKET"
 
 echo "🌐 Setting DOCKER_HOST to: $SOCKET"
 export DOCKER_HOST=$SOCKET
+log_verbose "DOCKER_HOST environment variable set"
 
 echo ""
 echo "✅ Podman is ready for Terraform!"

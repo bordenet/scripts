@@ -23,19 +23,27 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESUME_SCRIPT="$SCRIPT_DIR/resume-claude.sh"
 DRY_RUN=false
+VERBOSE=false
 PROMPT=""
 HOURS=0
 MINUTES=0
 
+log_verbose() {
+  if [[ "$VERBOSE" == "true" ]]; then
+    echo "[VERBOSE] $*" >&2
+  fi
+}
+
 # --- Usage function ---
 usage() {
-  echo "Usage: $0 [-h hours] [-m minutes] [-p prompt] [--dry-run]"
+  echo "Usage: $0 [-h hours] [-m minutes] [-p prompt] [--dry-run] [--verbose]"
   echo ""
   echo "Options:"
   echo "  -h, --hours     Number of hours to wait before running"
   echo "  -m, --minutes   Number of minutes to wait before running"
   echo "  -p, --prompt    Prompt string to pass to resume-claude.sh"
   echo "  --dry-run       Show what would happen without executing"
+  echo "  -v, --verbose   Enable verbose logging"
   echo "  -?, --help      Show this help message"
   exit 1
 }
@@ -47,6 +55,7 @@ while [[ $# -gt 0 ]]; do
     -m|--minutes) MINUTES="$2"; shift 2 ;;
     -p|--prompt) PROMPT="$2"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
+    -v|--verbose) VERBOSE=true; shift ;;
     -\?|--help) usage ;;
     *) echo "Unknown option: $1"; usage ;;
   esac
@@ -55,6 +64,9 @@ done
 # --- Calculate total seconds ---
 TOTAL_MINUTES=$(( HOURS * 60 + MINUTES ))
 TOTAL_SECONDS=$(( TOTAL_MINUTES * 60 ))
+
+log_verbose "Parsed hours: $HOURS, minutes: $MINUTES"
+log_verbose "Total delay: $TOTAL_SECONDS seconds"
 
 if [[ $TOTAL_SECONDS -le 0 ]]; then
   echo "⚠️  No valid delay specified. Use -h or -m."
@@ -84,9 +96,11 @@ if $DRY_RUN; then
 fi
 
 # --- Keep system awake while waiting ---
+log_verbose "Starting caffeinate to prevent sleep during countdown"
 echo "⚡ Using caffeinate to keep macOS awake..."
 caffeinate -dimsu &
 CAFFEINATE_PID=$!
+log_verbose "Caffeinate PID: $CAFFEINATE_PID"
 
 # --- Countdown ticker (per second) ---
 SECONDS_LEFT=$TOTAL_SECONDS
@@ -114,9 +128,11 @@ done
 echo ""
 
 # --- Execute resume script ---
+log_verbose "Stopping caffeinate (PID: $CAFFEINATE_PID)"
 kill $CAFFEINATE_PID >/dev/null 2>&1 || true
 
 if [[ -x "$RESUME_SCRIPT" ]]; then
+  log_verbose "Executing: $RESUME_SCRIPT -p \"$PROMPT\""
   echo "🚀 Running $RESUME_SCRIPT -p \"$PROMPT\"..."
   "$RESUME_SCRIPT" -p "$PROMPT"
 else
