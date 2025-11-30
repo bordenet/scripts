@@ -28,11 +28,19 @@
 
 set -euo pipefail
 
+# Logs verbose messages when --verbose flag is set.
+log_verbose() {
+  if [ "$VERBOSE" = true ]; then
+    echo "[VERBOSE] $1" >&2
+  fi
+}
+
 # Parse arguments
 WHAT_IF="true"  # DEFAULT to what-if mode
 N=""
 COMMIT_MSG=""
 FORCE=""
+VERBOSE=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -46,6 +54,10 @@ while [[ $# -gt 0 ]]; do
       FORCE="true"
       shift
       ;;
+    -v|--verbose)
+      VERBOSE=true
+      shift
+      ;;
     --help)
       echo "Usage: $0 <N> [\"Commit message\"] [--force]"
       echo ""
@@ -56,6 +68,7 @@ while [[ $# -gt 0 ]]; do
       echo "Options:"
       echo "  --what-if        DEFAULT. Preview actions without executing."
       echo "  --force          REQUIRED to actually execute the squash."
+      echo "  -v, --verbose    Enable verbose logging to show detailed operations."
       echo "  --help           Show this help message."
       echo ""
       echo "IMPORTANT: This script defaults to --what-if mode. Use --force to actually execute."
@@ -90,12 +103,15 @@ if [ -z "$COMMIT_MSG" ]; then
 fi
 
 # --- Validation ---
+log_verbose "Validating N=$N is a positive integer"
 if ! [[ "$N" =~ ^[0-9]+$ ]] || [ "$N" -lt 1 ]; then
   echo "❌ Error: N must be a positive integer." >&2
   exit 1
 fi
 
+log_verbose "Counting total commits in repository"
 TOTAL_COMMITS=$(git rev-list --count HEAD)
+log_verbose "Total commits: $TOTAL_COMMITS"
 if [ "$N" -ge "$TOTAL_COMMITS" ]; then
     echo "❌ Error: N ($N) must be less than the total number of commits ($TOTAL_COMMITS)." >&2
     echo "Cannot squash all commits." >&2
@@ -129,10 +145,14 @@ if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
 fi
 
 echo "🚀 Resetting HEAD~$N..."
+log_verbose "Running git reset --soft HEAD~$N"
 git reset --soft "HEAD~$N"
+log_verbose "Reset complete, staging area preserved"
 
 echo "📝 Committing squashed changes..."
+log_verbose "Creating new commit with message: $COMMIT_MSG"
 git commit -m "$COMMIT_MSG"
+log_verbose "Commit created successfully"
 
 echo "🎉 Squash complete!"
 echo "Check the new history with: git log --oneline -n 5"

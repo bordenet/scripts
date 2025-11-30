@@ -40,6 +40,16 @@ MAIN_BRANCH=""
 PR_NUMBER=""
 WHAT_IF=false
 CREATE_ONLY=false
+VERBOSE=false
+
+# --- Functions ---
+
+# Logs verbose messages when --verbose flag is set.
+log_verbose() {
+  if [ "$VERBOSE" = true ]; then
+    echo "[VERBOSE] $1" >&2
+  fi
+}
 
 # --- Argument Parsing ---
 [ $# -eq 0 ] && { echo -e "${RED}Error:${NC} Branch name required\nUsage: $0 [--what-if] <branch-name>\nTry '$0 --help' for more information"; exit 1; }
@@ -48,6 +58,7 @@ while [ $# -gt 0 ]; do
         -h|--help) show_help ;;
         --create-only) CREATE_ONLY=true; shift ;;
         --what-if) WHAT_IF=true; shift ;;
+        -v|--verbose) VERBOSE=true; shift ;;
         -*) echo -e "${RED}Error:${NC} Unknown option: $1\nTry '$0 --help' for more information"; exit 1 ;;
         *) BRANCH_NAME="$1"; shift ;;
     esac
@@ -105,8 +116,10 @@ complete_status "${GREEN}✓${NC} GitHub authenticated"
 
 # Fetch latest from origin (including remote Claude branches)
 update_status "  Fetching latest from origin..."
+log_verbose "Running git fetch origin"
 if git fetch origin &> /dev/null; then
     complete_status "${GREEN}✓${NC} Fetched latest from origin"
+    log_verbose "Fetch completed successfully"
 else
     complete_status "${RED}✗${NC} Failed to fetch from origin"
     exit 1
@@ -114,6 +127,7 @@ fi
 
 # Detect main branch (use || true to prevent pipefail from killing script)
 update_status "  Detecting main branch..."
+log_verbose "Querying remote HEAD branch"
 MAIN_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}' || true)
 if [ -z "$MAIN_BRANCH" ]; then
     if git show-ref --quiet refs/heads/main; then
@@ -131,6 +145,7 @@ complete_status "${GREEN}✓${NC} Main branch: $MAIN_BRANCH"
 
 # Check if remote branch exists
 update_status "  Verifying remote branch exists..."
+log_verbose "Checking for remote branch: origin/$BRANCH_NAME"
 if ! git show-ref --quiet refs/remotes/origin/"$BRANCH_NAME"; then
     complete_status "${RED}✗${NC} Remote branch not found"
     echo
@@ -139,6 +154,7 @@ if ! git show-ref --quiet refs/remotes/origin/"$BRANCH_NAME"; then
     exit 1
 fi
 complete_status "${GREEN}✓${NC} Remote branch exists"
+log_verbose "Remote branch verified: origin/$BRANCH_NAME"
 
 # --- Integration Workflow ---
 
@@ -170,6 +186,7 @@ fi
 
 # Create pull request from remote branch
 update_status "  Creating pull request..."
+log_verbose "Attempting to create PR: $BRANCH_NAME → $MAIN_BRANCH"
 if [ "$WHAT_IF" = true ]; then
     complete_status "${YELLOW}⊙${NC} Would create PR: origin/$BRANCH_NAME → $MAIN_BRANCH"
     PR_NUMBER="(dry-run)"
@@ -177,6 +194,7 @@ if [ "$WHAT_IF" = true ]; then
 else
     # For remote-only branches, we need to specify origin/ prefix or fetch the branch locally first
     # Try creating PR directly; if it fails with ambiguous revision, fetch the branch
+    log_verbose "Running gh pr create --base $MAIN_BRANCH --head $BRANCH_NAME --fill"
     if PR_OUTPUT=$(gh pr create --base "$MAIN_BRANCH" --head "$BRANCH_NAME" --fill 2>&1); then
         PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
         PR_URL=$(echo "$PR_OUTPUT" | grep -oE 'https://[^ ]+')
@@ -319,11 +337,14 @@ fi
 
 # Merge pull request
 update_status "  Merging PR #$PR_NUMBER..."
+log_verbose "Attempting to merge PR #$PR_NUMBER"
 if [ "$WHAT_IF" = true ]; then
     complete_status "${YELLOW}⊙${NC} Would merge PR into $MAIN_BRANCH"
 else
+    log_verbose "Running gh pr merge $PR_NUMBER --merge --delete-branch=false"
     if gh pr merge "$PR_NUMBER" --merge --delete-branch=false &> /dev/null; then
         complete_status "${GREEN}✓${NC} Merged PR #$PR_NUMBER"
+        log_verbose "PR merged successfully"
     else
         complete_status "${RED}✗${NC} Failed to merge PR"
         echo

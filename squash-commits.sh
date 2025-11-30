@@ -61,6 +61,13 @@ cleanup() {
   fi
 }
 
+# Logs verbose messages when --verbose flag is set.
+log_verbose() {
+  if [ -n "${VERBOSE:-}" ]; then
+    echo "[VERBOSE] $1" >&2
+  fi
+}
+
 # --- Utility Functions ---
 suggest_ranges() {
   echo "--suggest feature is temporarily disabled due to a persistent bug."
@@ -131,10 +138,12 @@ main() {
 
   if [ -n "$VERBOSE" ]; then
     set -x
+    log_verbose "Verbose mode enabled"
   fi
 
   # Set a non-interactive editor for all git commands
   export GIT_EDITOR=true
+  log_verbose "Set GIT_EDITOR=true for non-interactive mode"
 
   # 2. Assign positional arguments
   if [ "$ACTION" = "squash" ]; then
@@ -150,11 +159,14 @@ main() {
   # 3. Handle repository source and context
   if [ -n "$REPO_URL_PARAM" ]; then
     WORKDIR=$(mktemp -d)
+    log_verbose "Created temporary directory: $WORKDIR"
     echo "📥 Cloning repo from $REPO_URL_PARAM into temporary directory..."
     gh repo clone "$REPO_URL_PARAM" "$WORKDIR" || abort "git clone failed"
     cd "$WORKDIR"
-    
+    log_verbose "Changed directory to: $WORKDIR"
+
     default_branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+    log_verbose "Detected default branch: $default_branch"
     git checkout "$default_branch" || abort "Failed to checkout branch $default_branch"
 
   elif ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -174,8 +186,10 @@ main() {
 
   BRANCH="main"
   TMPFILE="$(mktemp)"
+  log_verbose "Created temporary file: $TMPFILE"
 
   TOTAL_COMMITS=$(git rev-list --count HEAD)
+  log_verbose "Total commits in repository: $TOTAL_COMMITS"
   echo "✅ Repo has $TOTAL_COMMITS commits."
 
   if ! [[ "$START" =~ ^[0-9]+$ && "$END" =~ ^[0-9]+$ ]]; then
@@ -213,6 +227,7 @@ main() {
     exit 0
   fi
 
+  log_verbose "Starting interactive rebase from root"
   git rebase -i --root --quiet || true
 
   TODO_FILE="$(git rev-parse --git-path rebase-merge/git-rebase-todo 2>/dev/null || true)"
