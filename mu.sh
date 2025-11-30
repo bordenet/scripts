@@ -15,6 +15,7 @@ set -o pipefail
 LOG_DIR="/tmp"
 ERRORS=()
 SKIP_WINDOWS_UPDATE=false
+VERBOSE=false
 
 # Show help
 show_help() {
@@ -36,6 +37,9 @@ DESCRIPTION
 OPTIONS
     --skip-windows-update
         Skip Windows Update (only update packages via winget)
+
+    -v, --verbose
+        Enable verbose output showing detailed update operations
 
     -h, --help
         Display this help message and exit
@@ -66,10 +70,18 @@ SEE ALSO
 EOF
 }
 
+# Logging function for verbose output
+log_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo "[VERBOSE] $*" >&2
+    fi
+}
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         --skip-windows-update) SKIP_WINDOWS_UPDATE=true; shift ;;
+        -v|--verbose) VERBOSE=true; shift ;;
         -h|--help) show_help; exit 0 ;;
         *) echo "Unknown option: $1"; echo "Use --help for usage information"; exit 1 ;;
     esac
@@ -112,6 +124,7 @@ echo "=================================================="
 echo "mu.sh - Matt's Update Script"
 echo "=================================================="
 echo ""
+log_verbose "Starting system update process"
 
 start_time=$(date +%s)
 
@@ -127,7 +140,9 @@ fi
 echo ""
 
 cleanup_old_logs
+log_verbose "Cleaned up old log files (>24 hours)"
 
+log_verbose "Starting APT package updates"
 run_phase "apt upgrade" "$LOG_DIR/mu_apt_upgrade.log" \
     sudo apt upgrade -y || true
 
@@ -323,17 +338,20 @@ if command -v pip &> /dev/null && [[ $(pip --version) == *"python 2"* ]]; then
     fi
 fi
 
+log_verbose "Completed Linux package updates"
 echo ""
 
 # -----------------------------------------------------------------------------
 # Phase 2: Windows Updates (via PowerShell)
 # -----------------------------------------------------------------------------
 
+log_verbose "Starting Windows updates phase"
 echo "PHASE 2: Windows Updates"
 echo "--------------------------------------------------"
 
 # Check if we're in WSL
 if grep -qi microsoft /proc/version 2>/dev/null; then
+    log_verbose "Running in WSL environment, proceeding with Windows updates"
     # winget updates
     printf "%-30s" "winget upgrade..."
 
@@ -388,8 +406,10 @@ fi
 # Calculate execution time
 end_time=$(date +%s)
 execution_time=$((end_time - start_time))
+log_verbose "Total execution time: ${execution_time}s"
 
 # Print error report
 print_error_report $execution_time
 
+log_verbose "System update completed"
 exit 0
