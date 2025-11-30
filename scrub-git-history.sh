@@ -45,17 +45,26 @@ set -euo pipefail
 BACKUP_BRANCH="backup-before-scrub"
 TAG_PREFIX="pre-scrub"
 TMPFILE=$(mktemp)
+VERBOSE=false  # Initialize early for use in checks
 # Trap to ensure the temporary file is cleaned up on exit, including errors
 trap 'rm -f "$TMPFILE"' EXIT
 
 # --- FUNCTIONS ----------------------------------------------------------------
 
+# Logs verbose messages when --verbose flag is set.
+log_verbose() {
+  if [ "$VERBOSE" = true ]; then
+    echo "[VERBOSE] $1" >&2
+  fi
+}
+
 # USAGE
 usage() {
-  echo "Usage: $0 [--file <path-to-file.txt>] [--preview] [path1 path2 ...]" >&2
+  echo "Usage: $0 [--file <path-to-file.txt>] [--preview] [--verbose] [path1 path2 ...]" >&2
   echo "" >&2
   echo "  --file <file>   : Path to a .txt file with one path/glob per line" >&2
   echo "  --preview       : Show affected commits without rewriting history" >&2
+  echo "  --verbose       : Enable verbose logging to show detailed operations" >&2
   echo "" >&2
   echo "Use 'man git-filter-repo' for path/glob format details." >&2
   exit 1
@@ -64,22 +73,28 @@ usage() {
 # --- CHECKS -------------------------------------------------------------------
 
 # Check for git-filter-repo
+log_verbose "Checking for git-filter-repo installation"
 if ! command -v git-filter-repo &> /dev/null; then
   echo "Error: git-filter-repo not installed. Try: pip install git-filter-repo" >&2
   exit 2
 fi
+log_verbose "git-filter-repo found"
 
 # Check if inside a Git repository
+log_verbose "Verifying inside a Git repository"
 if ! git rev-parse --is-inside-work-tree &> /dev/null; then
   echo "Error: Not inside a Git repository." >&2
   exit 3
 fi
+log_verbose "Git repository verified"
 
 # Check for existing backup branch to prevent accidental overwrite
+log_verbose "Checking for existing backup branch: $BACKUP_BRANCH"
 if git show-ref --verify --quiet "refs/heads/$BACKUP_BRANCH"; then
   echo "Error: Backup branch '$BACKUP_BRANCH' already exists. Please delete it or rename it before running." >&2
   exit 5
 fi
+log_verbose "No existing backup branch found"
 
 # --- ARG PARSING --------------------------------------------------------------
 
@@ -95,12 +110,12 @@ while [[ "$#" -gt 0 ]]; do
       [[ "$#" -lt 2 ]] && { echo "Error: Missing argument for --file." >&2; usage; }
       FILE="$2"
       shift 2
-      
+
       if [[ ! -f "$FILE" ]]; then
         echo "Error: File '$FILE' not found." >&2
         exit 4
       fi
-      
+
       # Read file, trim whitespace, and skip empty lines
       while IFS= read -r line || [[ -n "$line" ]]; do
         # Use xargs to trim leading/trailing whitespace, then check if it's non-empty
@@ -110,6 +125,10 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     --preview)
       PREVIEW=true
+      shift
+      ;;
+    -v|--verbose)
+      VERBOSE=true
       shift
       ;;
     --) # End of options
@@ -158,9 +177,11 @@ fi
 
 # BACKUP
 CURRENT_COMMIT=$(git rev-parse HEAD)
+log_verbose "Current commit: $CURRENT_COMMIT"
 echo "Attempting to create backup branch '$BACKUP_BRANCH' and tag..."
 
 # Create backup branch
+log_verbose "Creating backup branch: $BACKUP_BRANCH"
 if ! git branch "$BACKUP_BRANCH"; then
     echo "Fatal Error: Failed to create backup branch '$BACKUP_BRANCH'." >&2
     exit 5
@@ -168,6 +189,7 @@ fi
 
 # Create backup tag
 BACKUP_TAG="${TAG_PREFIX}-$(date +%Y%m%d-%H%M%S)"
+log_verbose "Creating backup tag: $BACKUP_TAG"
 git tag -a "$BACKUP_TAG" -m "Backup before scrub at $CURRENT_COMMIT"
 
 echo "✅ Backup created:"
@@ -186,9 +208,11 @@ fi
 
 # SCRUB
 echo "Commencing history rewrite (this may take a while)..."
+log_verbose "Running git-filter-repo with --invert-paths using temp file: $TMPFILE"
 # The --invert-paths option tells git-filter-repo to KEEP all paths *EXCEPT*
 # those listed in the temporary file.
 git filter-repo --force --invert-paths --paths-from-file "$TMPFILE"
+log_verbose "History rewrite completed"
 
 echo "---"
 echo "✅ History rewritten successfully."

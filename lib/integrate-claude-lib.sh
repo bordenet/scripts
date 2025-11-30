@@ -108,6 +108,9 @@ OPTIONS
         Dry-run mode: show what would happen without making any changes.
         No branches will be pushed, no PRs created or merged.
 
+    -v, --verbose
+        Enable verbose logging to show detailed operations.
+
     -h, --help
         Display this help message and exit
 
