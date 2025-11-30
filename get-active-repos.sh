@@ -33,6 +33,9 @@ set -euo pipefail
 
 set -e
 
+# --- Argument Defaults ---
+VERBOSE=false
+
 # --- Help Function ---
 show_help() {
     cat << EOF
@@ -51,6 +54,9 @@ DESCRIPTION
 OPTIONS
     -h, --help
         Display this help message and exit.
+
+    -v, --verbose
+        Enable verbose output showing detailed progress information.
 
 PLATFORM
     Cross-platform (macOS, Linux, WSL)
@@ -89,11 +95,27 @@ EOF
 }
 
 # Parse arguments
-case "${1:-}" in
-    -h|--help)
-        show_help
-        ;;
-esac
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        -*)
+            echo "Error: Unknown option: $1"
+            echo "Try '$0 --help' for more information"
+            exit 1
+            ;;
+        *)
+            echo "Error: Unexpected argument: $1"
+            echo "Try '$0 --help' for more information"
+            exit 1
+            ;;
+    esac
+done
 
 # --- Configuration ---
 # !!! IMPORTANT !!!
@@ -107,12 +129,21 @@ start_time=$(date +%s)
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
+# --- Functions ---
+
+# Function to log verbose messages
+log_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo "INFO: $*"
+    fi
+}
+
 # Calculate the date one year ago.
 ONE_YEAR_AGO=$(date -u -v-1y +'%Y-%m-%dT%H:%M:%SZ')
 
+log_verbose "Verbose mode enabled"
+log_verbose "Configuration: GITHUB_ORG=$GITHUB_ORG, GITHUB_API_URL=$GITHUB_API_URL"
 echo "Finding active repositories in '$GITHUB_ORG' since $ONE_YEAR_AGO..."
-
-# --- Functions ---
 
 # Function to fetch all repositories for the organization, handling pagination.
 fetch_all_repos() {
@@ -121,7 +152,9 @@ fetch_all_repos() {
     local repos_url="$GITHUB_API_URL/orgs/$GITHUB_ORG/repos"
 
     echo "Fetching all repositories for organization: $GITHUB_ORG"
+    log_verbose "API URL: $repos_url"
     while :; do
+        log_verbose "Fetching page $page"
         response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$repos_url?per_page=100&page=$page")
         repo_names=$(echo "$response" | jq -r '.[].name')
 
@@ -143,8 +176,10 @@ count_loc() {
     local clone_dir="$TEMP_DIR/$repo_name"
 
     echo "Cloning $repo_name to count lines of code..."
+    log_verbose "Clone destination: $clone_dir"
     git clone --quiet "$repo_url" "$clone_dir"
 
+    log_verbose "Counting lines using git ls-files"
     # Using git ls-files to respect .gitignore, then counting lines.
     lines_of_code=$(cd "$clone_dir" && git ls-files | xargs wc -l | tail -n 1 | awk '{print $1}')
 
