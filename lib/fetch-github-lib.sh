@@ -44,6 +44,11 @@ OPTIONS
         Still shows interactive menu unless combined with --all.
         Can be used as first argument or second argument after directory.
 
+    -v, --verbose
+        Verbose mode: shows detailed INFO-level logs for each repository.
+        Displays branch detection, local changes check, and pull output.
+        Disables inline status updates and timer display.
+
     -h, --help
         Display this help message and exit.
 
@@ -69,6 +74,12 @@ EXAMPLES
     # Update all repos recursively without menu
     ./fetch-github-projects.sh --all -r
     ./fetch-github-projects.sh --all /path/to/repos -r
+
+    # Update specific directory with verbose output
+    ./fetch-github-projects.sh scripts --verbose
+
+    # Update all with detailed logging
+    ./fetch-github-projects.sh --all --verbose
 
 AUTHOR
     Matt J Bordenet
