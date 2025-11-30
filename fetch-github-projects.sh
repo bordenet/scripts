@@ -179,27 +179,48 @@ update_repo() {
     fi
 
     # Pull quietly (fast-forward only to avoid merge conflicts)
-    log_verbose "INFO: Pulling latest changes from origin/$DEFAULT_BRANCH..."
-    if OUTPUT=$(git pull --ff-only origin "$DEFAULT_BRANCH" 2>&1); then
-        if grep -q "Already up to date" <<< "$OUTPUT"; then
+    if [ "$WHAT_IF" = true ]; then
+        log_verbose "INFO: [WHAT-IF] Would pull latest changes from origin/$DEFAULT_BRANCH..."
+        # Check if there are updates available
+        git fetch origin "$DEFAULT_BRANCH" >/dev/null 2>&1
+        LOCAL=$(git rev-parse @ 2>/dev/null)
+        REMOTE=$(git rev-parse "origin/$DEFAULT_BRANCH" 2>/dev/null)
+
+        if [ "$LOCAL" = "$REMOTE" ]; then
             if [ "$show_progress" = true ]; then
-                complete_status "${BLUE}•${NC} ${repo_name}"
+                complete_status "${BLUE}•${NC} ${repo_name} [WHAT-IF: would skip, already up to date]"
             fi
-            log_verbose "INFO: Already up to date"
+            log_verbose "INFO: [WHAT-IF] Already up to date, would skip"
         else
             if [ "$show_progress" = true ]; then
-                complete_status "${GREEN}✓${NC} ${repo_name} (updated)"
+                complete_status "${GREEN}✓${NC} ${repo_name} [WHAT-IF: would update]"
             fi
-            log_verbose "INFO: Successfully updated"
-            log_verbose "INFO: $OUTPUT"
+            log_verbose "INFO: [WHAT-IF] Would update from $LOCAL to $REMOTE"
             UPDATED_REPOS+=("$repo_name")
         fi
     else
-        if [ "$show_progress" = true ]; then
-            complete_status "${RED}✗${NC} ${repo_name} (pull failed)"
+        log_verbose "INFO: Pulling latest changes from origin/$DEFAULT_BRANCH..."
+        if OUTPUT=$(git pull --ff-only origin "$DEFAULT_BRANCH" 2>&1); then
+            if grep -q "Already up to date" <<< "$OUTPUT"; then
+                if [ "$show_progress" = true ]; then
+                    complete_status "${BLUE}•${NC} ${repo_name}"
+                fi
+                log_verbose "INFO: Already up to date"
+            else
+                if [ "$show_progress" = true ]; then
+                    complete_status "${GREEN}✓${NC} ${repo_name} (updated)"
+                fi
+                log_verbose "INFO: Successfully updated"
+                log_verbose "INFO: $OUTPUT"
+                UPDATED_REPOS+=("$repo_name")
+            fi
+        else
+            if [ "$show_progress" = true ]; then
+                complete_status "${RED}✗${NC} ${repo_name} (pull failed)"
+            fi
+            log_verbose "ERROR: Pull failed: $OUTPUT"
+            FAILED_REPOS+=("$repo_name: $OUTPUT")
         fi
-        log_verbose "ERROR: Pull failed: $OUTPUT"
-        FAILED_REPOS+=("$repo_name: $OUTPUT")
     fi
 
     popd > /dev/null || return
@@ -212,6 +233,7 @@ MENU_MODE=true
 TARGET_DIR=""
 RECURSIVE_MODE=false
 VERBOSE=false
+WHAT_IF=false
 
 # Parse arguments
 while [ $# -gt 0 ]; do
@@ -229,6 +251,10 @@ while [ $# -gt 0 ]; do
             ;;
         -v|--verbose)
             VERBOSE=true
+            shift
+            ;;
+        --what-if)
+            WHAT_IF=true
             shift
             ;;
         *)
@@ -422,16 +448,13 @@ fi
 end_time=$(date +%s)
 execution_time=$((end_time - start_time))
 
-echo
-echo -e "${BOLD}Summary${NC} (${execution_time}s)"
-echo
+echo -e "\n${BOLD}Summary${NC} (${execution_time}s)"
 
 if [ ${#UPDATED_REPOS[@]} -gt 0 ]; then
     echo -e "${GREEN}✓ Updated (${#UPDATED_REPOS[@]}):${NC}"
     for repo in "${UPDATED_REPOS[@]}"; do
         echo "  • $repo"
     done
-    echo
 fi
 
 if [ ${#SKIPPED_REPOS[@]} -gt 0 ]; then
@@ -439,7 +462,6 @@ if [ ${#SKIPPED_REPOS[@]} -gt 0 ]; then
     for repo in "${SKIPPED_REPOS[@]}"; do
         echo "  • $repo"
     done
-    echo
 fi
 
 if [ ${#FAILED_REPOS[@]} -gt 0 ]; then
@@ -447,9 +469,8 @@ if [ ${#FAILED_REPOS[@]} -gt 0 ]; then
     for repo in "${FAILED_REPOS[@]}"; do
         echo "  • $repo"
     done
-    echo
     exit 1
 fi
 
-echo -e "${GREEN}✓${NC} All repositories processed successfully!"
+echo -e "\n${GREEN}✓${NC} All repositories processed successfully!"
 exit 0
