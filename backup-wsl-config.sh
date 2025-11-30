@@ -59,6 +59,9 @@
 
 set -euo pipefail
 
+# Arguments
+VERBOSE=false
+
 # Get script directory for sourcing libraries
 # Resolve symlinks to get actual script location
 SCRIPT_PATH="${BASH_SOURCE[0]}"
@@ -90,6 +93,9 @@ DESCRIPTION
     and package lists. Creates an interactive restore script inside the archive.
 
 OPTIONS
+    -v, --verbose
+        Enable verbose output showing detailed backup operations
+
     -h, --help
         Display this help message and exit.
 
@@ -141,18 +147,35 @@ EOF
     exit 0
 }
 
+# Logging function for verbose output
+log_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo "[VERBOSE] $*" >&2
+    fi
+}
+
 # Parse arguments
-case "${1:-}" in
-    -h|--help)
-        show_help
-        ;;
-esac
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        -h|--help)
+            show_help
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
 
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
 
 BACKUP_BASE_DIR="${1:-$HOME/wsl-backups}"
+log_verbose "Backup base directory set to: $BACKUP_BASE_DIR"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_NAME="wsl-backup-$TIMESTAMP"
 BACKUP_DIR="$BACKUP_BASE_DIR/$BACKUP_NAME"
@@ -172,6 +195,7 @@ fi
 
 # Create backup directory
 mkdir -p "$BACKUP_DIR"
+log_verbose "Created backup directory: $BACKUP_DIR"
 print_info "Backup directory: $BACKUP_DIR"
 echo
 
@@ -179,6 +203,7 @@ echo
 # System Configuration Files
 # -----------------------------------------------------------------------------
 
+log_verbose "Starting backup of system configuration files"
 echo -e "${BLUE}System Configuration Files:${NC}"
 
 backup_file "/etc/wsl.conf" "$BACKUP_DIR/system/wsl.conf" "WSL configuration"
@@ -270,6 +295,7 @@ echo
 # Package Lists and System Information
 # -----------------------------------------------------------------------------
 
+log_verbose "Collecting package lists and system information"
 echo -e "${BLUE}Package Lists and System Information:${NC}"
 
 # APT packages
@@ -340,10 +366,12 @@ echo
 # Create Archive
 # -----------------------------------------------------------------------------
 
+log_verbose "Creating zip archive from: $BACKUP_DIR"
 echo -e "${BLUE}Creating zip archive...${NC}"
 
 cd "$BACKUP_BASE_DIR"
 zip -r "$BACKUP_NAME.zip" "$BACKUP_NAME" > /dev/null 2>&1
+log_verbose "Zip command completed for: $ARCHIVE_PATH"
 
 if [ -f "$ARCHIVE_PATH" ]; then
     print_success "Archive created: $ARCHIVE_PATH"

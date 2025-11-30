@@ -3,6 +3,60 @@
 
 set -euo pipefail
 
+# Arguments
+VERBOSE=false
+
+# Display help information
+show_help() {
+    cat << EOF
+NAME
+    add-help-batch.sh - Add help function to scripts missing it
+
+SYNOPSIS
+    add-help-batch.sh [OPTIONS]
+
+DESCRIPTION
+    Batch adds help functions to scripts that don't have them. Extracts
+    descriptions from existing comments and generates man-page style help text.
+
+OPTIONS
+    -v, --verbose
+        Enable verbose output showing detailed processing information
+
+    -h, --help
+        Display this help message and exit
+
+EXIT STATUS
+    0   Success
+    1   Error
+
+EOF
+    exit 0
+}
+
+# Logging function for verbose output
+log_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo "[VERBOSE] $*" >&2
+    fi
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        -h|--help)
+            show_help
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
 SCRIPTS=(
     "analyze-malware-sandbox/check-alpine-version.sh"
     "analyze-malware-sandbox/create-vm-alternate.sh"
@@ -16,21 +70,27 @@ SCRIPTS=(
 )
 
 for script in "${SCRIPTS[@]}"; do
+    log_verbose "Processing script: $script"
+
     if [ ! -f "$script" ]; then
         echo "Skipping $script (not found)"
+        log_verbose "File not found at path: $script"
         continue
     fi
-    
+
     # Check if already has help
     if grep -q "show_help()" "$script" 2>/dev/null; then
         echo "Skipping $script (already has help)"
+        log_verbose "Script already contains show_help() function"
         continue
     fi
-    
+
     echo "Adding help to $script..."
-    
+    log_verbose "Extracting description from comments"
+
     # Extract description from existing comments
     desc=$(grep -m1 "^# Description:" "$script" | sed 's/^# Description: This script //' | sed 's/^# Description: //' || echo "Script functionality")
+    log_verbose "Extracted description: $desc"
     
     # Create temp file with help function
     awk -v desc="$desc" '
@@ -83,9 +143,11 @@ for script in "${SCRIPTS[@]}"; do
     }
     { print }
     ' "$script" > "$script.tmp" && mv "$script.tmp" "$script"
-    
+
+    log_verbose "Successfully added help function to $script"
     echo "  ✓ Added help to $script"
 done
 
+log_verbose "Batch help addition completed"
 echo ""
 echo "✓ All scripts updated"
