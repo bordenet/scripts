@@ -49,6 +49,11 @@ OPTIONS
         Displays branch detection, local changes check, and pull output.
         Disables inline status updates and timer display.
 
+    --what-if
+        Dry-run mode: shows what would be updated without making changes.
+        Fetches latest commits to check for updates but doesn't pull.
+        Safe for checking repository status before actual updates.
+
     -h, --help
         Display this help message and exit.
 
@@ -80,6 +85,10 @@ EXAMPLES
 
     # Update all with detailed logging
     ./fetch-github-projects.sh --all --verbose
+
+    # Dry-run: check what would be updated without making changes
+    ./fetch-github-projects.sh --all --what-if
+    ./fetch-github-projects.sh scripts --what-if --verbose
 
 AUTHOR
     Matt J Bordenet
