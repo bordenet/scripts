@@ -40,6 +40,9 @@ OPTIONS
         Dry-run mode: show what would be deleted without making any changes.
         No branches will be deleted locally or remotely.
 
+    -v, --verbose
+        Enable verbose output showing detailed progress information.
+
     -h, --help
         Display this help message and exit
 

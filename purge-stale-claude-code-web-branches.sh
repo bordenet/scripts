@@ -39,6 +39,7 @@ SKIPPED_BRANCHES=()
 FAILED_BRANCHES=()
 ALL_MODE=false
 WHAT_IF=false
+VERBOSE=false
 
 # Array to store branch info: "name|timestamp|author|subject|location"
 declare -a BRANCHES
@@ -85,6 +86,13 @@ stop_timer() {
 
 # Helper functions (calculate_age, format_timestamp, delete_branch) now in lib/purge-stale-branches-lib.sh
 
+# Function to log verbose messages
+log_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo "INFO: $*"
+    fi
+}
+
 # --- Help Function (now in lib/purge-stale-branches-lib.sh) ---
 
 # --- Argument Parsing ---
@@ -99,6 +107,10 @@ while [ $# -gt 0 ]; do
             ;;
         --what-if)
             WHAT_IF=true
+            shift
+            ;;
+        -v|--verbose)
+            VERBOSE=true
             shift
             ;;
         -*)
@@ -139,10 +151,13 @@ fi
 
 # Fetch latest from origin
 echo -ne "  Fetching latest from origin..."
+log_verbose "Running git fetch origin"
 if git fetch origin &> /dev/null; then
     echo -e "\r${ERASE_LINE}${GREEN}✓${NC} Fetched latest from origin"
+    log_verbose "Fetch completed successfully"
 else
     echo -e "\r${ERASE_LINE}${YELLOW}⊘${NC} Could not fetch from origin (continuing with local data)"
+    log_verbose "Fetch failed, continuing with local data"
 fi
 
 # Get current branch to protect it
@@ -150,6 +165,7 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 
 # --- Branch Discovery ---
 echo -ne "  Discovering Claude Code branches..."
+log_verbose "Searching for local claude/* branches"
 
 # Get local claude/* branches
 while IFS='|' read -r refname timestamp author subject; do
@@ -172,6 +188,7 @@ while IFS='|' read -r refname timestamp author subject; do
     fi
 done < <(git for-each-ref --format='%(refname:short)|%(committerdate:unix)|%(authorname)|%(subject)' refs/heads/claude/ 2>/dev/null)
 
+log_verbose "Searching for remote origin/claude/* branches"
 # Get remote claude/* branches
 while IFS='|' read -r refname timestamp author subject; do
     # Remove 'origin/' prefix for comparison
@@ -197,6 +214,7 @@ while IFS='|' read -r refname timestamp author subject; do
 done < <(git for-each-ref --format='%(refname:short)|%(committerdate:unix)|%(authorname)|%(subject)' refs/remotes/origin/claude/ 2>/dev/null)
 
 echo -e "\r${ERASE_LINE}${GREEN}✓${NC} Found ${#BRANCHES[@]} Claude Code branches"
+log_verbose "Discovered ${#BRANCHES[@]} total branches (local/remote/both)"
 echo
 
 # Check if any branches found

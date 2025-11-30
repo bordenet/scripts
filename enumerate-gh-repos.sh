@@ -35,6 +35,9 @@ set -euo pipefail
 
 set -e
 
+# --- Argument Defaults ---
+VERBOSE=false
+
 # --- Help Function ---
 show_help() {
     cat << EOF
@@ -52,6 +55,9 @@ DESCRIPTION
 OPTIONS
     -h, --help
         Display this help message and exit.
+
+    -v, --verbose
+        Enable verbose output showing detailed progress information.
 
 ARGUMENTS
     GITHUB_API_TOKEN
@@ -98,12 +104,27 @@ EOF
     exit 0
 }
 
-# Parse arguments for help
-case "${1:-}" in
-    -h|--help)
-        show_help
-        ;;
-esac
+# Parse arguments
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        -*)
+            echo "Error: Unknown option: $1"
+            echo "Try '$0 --help' for more information"
+            exit 1
+            ;;
+        *)
+            # This is the API token
+            break
+            ;;
+    esac
+done
 
 # --- Configuration ---
 # !!! IMPORTANT !!!
@@ -133,6 +154,13 @@ log() {
     echo -e "$(date '+%Y-%m-%d %H:%M:%S')\t$1" | tee -a "$LOG_FILE"
 }
 
+# Function to log verbose messages
+log_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo "INFO: $*"
+    fi
+}
+
 # Function to handle errors and exit the script.
 error_exit() {
     log "ERROR: $1"
@@ -142,6 +170,7 @@ error_exit() {
 # Function to retrieve the list of repository clone URLs for the organization.
 get_repos() {
     log "Fetching repository list for organization: $GITHUB_ORG"
+    log_verbose "Calling GitHub API: $GITHUB_URL/api/v3/orgs/$GITHUB_ORG/repos"
     curl -s -H "Authorization: token $GITHUB_TOKEN" "$GITHUB_URL/api/v3/orgs/$GITHUB_ORG/repos" | jq -r '.[].clone_url' || true
 }
 
@@ -159,8 +188,10 @@ count_loc() {
     local repo_name; repo_name=$(basename "$repo_url" .git)
     local clone_dir="$TEMP_DIR/$repo_name"
     log "Cloning $repo_name to $clone_dir"
+    log_verbose "Clone destination: $clone_dir"
     git clone "$repo_url" "$clone_dir" --quiet || error_exit "Failed to clone $repo_url"
     log "Counting lines of code for: $repo_name"
+    log_verbose "Using find to count all non-hidden files"
     # This command finds all files, excludes dotfiles/dot-directories, and counts their lines.
     find "$clone_dir" -type f ! -path "*/\.*" -exec wc -l {} + | awk '{total += $1} END {print total}'
 }
@@ -175,6 +206,9 @@ if [ "$#" -ne 1 ]; then
     usage
 fi
 GITHUB_TOKEN=$1
+
+log_verbose "Verbose mode enabled"
+log_verbose "Configuration: GITHUB_URL=$GITHUB_URL, GITHUB_ORG=$GITHUB_ORG"
 
 # Create a temporary directory for cloning repositories.
 TEMP_DIR=$(mktemp -d)
