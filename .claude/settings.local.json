@@ -12,7 +12,11 @@
       "Bash(/Users/matt/GitHub/Personal/scripts/delete-time-machine-snapshots.sh:*)",
       "Bash(/Users/matt/GitHub/Personal/scripts/list-dormant-repos.sh:*)",
       "Bash(/Users/matt/GitHub/Personal/scripts/start-ollama.sh:*)",
-      "Bash(/Users/matt/GitHub/Personal/scripts/purge-stale-claude-code-web-branches.sh --help)"
+      "Bash(/Users/matt/GitHub/Personal/scripts/purge-stale-claude-code-web-branches.sh --help)",
+      "Bash(timeout 60 ./ci-quality-gates.sh:*)",
+      "Bash(timeout:*)",
+      "Bash(for script in cleanup-npm-global.sh fetch-github-projects.sh lib/fetch-github-lib.sh)",
+      "Bash(do echo \"=== $script ===\")"
     ],
     "deny": [],
     "ask": []
