@@ -214,13 +214,8 @@ while [ $# -gt 0 ]; do
     esac
 done
 if [ -z "$TARGET_DIR" ]; then
-    if [ "$MENU_MODE" = false ]; then
-        # --all without directory defaults to $HOME/GitHub
-        TARGET_DIR="$HOME/GitHub"
-    else
-        # Menu mode without directory defaults to current directory
-        TARGET_DIR="."
-    fi
+    # Always default to current directory
+    TARGET_DIR="."
 fi
 start_time=$(date +%s)
 if [ ! -d "$TARGET_DIR" ]; then
