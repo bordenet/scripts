@@ -59,7 +59,7 @@ OPTIONS
 
 ARGUMENTS
     DIRECTORY
-        Target directory containing Git repositories. Default: ~/GitHub
+        Target directory containing Git repositories. Default: . (current directory)
 
 PLATFORM
     Cross-platform (macOS, Linux, WSL)
