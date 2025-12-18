@@ -6,6 +6,35 @@
 # USAGE: source "$(dirname "${BASH_SOURCE[0]}")/lib/bu-lib.sh"
 ################################################################################
 
+# Ensure required dependencies are available
+# Checks for Homebrew and coreutils (for timeout/gtimeout)
+ensure_dependencies() {
+    # Check for Homebrew first - it's required for everything else
+    if ! command -v brew &>/dev/null; then
+        echo "Error: Homebrew is required but not installed." >&2
+        echo "Install it from https://brew.sh" >&2
+        exit 1
+    fi
+
+    # Check for timeout (GNU coreutils)
+    # On macOS, GNU timeout is installed as 'gtimeout' by coreutils
+    if ! command -v timeout &>/dev/null && ! command -v gtimeout &>/dev/null; then
+        echo "Installing coreutils (required for timeout command)..."
+        if ! brew install coreutils; then
+            echo "Error: Failed to install coreutils" >&2
+            exit 1
+        fi
+        echo "coreutils installed successfully"
+    fi
+
+    # If timeout doesn't exist but gtimeout does, create alias function
+    if ! command -v timeout &>/dev/null && command -v gtimeout &>/dev/null; then
+        # Export function so subshells can use it
+        timeout() { gtimeout "$@"; }
+        export -f timeout
+    fi
+}
+
 # Display help information
 show_help() {
     cat << EOF
