@@ -22,6 +22,7 @@ done
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 # shellcheck source=lib/bu-lib.sh
 source "$SCRIPT_DIR/lib/bu-lib.sh"
+ensure_dependencies  # Check/install coreutils for timeout command
 
 # --- Colors for Output (exported for library use) ---
 export RED='\033[0;31m'
