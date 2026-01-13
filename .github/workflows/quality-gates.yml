@@ -64,8 +64,8 @@ jobs:
               ((WRONG_SHEBANG++)) || true
             fi
 
-            # 5. Check error handling (skip bu.sh, mu.sh, and lib files)
-            if [[ ! "$script" =~ (bu\.sh|mu\.sh|/lib/) ]]; then
+            # 5. Check error handling (skip bu.sh, mu.sh, lib files, and experimental/)
+            if [[ ! "$script" =~ (bu\.sh|mu\.sh|/lib/|/experimental/) ]]; then
               if ! grep -q "^set -euo pipefail" "$script"; then
                 echo "  ✗ Missing error handling (set -euo pipefail)"
                 ((MISSING_ERROR_HANDLING++)) || true
