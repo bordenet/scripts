@@ -192,6 +192,7 @@ while [ $# -gt 0 ]; do
             ;;
         --all)
             MENU_MODE=false
+            RECURSIVE_MODE=true  # --all implies recursive search
             shift
             ;;
         -r|--recursive)
@@ -269,38 +270,22 @@ if [ "$RECURSIVE_MODE" = true ]; then
     find_repos_recursive "." repos
     complete_status "${BLUE}Found ${#repos[@]} repositories${NC}"
     log_verbose "INFO: Found ${#repos[@]} repositories"
-elif [ "$MENU_MODE" = true ]; then
-    if [ -d ".git" ]; then
-        repos+=(".")
-    else
-        for dir in */; do
-            if [ -d "$dir/.git" ]; then
-                repos+=("$dir")
-            else
-                for subdir in "$dir"*/; do
-                    if [ -d "$subdir/.git" ]; then
-                        repos+=("$subdir")
-                    fi
-                done
-            fi
-        done
-    fi
 else
-    # --all mode (non-recursive)
-    if [ -d ".git" ]; then
+    # Menu mode (non-recursive): look for child git repos (up to 2 levels deep)
+    for dir in */; do
+        if [ -d "$dir/.git" ]; then
+            repos+=("$dir")
+        else
+            for subdir in "$dir"*/; do
+                if [ -d "$subdir/.git" ]; then
+                    repos+=("$subdir")
+                fi
+            done
+        fi
+    done
+    # If no child repos found but current dir is a repo, include it
+    if [ ${#repos[@]} -eq 0 ] && [ -d ".git" ]; then
         repos+=(".")
-    else
-        for dir in */; do
-            if [ -d "$dir/.git" ]; then
-                repos+=("$dir")
-            else
-                for subdir in "$dir"*/; do
-                    if [ -d "$subdir/.git" ]; then
-                        repos+=("$subdir")
-                    fi
-                done
-            fi
-        done
     fi
 fi
 
