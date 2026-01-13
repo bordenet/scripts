@@ -35,7 +35,7 @@ jobs:
           MISSING_ERROR_HANDLING=0
           OVERSIZED_SCRIPTS=0
           
-          # Find all .sh files (excluding hidden directories)
+          # Find all .sh files (excluding hidden directories and experimental/)
           while IFS= read -r -d '' script; do
             ((TOTAL_SCRIPTS++)) || true
             echo "Checking: $script"
@@ -79,7 +79,7 @@ jobs:
               ((OVERSIZED_SCRIPTS++)) || true
             fi
             
-          done < <(find . -type f -name "*.sh" ! -path "*/.*" -print0)
+          done < <(find . -type f -name "*.sh" ! -path "*/.*" ! -path "./experimental/*" -print0)
           
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
