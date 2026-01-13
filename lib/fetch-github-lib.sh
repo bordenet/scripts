@@ -36,8 +36,8 @@ DESCRIPTION
 
 OPTIONS
     --all
-        Skip interactive menu and update all repositories automatically.
-        Searches up to 2 levels deep (*/  and */*/).
+        Skip interactive menu and update ALL repositories automatically.
+        Implies --recursive: searches all subdirectories for git repositories.
 
     -r, --recursive
         Recursive mode: searches all subdirectories for git repositories.
