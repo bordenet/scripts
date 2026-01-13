@@ -15,6 +15,7 @@ A collection of utility scripts for macOS and Linux systems.
 - [Security & Analysis](#security--analysis)
 - [Xcode](#xcode)
 - [AI Assistant](#ai-assistant)
+- [Experimental](#experimental)
 - [Engineering Starter Kit](#engineering-starter-kit)
 - [macOS Development Environment Setup](#macos-development-environment-setup)
 - [Documentation](#documentation)
@@ -91,6 +92,17 @@ A collection of utility scripts for macOS and Linux systems.
 | [`resume-claude.sh`](./resume-claude.sh) | Automates the process of resuming an AI assistant session with "Claude" within VS Code. |
 | [`schedule-claude.sh`](./schedule-claude.sh) | Schedules the execution of the 'resume-claude.sh' script after a specified delay. |
 | [`tell-vscode-at.sh`](./tell-vscode-at.sh) | Send messages to VS Code instances at specified times using AppleScript. [Docs](./docs/tell-vscode-at.md) |
+
+## Experimental
+
+Scripts in development or testing. May not meet full compliance standards yet.
+
+| Script | Description |
+|---|---|
+| [`experimental/install-augment-superpowers.sh`](./experimental/install-augment-superpowers.sh) | Installs the superpowers skill system for Augment Code. Self-contained installer (requires only git + node) works via curl pipe on macOS, Linux, and WSL. |
+| [`experimental/app-nuke.sh`](./experimental/app-nuke.sh) | Application removal utility (experimental). |
+| [`experimental/daily-trim.sh`](./experimental/daily-trim.sh) | Daily cleanup utility (experimental). |
+| [`experimental/disk-master.sh`](./experimental/disk-master.sh) | Disk management utility (experimental). |
 
 ## Engineering Starter Kit
 
