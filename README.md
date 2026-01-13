@@ -38,10 +38,7 @@ A collection of utility scripts for macOS and Linux systems.
 | [`squash-commits.sh`](./squash-commits.sh) | Interactively squash a range of commits in a Git repository. |
 | [`squash-last-n.sh`](./squash-last-n.sh) | Squashes the last <N> commits into a single new commit using git reset --soft. |
 
-## System & Environme
-
-
-
+## System & Environment
 
 
 
