@@ -13,38 +13,38 @@ This style guide is the single source of truth for all shell scripts in this rep
 
 Memorize these rules before writing anything:
 
-1. 400-line limit  
-   - Any script approaching 350 lines must be refactored into libraries under lib/.  
+1. 400-line limit
+   - Any script approaching 350 lines must be refactored into libraries under lib/.
    - Short, focused scripts are easier to debug, test, and reuse.
 
-2. Zero ShellCheck noise  
+2. Zero ShellCheck noise
    - All scripts must pass ShellCheck with zero warnings at severity warning and above. [1][2][3]
    - If a warning is intentionally suppressed, document why with a ShellCheck directive.
 
-3. Required flags (-h/--help, -v/--verbose)  
-   - Every script implements both -h/--help and -v/--verbose.  
+3. Required flags (-h/--help, -v/--verbose)
+   - Every script implements both -h/--help and -v/--verbose.
    - Help is man-page style, comprehensive, and callable without any other arguments.
 
-4. UX: Smart console output and timer  
+4. UX: Smart console output and timer
    - Non-verbose mode is compact and overwrites in place using ANSI escape codes. [4][5][6][7]
-   - Verbose mode shows rich INFO-level logs and detailed progress.  
+   - Verbose mode shows rich INFO-level logs and detailed progress.
    - Scripts expected to run >10 seconds or with deferred actions must show a yellow-on-black wall clock timer in the top-right corner plus total execution time at exit.
 
-5. Defensive error handling  
-   - All scripts start with:  
-     - `#!/usr/bin/env bash`  
+5. Defensive error handling
+   - All scripts start with:
+     - `#!/usr/bin/env bash`
      - `set -euo pipefail` [1][8][9]
    - Critical operations must check return codes and use trap-based cleanup for temporary state.
 
-6. Relentless input validation  
-   - Validate argument count, types, formats, paths, and permissions.  
+6. Relentless input validation
+   - Validate argument count, types, formats, paths, and permissions.
    - Never trust user input; sanitize to prevent command injection.
 
-7. Platform-aware, portable by default  
+7. Platform-aware, portable by default
    - Use is_macos/is_linux helpers and handle BSD vs GNU differences explicitly (e.g., sed -i behavior). [1][8][10][9]
    - Default to Apple Silicon macOS but keep Linux paths and differences well-documented.
 
-8. Always test before commit  
+8. Always test before commit
    - shellcheck (zero warnings), bash -n, and functional testing with sample and edge-case data. [1][2][3]
    - Scripts that are not tested are not considered “done.”
 
@@ -64,13 +64,24 @@ Common mistakes to avoid:
 
 Goal: Every script should read like a clear story, not a tangle.
 
-- Hard cap: 400 lines including comments and blank lines.  
-- At ~350 lines, refactor immediately into:  
-  - lib/common.sh for shared utilities.  
-  - lib/<domain>.sh for domain-specific helpers.  
+- Hard cap: 400 lines including comments and blank lines.
+- At ~350 lines, refactor immediately into:
+  - lib/common.sh for shared utilities.
+  - lib/<domain>.sh for domain-specific helpers.
   - Small, focused sub-scripts for distinct workflow phases.
 
-Recommended layout for a “real” script:
+### Small Script Exception (Under ~20 Lines)
+
+For trivial utility scripts under approximately 20 lines of logic:
+
+- **Keep it simple** - Skip fancy logging helpers, color frameworks, and elaborate UI
+- **Still required**: Shebang (`#!/usr/bin/env bash`), basic error handling (`set -e`), and `-h/--help`
+- **Skip**: `set -uo pipefail` (unless handling user input), verbose mode, timers, progress indicators
+- **Rationale**: Over-engineering tiny scripts makes them harder to understand than the original problem
+
+The goal is readability. A 15-line script wrapped in 100 lines of boilerplate loses clarity.
+
+### Recommended Layout (Standard Scripts)
 
 1. Shebang and strict mode (`#!/usr/bin/env bash`, `set -euo pipefail`).
 2. Metadata constants (VERSION, SCRIPT_NAME).
@@ -83,9 +94,9 @@ Recommended layout for a “real” script:
 
 Use a project structure like:
 
-- main-script.sh (entry point, <400 lines)  
-- lib/ (shared logic)  
-- scripts/ (phase and utility scripts)  
+- main-script.sh (entry point, <400 lines)
+- lib/ (shared logic)
+- scripts/ (phase and utility scripts)
 - tests/ (automated and manual test harnesses)
 
 This structure aligns with other professional shell style guides and makes it easy to onboard new contributors. [1][8][9]
@@ -96,18 +107,18 @@ This structure aligns with other professional shell style guides and makes it ea
 
 Every script must start with:
 
-- `#!/usr/bin/env bash`  
+- `#!/usr/bin/env bash`
 - `set -euo pipefail`
 
 These defaults:
 
-- Fail fast on errors.  
-- Treat unset variables as bugs instead of silently continuing.  
+- Fail fast on errors.
+- Treat unset variables as bugs instead of silently continuing.
 - Propagate errors through pipelines.
 
 Optional but encouraged:
 
-- `set -x` when debugging locally (never committed enabled).  
+- `set -x` when debugging locally (never committed enabled).
 - `shopt -s nullglob` when globbing on possibly-empty patterns is expected.
 
 For scripts that intentionally relax strictness, document the rationale in comments near the configuration line.
@@ -207,21 +218,21 @@ Every script is self-documenting and friendly for both humans and AI assistants.
 
 Header must include:
 
-- PURPOSE: one crisp sentence.  
-- USAGE: how to run the script.  
-- PLATFORM: macOS, Linux, or both.  
-- DEPENDENCIES: external tools (brew, git, jq, etc.).  
+- PURPOSE: one crisp sentence.
+- USAGE: how to run the script.
+- PLATFORM: macOS, Linux, or both.
+- DEPENDENCIES: external tools (brew, git, jq, etc.).
 - AUTHOR (optional) and Last Updated.
 
 Inline comments:
 
-- Focus on WHY and trade-offs, not obvious “what.”  
+- Focus on WHY and trade-offs, not obvious “what.”
 - Document non-obvious platform differences (e.g., BSD sed vs GNU sed). [1][8][10]
 - Use TODO/FIXME with enough context for another contributor (or AI) to finish the work confidently.
 
 Functions:
 
-- Brief comment block for purpose, parameters, exit codes, and side effects.  
+- Brief comment block for purpose, parameters, exit codes, and side effects.
 - Make it easy for a reader to decide whether to call, modify, or extract the function.
 
 ***
@@ -230,9 +241,9 @@ Functions:
 
 Names should be boring, predictable, and descriptive.
 
-- Files: lowercase-hyphen-separated, .sh extension.  
-- Constants and globals: SCREAMING_SNAKE_CASE with readonly where possible.  
-- Local variables and functions: snake_case.  
+- Files: lowercase-hyphen-separated, .sh extension.
+- Constants and globals: SCREAMING_SNAKE_CASE with readonly where possible.
+- Local variables and functions: snake_case.
 - Environment variables: SCREAMING_SNAKE_CASE and exported explicitly.
 
 Prefer verb-based prefixes for functions: get_, set_, is_, has_, validate_, log_, require_, etc. This matches guidance from other shell style guides and reduces cognitive load when scanning. [1][8]
@@ -243,14 +254,14 @@ Prefer verb-based prefixes for functions: get_, set_, is_, has_, validate_, log_
 
 Error handling is explicit, intentional, and actionable.
 
-- Always check exit codes for critical operations.  
-- use trap-based cleanup (EXIT, ERR) for temporary files, directories, and state.  
+- Always check exit codes for critical operations.
+- use trap-based cleanup (EXIT, ERR) for temporary files, directories, and state.
 - Error messages must tell the user what went wrong and how to fix it, not just “Error.”
 
 Do not:
 
-- Hide exit codes by combining declaration + assignment from a command.  
-- Rely on `|| true` without very clear justification.  
+- Hide exit codes by combining declaration + assignment from a command.
+- Rely on `|| true` without very clear justification.
 - Leave temporary files or partial state behind after failure.
 
 Where appropriate, differentiate between “recoverable warnings” and “hard failures,” and reflect that in both log levels and exit status.
@@ -343,10 +354,10 @@ fi
 
 Treat all input as hostile until proven otherwise.
 
-- Validate argument count early; fail fast with helpful usage hints.  
-- Validate formats for emails, URLs, paths, and numeric values with regex or dedicated helpers.  
-- Sanitize input when used in shell commands to avoid injection.  
-- Never use eval on user input or untrusted data.  
+- Validate argument count early; fail fast with helpful usage hints.
+- Validate formats for emails, URLs, paths, and numeric values with regex or dedicated helpers.
+- Sanitize input when used in shell commands to avoid injection.
+- Never use eval on user input or untrusted data.
 - Always handle filenames and paths safely using null-terminated lists and proper quoting.
 
 Use helpers like validate_email, validate_path, and sanitize_input to keep core logic focused and readable.
@@ -357,8 +368,8 @@ Use helpers like validate_email, validate_path, and sanitize_input to keep core 
 
 Organize code for reuse and clarity:
 
-- Group related functions with section headers (validation, IO, domain logic, etc.).  
-- Keep helpers and utilities at the top, orchestration at the bottom.  
+- Group related functions with section headers (validation, IO, domain logic, etc.).
+- Keep helpers and utilities at the top, orchestration at the bottom.
 - Extract reusable behavior (logging, timers, platform detection, input validation) into lib/common.sh or domain-specific libraries.
 
 This lets new scripts come together quickly by composing existing, well-tested helpers.
@@ -371,24 +382,24 @@ Console output is opinionated and user-centric.
 
 - Default mode:
   - Minimal, compact lines updated in place using ANSI escape codes. [4][5][6][7]
-  - Ideal for CI logs and repeated runs.  
+  - Ideal for CI logs and repeated runs.
 - Verbose mode (-v/--verbose):
-  - Rich INFO-level logs, details about decisions, and multi-line context.  
+  - Rich INFO-level logs, details about decisions, and multi-line context.
   - Great for debugging, understanding flow, and AI-assisted troubleshooting.
 
 Core UX requirements:
 
-- Use shared logging helpers: log_info, log_success, log_warning, log_error, log_debug, log_section, etc.  
+- Use shared logging helpers: log_info, log_success, log_warning, log_error, log_debug, log_section, etc.
 - Detect whether output is a TTY; disable color when piping or redirecting. [1][8][4]
 - Use ANSI escape codes for:
-  - In-place progress updates.  
-  - Compact “dashboard-like” displays.  
+  - In-place progress updates.
+  - Compact “dashboard-like” displays.
   - A top-right wall-clock timer for long-running or deferred scripts.
 
 All long-running scripts must:
 
-- Start a wall-clock timer process at script start.  
-- Display it as [HH:MM:SS] in yellow-on-black in the top-right corner.  
+- Start a wall-clock timer process at script start.
+- Display it as [HH:MM:SS] in yellow-on-black in the top-right corner.
 - Stop it cleanly via trap, then print total execution time at exit.
 
 Choose ANSI sequences that are widely supported and avoid terminal-specific tricks where possible; rely on tools like tput where it improves portability. [4][5][6][7][11]
@@ -399,11 +410,11 @@ Choose ANSI sequences that are widely supported and avoid terminal-specific tric
 
 Every change goes through the same predictable pipeline:
 
-1. Syntax: `bash -n script.sh`.  
+1. Syntax: `bash -n script.sh`.
 2. Lint: `shellcheck --severity=warning script.sh` with zero warnings. [1][2][3]
 3. Functional testing:
-   - With representative “happy path” inputs.  
-   - With edge cases (empty inputs, weird filenames, missing resources, network failures).  
+   - With representative “happy path” inputs.
+   - With edge cases (empty inputs, weird filenames, missing resources, network failures).
    - On target platforms (macOS vs Linux), particularly for sed/awk/grep. [1][8][10][9]
 
 Have a repeatable `validate-script-compliance.sh` helper that can validate a single script, all scripts, and emit a compliance report. Align its checks with this guide and with established shell standards. [1][8][9]
@@ -416,7 +427,7 @@ Only commit after all checks pass. Scripts that do not lint, validate, and test 
 
 Default to portability, then layer platform-specific behavior where necessary.
 
-- Always use is_macos and is_linux helpers before branching into platform-specific code.  
+- Always use is_macos and is_linux helpers before branching into platform-specific code.
 - Handle BSD vs GNU tooling explicitly, particularly sed -i, date, and regex support. [1][8][10][9]
 - Assume Apple Silicon macOS for Homebrew paths (/opt/homebrew) and document any x86-only or Rosetta caveats.
 
@@ -428,9 +439,9 @@ When in doubt, test the exact sed/awk/grep incantation in isolation on the targe
 
 Security is a first-class concern, not an afterthought.
 
-- Never use eval with user-controlled data.  
-- Use mktemp for temporary files and directories, and ensure cleanup via trap.  
-- Avoid brittle constructs like `for file in $(find ...)` that break with spaces and special characters.  
+- Never use eval with user-controlled data.
+- Use mktemp for temporary files and directories, and ensure cleanup via trap.
+- Avoid brittle constructs like `for file in $(find ...)` that break with spaces and special characters.
 - Quote variables by default and only deviate when absolutely necessary and documented. [1][8][12]
 
 The goal is to make it very hard to introduce command injection, data leaks, or privilege escalation via these scripts.
@@ -442,17 +453,17 @@ The goal is to make it very hard to introduce command injection, data leaks, or 
 Every script behaves like a well-behaved CLI tool.
 
 - -h and --help must:
-  - Be available without any other arguments.  
-  - Exit 0 and never modify state.  
-  - Provide man-style sections: NAME, SYNOPSIS, DESCRIPTION, OPTIONS, ARGUMENTS, EXAMPLES, EXIT STATUS, ENVIRONMENT, SEE ALSO, AUTHOR.  
+  - Be available without any other arguments.
+  - Exit 0 and never modify state.
+  - Provide man-style sections: NAME, SYNOPSIS, DESCRIPTION, OPTIONS, ARGUMENTS, EXAMPLES, EXIT STATUS, ENVIRONMENT, SEE ALSO, AUTHOR.
 - -v and --verbose must:
-  - Control INFO and DEBUG visibility.  
+  - Control INFO and DEBUG visibility.
   - Enable detailed logs without changing semantics.
 
 Unknown options must:
 
-- Produce a clear error message.  
-- Point the user to --help.  
+- Produce a clear error message.
+- Point the user to --help.
 - Exit with a non-zero status.
 
 This gives humans and AI assistants a consistent, discoverable interface across the entire script library.
@@ -471,10 +482,10 @@ Where appropriate, cross-link external references for deeper reading (e.g., Goog
 
 For humans and AI assistants:
 
-- Read this entire guide once, then refer to it often.  
-- Follow all rules without exception unless the guide itself is updated.  
+- Read this entire guide once, then refer to it often.
+- Follow all rules without exception unless the guide itself is updated.
 - Treat ShellCheck, bash -n, and the compliance script as non-negotiable gates. [1][2][3]
-- Ask questions (via issues, comments, or prompts) when platform or security behavior is unclear.  
+- Ask questions (via issues, comments, or prompts) when platform or security behavior is unclear.
 - When in doubt, choose the safer, more explicit, and more testable option.
 
 This repository is designed so that anyone can clone, run, and extend these scripts with confidence. The style guide is the contract that makes that possible.
