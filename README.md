@@ -1,26 +1,9 @@
 # Scripts
 
+Utility scripts for macOS and Linux. Bash 4.0+, ShellCheck-clean.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Shell](https://img.shields.io/badge/Shell-Bash%204.0%2B-green.svg)](https://www.gnu.org/software/bash/)
-[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/bordenet/scripts)
 [![ShellCheck](https://img.shields.io/badge/ShellCheck-passing-success.svg)](https://www.shellcheck.net/)
-[![Code Style](https://img.shields.io/badge/Code%20Style-Google-blue.svg)](./STYLE_GUIDE.md)
-
-A collection of utility scripts for macOS and Linux systems.
-
-## Table of Contents
-
-- [Git & GitHub](#git--github)
-- [System & Environment](#system--environment)
-- [Security & Analysis](#security--analysis)
-- [Xcode](#xcode)
-- [AI Assistant](#ai-assistant)
-- [Experimental](#experimental)
-- [Engineering Starter Kit](#engineering-starter-kit)
-- [macOS Development Environment Setup](#macos-development-environment-setup)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
-- [License](#license)
 
 ## Git & GitHub
 
@@ -138,94 +121,26 @@ cp macos-setup/setup-macos-template.sh your-project/scripts/setup-macos.sh
 
 ---
 
+## Standards
+
+All scripts follow [STYLE_GUIDE.md](./STYLE_GUIDE.md):
+
+- `#!/usr/bin/env bash` shebang
+- `set -euo pipefail` error handling
+- `-h/--help` with man-page style output
+- `--what-if` for destructive operations
+- Under 400 lines
+- ShellCheck clean (`shellcheck -S warning`)
+
+Pre-commit hooks and CI enforce these automatically.
+
 ## Documentation
 
-- **[STYLE_GUIDE.md](./STYLE_GUIDE.md)** - Shell script coding standards
-- **[CLAUDE.md](./CLAUDE.md)** - Guidelines for AI assistants working in this repository
-- **[docs/](./docs/)** - Additional documentation for specific scripts
-
-## Code Quality Standards
-
-**All 80+ scripts in this repository are fully compliant with our coding standards.**
-
-### Quality Metrics (100% Compliance)
-
-- ✅ **Zero ShellCheck warnings** - All scripts pass `shellcheck -S warning`
-- ✅ **Zero syntax errors** - All scripts validated with `bash -n`
-- ✅ **Correct shebang** - All scripts use `#!/usr/bin/env bash`
-- ✅ **Error handling** - All scripts use `set -euo pipefail` (except intentional exceptions)
-- ✅ **Line limits** - No script exceeds 400 lines
-- ✅ **Help documentation** - All scripts implement `-h/--help` with man-page style output
-- ✅ **Dry-run support** - All destructive scripts implement `--what-if` flag
-
-### Automated Quality Gates
-
-- **Pre-commit hook** - Validates all staged scripts before commit
-- **CI validation** - Continuous integration checks enforce standards
-- **Comprehensive testing** - Syntax, linting, and compliance checks
-
-### Standards Documentation
-
-- **[STYLE_GUIDE.md](./STYLE_GUIDE.md)** - Authoritative coding standards (read this first)
-- **[CLAUDE.md](./CLAUDE.md)** - AI assistant guidelines and platform-specific gotchas
-
-## Contributing
-
-All contributions must meet our quality standards:
-
-1. ✅ **Pass shellcheck** with zero warnings (`shellcheck -S warning`)
-2. ✅ **Pass syntax validation** (`bash -n script.sh`)
-3. ✅ **Stay under 400 lines** per script
-4. ✅ **Include `--help` documentation** (man-page style)
-5. ✅ **Add `--what-if` support** for destructive operations
-6. ✅ **Use `#!/usr/bin/env bash`** shebang
-7. ✅ **Include `set -euo pipefail`** error handling
-8. ✅ **Test all changes** before committing
-
-The pre-commit hook will automatically validate your changes. See [STYLE_GUIDE.md](./STYLE_GUIDE.md) for complete details.
+- [STYLE_GUIDE.md](./STYLE_GUIDE.md) — Coding standards
+- [CLAUDE.md](./CLAUDE.md) — AI assistant guidelines
+- [docs/](./docs/) — Script-specific docs
 
 ## License
 
-MIT License - see [LICENSE](./LICENSE) file for details.
-
-Copyright (c) 2025 Matt J Bordenet
-
-## Claude Code Skills
-
-This repository includes Claude Code skills for automated enforcement of coding standards.
-
-### enforce-style-guide Skill
-
-**Location**: `~/.claude/skills/skills/enforce-style-guide.md`
-
-**Purpose**: Ruthlessly enforces STYLE_GUIDE.md compliance before every commit.
-
-**Installation**: Already installed globally at `~/.claude/skills/skills/enforce-style-guide.md`
-
-**Usage**: This skill activates automatically when Claude Code detects commit-related activity. You can also explicitly request it:
-
-```
-User: "Use the enforce-style-guide skill to audit all scripts"
-User: "I'm ready to commit - check style guide compliance first"
-```
-
-**What it does**:
-1. Locates STYLE_GUIDE.md in repository root or docs/
-2. Audits ALL shell scripts against mandatory requirements
-3. Reports violations with file:line references
-4. Fixes violations systematically
-5. Re-audits until zero violations
-6. Prevents commits of non-compliant code
-
-**Enforcement Rules** (Shell Scripts):
-- ✅ Shebang: `#!/usr/bin/env bash`
-- ✅ Error handling: `set -euo pipefail`
-- ✅ Help flag: `-h|--help`
-- ✅ Verbose flag: `-v|--verbose`
-- ✅ Dry-run: `--what-if` (destructive scripts)
-- ✅ Line limit: Under 400 lines
-- ✅ ShellCheck: Zero warnings
-- ✅ Syntax: `bash -n` passes
-
-**Integration**: Implements MANDATORY Step 1 from CLAUDE.md pre-commit checklist.
+MIT — see [LICENSE](./LICENSE)
 
