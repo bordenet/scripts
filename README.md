@@ -2,6 +2,7 @@
 
 Utility scripts for macOS and Linux. Bash 4.0+, ShellCheck-clean.
 
+[![Quality Gates](https://github.com/bordenet/scripts/actions/workflows/quality-gates.yml/badge.svg)](https://github.com/bordenet/scripts/actions/workflows/quality-gates.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![ShellCheck](https://img.shields.io/badge/ShellCheck-passing-success.svg)](https://www.shellcheck.net/)
 
