@@ -232,9 +232,11 @@ log_verbose "INFO: Verbose mode: $VERBOSE"
 if [ -d "$SCRIPT_DIR/.git" ]; then
     log_verbose "INFO: Checking if scripts repository needs updating..."
     pushd "$SCRIPT_DIR" > /dev/null || exit
-    git fetch origin > /dev/null 2>&1
-    LOCAL=$(git rev-parse @ 2>/dev/null)
-    REMOTE=$(git rev-parse '@{u}' 2>/dev/null)
+    # Disable git prompts to prevent hanging on credential/passphrase prompts
+    # Use || true to prevent script exit when upstream branch is not configured
+    GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -oBatchMode=yes" timeout 10 git fetch origin > /dev/null 2>&1 || true
+    LOCAL=$(git rev-parse @ 2>/dev/null || true)
+    REMOTE=$(git rev-parse '@{u}' 2>/dev/null || true)
 
     if [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
         echo "⚠️  WARNING: The scripts repository itself has updates available!"
