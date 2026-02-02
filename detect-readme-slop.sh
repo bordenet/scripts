@@ -6,7 +6,7 @@
 #   ./detect-readme-slop.sh [OPTIONS] [FILE...]
 #
 # Options:
-#   -t, --threshold NUM  Fail if bullshit factor exceeds NUM (default: 40)
+#   -t, --threshold NUM  Fail if slop score exceeds NUM (default: 40)
 #   -v, --verbose        Show detailed pattern breakdown
 #   -q, --quiet          Only output on failure
 #   --staged             Check git staged README files (for pre-commit)
@@ -94,7 +94,7 @@ for file in "${FILES[@]}"; do
         continue
     fi
     
-    score=$(calculate_bullshit_factor "$file")
+    score=$(calculate_slop_score "$file")
     verdict=$(get_verdict "$score")
     
     if score_passes "$score" "$THRESHOLD"; then

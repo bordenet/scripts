@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # slop-detection-lib.sh - AI slop detection for README files
 # Detects patterns that indicate low-quality AI-generated content
-# Returns bullshit factor score (0-100)
+# Returns slop score score (0-100)
 
 # Lexical patterns - generic boosters and buzzwords
 readonly SLOP_BOOSTERS='incredibly|extremely|highly|very|truly|remarkably|absolutely|undoubtedly'
@@ -14,9 +14,9 @@ readonly SLOP_TRANSITION='furthermore|moreover|additionally|nevertheless|consequ
 # Structural patterns
 readonly SLOP_STRUCTURAL='key benefits|in conclusion|to summarize|in summary|the following|as follows|here is|here are'
 
-# Calculate bullshit factor for a file (0-100)
-# Usage: calculate_bullshit_factor <file_path>
-calculate_bullshit_factor() {
+# Calculate slop score for a file (0-100)
+# Usage: calculate_slop_score <file_path>
+calculate_slop_score() {
     local file_path="$1"
     local content
     local score=0
