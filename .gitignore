@@ -21,3 +21,5 @@ analyze-malware-sandbox/.env
 # Purge identity - runtime data
 purge-identity/cache/*
 purge-identity/logs/*
+ADOPT-PROMPT.md
+Agents.md.original
