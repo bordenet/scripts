@@ -144,4 +144,3 @@ Pre-commit hooks and CI enforce these automatically.
 ## License
 
 MIT — see [LICENSE](./LICENSE)
-
