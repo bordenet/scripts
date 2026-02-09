@@ -1,6 +1,6 @@
 # Shell Script Style Guide: Error Handling & set -euo pipefail
 
-> Part of [SHELL_SCRIPT_STYLE_GUIDE.md](../SHELL_SCRIPT_STYLE_GUIDE.md)
+> Part of [STYLE_GUIDE.md](../STYLE_GUIDE.md)
 
 ---
 
