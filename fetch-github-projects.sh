@@ -27,6 +27,8 @@ RESTORE_CURSOR='\033[u'
 UPDATED_REPOS=()
 SKIPPED_REPOS=()
 FAILED_REPOS=()
+STASH_CONFLICT_REPOS=()
+STASH_ALL=false
 TIMER_PID=""
 TIMER_WAS_RUNNING=false
 # --- Helper Functions ---
@@ -127,14 +129,62 @@ update_repo() {
         return 0
     fi
     log_verbose "INFO: Checking for local changes..."
+    local has_local_changes=false
     if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
-        if [ "$show_progress" = true ]; then
-            complete_status "${YELLOW}⊘${NC} ${repo_name} (local changes, skipped)"
+        has_local_changes=true
+    fi
+
+    if [ "$has_local_changes" = true ]; then
+        local do_stash=false
+        if [ "$STASH_ALL" = true ]; then
+            do_stash=true
+            log_verbose "INFO: Auto-stashing (user selected 'all')"
+        else
+            # Stop timer during prompt to avoid visual interference
+            stop_timer
+            echo -ne "${ERASE_LINE}\r"
+            echo -ne "${YELLOW}${repo_name}${NC} has local changes. Stash and pull? [y/n/a] "
+            read -r stash_choice
+            case "$stash_choice" in
+                [Yy])
+                    do_stash=true
+                    ;;
+                [Aa])
+                    do_stash=true
+                    STASH_ALL=true
+                    ;;
+                *)
+                    if [ "$show_progress" = true ]; then
+                        complete_status "${YELLOW}⊘${NC} ${repo_name} (local changes, skipped)"
+                    fi
+                    log_verbose "WARN: User declined to stash, skipping"
+                    SKIPPED_REPOS+=("$repo_name: has local changes (user skipped)")
+                    popd > /dev/null || return
+                    # Restart timer if we were showing progress
+                    if [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ]; then
+                        start_timer
+                    fi
+                    return 0
+                    ;;
+            esac
+            # Restart timer after prompt
+            if [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ]; then
+                start_timer
+            fi
         fi
-        log_verbose "WARN: Local changes detected, skipping"
-        SKIPPED_REPOS+=("$repo_name: has local changes")
-        popd > /dev/null || return
-        return 0
+
+        if [ "$do_stash" = true ]; then
+            log_verbose "INFO: Stashing local changes..."
+            if ! git stash push -m "fetch-github-projects auto-stash" >/dev/null 2>&1; then
+                if [ "$show_progress" = true ]; then
+                    complete_status "${RED}✗${NC} ${repo_name} (stash failed)"
+                fi
+                log_verbose "ERROR: Failed to stash changes"
+                FAILED_REPOS+=("$repo_name: stash failed")
+                popd > /dev/null || return
+                return 1
+            fi
+        fi
     fi
     if [ "$WHAT_IF" = true ]; then
         log_verbose "INFO: [WHAT-IF] Would pull latest changes from origin/$DEFAULT_BRANCH..."
@@ -169,12 +219,35 @@ update_repo() {
                 log_verbose "INFO: $OUTPUT"
                 UPDATED_REPOS+=("$repo_name")
             fi
+
+            # Pop stash if we stashed earlier
+            if [ "$has_local_changes" = true ]; then
+                log_verbose "INFO: Restoring stashed changes..."
+                if ! git stash pop >/dev/null 2>&1; then
+                    if [ "$show_progress" = true ]; then
+                        complete_status "${YELLOW}⚠${NC} ${repo_name} (updated, stash pop failed - changes remain in stash)"
+                    fi
+                    log_verbose "WARN: Stash pop failed, changes remain in stash. Run 'git stash pop' manually."
+                    STASH_CONFLICT_REPOS+=("$repo_name")
+                else
+                    log_verbose "INFO: Stashed changes restored successfully"
+                fi
+            fi
         else
             if [ "$show_progress" = true ]; then
                 complete_status "${RED}✗${NC} ${repo_name} (pull failed)"
             fi
             log_verbose "ERROR: Pull failed: $OUTPUT"
             FAILED_REPOS+=("$repo_name: $OUTPUT")
+
+            # Try to restore stash even if pull failed
+            if [ "$has_local_changes" = true ]; then
+                log_verbose "INFO: Attempting to restore stashed changes after failed pull..."
+                if ! git stash pop >/dev/null 2>&1; then
+                    log_verbose "WARN: Stash pop also failed"
+                    STASH_CONFLICT_REPOS+=("$repo_name")
+                fi
+            fi
         fi
     fi
     popd > /dev/null || return
@@ -356,6 +429,13 @@ if [ ${#UPDATED_REPOS[@]} -gt 0 ]; then
     echo -e "${GREEN}✓ Updated (${#UPDATED_REPOS[@]}):${NC}"
     for repo in "${UPDATED_REPOS[@]}"; do
         echo "  • $repo"
+    done
+fi
+
+if [ ${#STASH_CONFLICT_REPOS[@]} -gt 0 ]; then
+    echo -e "${YELLOW}⚠ Stash conflicts (${#STASH_CONFLICT_REPOS[@]}):${NC}"
+    for repo in "${STASH_CONFLICT_REPOS[@]}"; do
+        echo "  • $repo (run 'git stash pop' manually)"
     done
 fi
 
