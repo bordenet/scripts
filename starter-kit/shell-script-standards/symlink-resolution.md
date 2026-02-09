@@ -1,6 +1,6 @@
 # Shell Script Style Guide: Library Sourcing & Symlink Resolution
 
-> Part of [SHELL_SCRIPT_STYLE_GUIDE.md](../SHELL_SCRIPT_STYLE_GUIDE.md)
+> Part of [SHELL_SCRIPT_STANDARDS.md](../SHELL_SCRIPT_STANDARDS.md)
 
 ---
 

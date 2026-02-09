@@ -1,6 +1,6 @@
 # Shell Script Style Guide: UX, Logging & CLI Interface
 
-> Part of [SHELL_SCRIPT_STYLE_GUIDE.md](../SHELL_SCRIPT_STYLE_GUIDE.md)
+> Part of [STYLE_GUIDE.md](../STYLE_GUIDE.md)
 
 ---
 
