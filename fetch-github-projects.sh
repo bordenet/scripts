@@ -186,67 +186,101 @@ update_repo() {
             fi
         fi
     fi
+    # Fetch first to get latest remote state
+    log_verbose "INFO: Fetching from origin/$DEFAULT_BRANCH..."
+    if ! git fetch origin "$DEFAULT_BRANCH" >/dev/null 2>&1; then
+        if [ "$show_progress" = true ]; then
+            complete_status "${RED}✗${NC} ${repo_name} (fetch failed)"
+        fi
+        log_verbose "ERROR: Fetch failed"
+        FAILED_REPOS+=("$repo_name: fetch failed")
+        popd > /dev/null || return
+        return 1
+    fi
+
+    LOCAL=$(git rev-parse HEAD 2>/dev/null)
+    REMOTE=$(git rev-parse "origin/$DEFAULT_BRANCH" 2>/dev/null)
+    BASE=$(git merge-base HEAD "origin/$DEFAULT_BRANCH" 2>/dev/null || echo "")
+
     if [ "$WHAT_IF" = true ]; then
-        log_verbose "INFO: [WHAT-IF] Would pull latest changes from origin/$DEFAULT_BRANCH..."
-        git fetch origin "$DEFAULT_BRANCH" >/dev/null 2>&1
-        LOCAL=$(git rev-parse @ 2>/dev/null)
-        REMOTE=$(git rev-parse "origin/$DEFAULT_BRANCH" 2>/dev/null)
+        log_verbose "INFO: [WHAT-IF] Checking if update needed..."
         if [ "$LOCAL" = "$REMOTE" ]; then
             if [ "$show_progress" = true ]; then
                 complete_status "${BLUE}•${NC} ${repo_name} [WHAT-IF: would skip, already up to date]"
             fi
             log_verbose "INFO: [WHAT-IF] Already up to date, would skip"
-        else
+        elif [ "$LOCAL" = "$BASE" ]; then
             if [ "$show_progress" = true ]; then
                 complete_status "${GREEN}✓${NC} ${repo_name} [WHAT-IF: would update]"
             fi
-            log_verbose "INFO: [WHAT-IF] Would update from $LOCAL to $REMOTE"
+            log_verbose "INFO: [WHAT-IF] Would fast-forward from $LOCAL to $REMOTE"
             UPDATED_REPOS+=("$repo_name")
+        else
+            if [ "$show_progress" = true ]; then
+                complete_status "${RED}✗${NC} ${repo_name} [WHAT-IF: diverged, needs manual merge]"
+            fi
+            log_verbose "WARN: [WHAT-IF] Branches have diverged, would need manual merge"
+            FAILED_REPOS+=("$repo_name: branches have diverged (local and remote have different commits)")
         fi
     else
-        log_verbose "INFO: Pulling latest changes from origin/$DEFAULT_BRANCH..."
-        if OUTPUT=$(git pull --ff-only origin "$DEFAULT_BRANCH" 2>&1); then
-            if grep -q "Already up to date" <<< "$OUTPUT"; then
-                if [ "$show_progress" = true ]; then
-                    complete_status "${BLUE}•${NC} ${repo_name}"
-                fi
-                log_verbose "INFO: Already up to date"
-            else
+        # Check if already up to date (avoid unnecessary pull)
+        if [ "$LOCAL" = "$REMOTE" ]; then
+            if [ "$show_progress" = true ]; then
+                complete_status "${BLUE}•${NC} ${repo_name}"
+            fi
+            log_verbose "INFO: Already up to date"
+        # Check if we can fast-forward (local is ancestor of remote)
+        elif [ "$LOCAL" = "$BASE" ]; then
+            log_verbose "INFO: Pulling latest changes from origin/$DEFAULT_BRANCH..."
+            if OUTPUT=$(git pull --ff-only origin "$DEFAULT_BRANCH" 2>&1); then
                 if [ "$show_progress" = true ]; then
                     complete_status "${GREEN}✓${NC} ${repo_name} (updated)"
                 fi
                 log_verbose "INFO: Successfully updated"
                 log_verbose "INFO: $OUTPUT"
                 UPDATED_REPOS+=("$repo_name")
-            fi
 
-            # Pop stash if we stashed earlier
-            if [ "$has_local_changes" = true ]; then
-                log_verbose "INFO: Restoring stashed changes..."
-                if ! git stash pop >/dev/null 2>&1; then
-                    if [ "$show_progress" = true ]; then
-                        complete_status "${YELLOW}⚠${NC} ${repo_name} (updated, stash pop failed - changes remain in stash)"
+                # Pop stash if we stashed earlier
+                if [ "$has_local_changes" = true ]; then
+                    log_verbose "INFO: Restoring stashed changes..."
+                    if ! git stash pop >/dev/null 2>&1; then
+                        if [ "$show_progress" = true ]; then
+                            complete_status "${YELLOW}⚠${NC} ${repo_name} (updated, stash pop failed - changes remain in stash)"
+                        fi
+                        log_verbose "WARN: Stash pop failed, changes remain in stash. Run 'git stash pop' manually."
+                        STASH_CONFLICT_REPOS+=("$repo_name")
+                    else
+                        log_verbose "INFO: Stashed changes restored successfully"
                     fi
-                    log_verbose "WARN: Stash pop failed, changes remain in stash. Run 'git stash pop' manually."
-                    STASH_CONFLICT_REPOS+=("$repo_name")
-                else
-                    log_verbose "INFO: Stashed changes restored successfully"
+                fi
+            else
+                if [ "$show_progress" = true ]; then
+                    complete_status "${RED}✗${NC} ${repo_name} (pull failed)"
+                fi
+                log_verbose "ERROR: Pull failed: $OUTPUT"
+                FAILED_REPOS+=("$repo_name: $OUTPUT")
+
+                # Try to restore stash even if pull failed
+                if [ "$has_local_changes" = true ]; then
+                    log_verbose "INFO: Attempting to restore stashed changes after failed pull..."
+                    if ! git stash pop >/dev/null 2>&1; then
+                        log_verbose "WARN: Stash pop also failed"
+                        STASH_CONFLICT_REPOS+=("$repo_name")
+                    fi
                 fi
             fi
         else
+            # Branches have diverged - cannot fast-forward
             if [ "$show_progress" = true ]; then
-                complete_status "${RED}✗${NC} ${repo_name} (pull failed)"
+                complete_status "${RED}✗${NC} ${repo_name} (diverged)"
             fi
-            log_verbose "ERROR: Pull failed: $OUTPUT"
-            FAILED_REPOS+=("$repo_name: $OUTPUT")
+            log_verbose "ERROR: Branches have diverged, cannot fast-forward"
+            FAILED_REPOS+=("$repo_name: branches have diverged (local and remote have different commits)")
 
-            # Try to restore stash even if pull failed
+            # Restore stash if we stashed
             if [ "$has_local_changes" = true ]; then
-                log_verbose "INFO: Attempting to restore stashed changes after failed pull..."
-                if ! git stash pop >/dev/null 2>&1; then
-                    log_verbose "WARN: Stash pop also failed"
-                    STASH_CONFLICT_REPOS+=("$repo_name")
-                fi
+                log_verbose "INFO: Restoring stashed changes..."
+                git stash pop >/dev/null 2>&1 || true
             fi
         fi
     fi
