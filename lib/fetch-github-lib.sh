@@ -112,3 +112,95 @@ find_repos_recursive() {
     done < <(find "$search_dir" -name ".git" -type d -print0 2>/dev/null)
 }
 
+# --- Timer/Status Helper Functions ---
+# These require global variables: start_time, TIMER_PID, TIMER_WAS_RUNNING, VERBOSE
+# ANSI codes: SAVE_CURSOR, RESTORE_CURSOR, ERASE_LINE, NC (must be defined in main script)
+# shellcheck disable=SC2154  # Variables are defined in main script
+
+show_timer() {
+    local elapsed=$(($(date +%s) - start_time))
+    local minutes=$((elapsed / 60))
+    local seconds=$((elapsed % 60))
+    local cols
+    cols=$(tput cols 2>/dev/null || echo 80)
+    local timer_text
+    timer_text=$(printf "%02d:%02d" "$minutes" "$seconds")
+    local timer_pos=$((cols - 6))
+    echo -ne "${SAVE_CURSOR}\033[1;${timer_pos}H\033[43;30m ${timer_text} ${NC}${RESTORE_CURSOR}"
+}
+
+timer_loop() {
+    while kill -0 $$ 2>/dev/null; do
+        show_timer
+        sleep 1
+    done
+}
+
+start_timer() {
+    timer_loop &
+    TIMER_PID=$!
+    # shellcheck disable=SC2034  # used in main script
+    TIMER_WAS_RUNNING=true
+}
+
+stop_timer() {
+    if [ -n "$TIMER_PID" ] && kill -0 "$TIMER_PID" 2>/dev/null; then
+        kill "$TIMER_PID" 2>/dev/null || true
+        wait "$TIMER_PID" 2>/dev/null || true
+    fi
+    TIMER_PID=""
+}
+
+update_status() {
+    if [ "$VERBOSE" = false ]; then
+        echo -ne "${ERASE_LINE}\r$*"
+    fi
+}
+
+complete_status() {
+    if [ "$VERBOSE" = false ]; then
+        echo -e "${ERASE_LINE}\r$*"
+    fi
+}
+
+log_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo "$*"
+    fi
+}
+
+# --- Summary Display Function ---
+# Requires arrays: UPDATED_REPOS, STASH_CONFLICT_REPOS, SKIPPED_REPOS, FAILED_REPOS
+# Requires colors: GREEN, YELLOW, RED, BOLD, NC
+show_summary() {
+    local execution_time=$1
+    echo -e "\n${BOLD}Summary${NC} (${execution_time}s)"
+    if [ ${#UPDATED_REPOS[@]} -gt 0 ]; then
+        echo -e "${GREEN}✓ Updated (${#UPDATED_REPOS[@]}):${NC}"
+        for repo in "${UPDATED_REPOS[@]}"; do
+            echo "  • $repo"
+        done
+    fi
+    if [ ${#STASH_CONFLICT_REPOS[@]} -gt 0 ]; then
+        echo -e "${YELLOW}⚠ Stash conflicts (${#STASH_CONFLICT_REPOS[@]}):${NC}"
+        for repo in "${STASH_CONFLICT_REPOS[@]}"; do
+            echo "  • $repo (run 'git stash pop' manually)"
+        done
+    fi
+    if [ ${#SKIPPED_REPOS[@]} -gt 0 ]; then
+        echo -e "${YELLOW}⊘ Skipped (${#SKIPPED_REPOS[@]}):${NC}"
+        for repo in "${SKIPPED_REPOS[@]}"; do
+            echo "  • $repo"
+        done
+    fi
+    if [ ${#FAILED_REPOS[@]} -gt 0 ]; then
+        echo -e "${RED}✗ Failed (${#FAILED_REPOS[@]}):${NC}"
+        for repo in "${FAILED_REPOS[@]}"; do
+            echo "  • $repo"
+        done
+        return 1
+    fi
+    echo -e "\n${GREEN}✓${NC} All repositories processed successfully!"
+    return 0
+}
+

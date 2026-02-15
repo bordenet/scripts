@@ -18,7 +18,6 @@ fi
 # Navigate to project root (find .git directory)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/.."
-PROJECT_ROOT=$(pwd)
 
 echo "🔒 Security Check - Scanning for secrets..."
 
@@ -43,14 +42,24 @@ PATTERNS=(
 
 ISSUES_FOUND=0
 
-# Build exclude arguments for grep
-EXCLUDE_DIRS="--exclude-dir=node_modules --exclude-dir=.git --exclude-dir=coverage --exclude-dir=.setup-cache --exclude-dir=build --exclude-dir=dist --exclude-dir=venv --exclude-dir=.venv --exclude-dir=.dart_tool --exclude-dir=Pods --exclude-dir=.gradle"
-EXCLUDE_FILES="--exclude=check-secrets.sh --exclude=*.lock --exclude=package-lock.json --exclude=*.md --exclude=*.yaml --exclude=*.yml --exclude=.env --exclude=.env.* --exclude=*.env --exclude=*.eml --exclude=*.mbox"
-GREP_OPTS="--binary-files=without-match"
+# Build exclude arguments for grep (using arrays to avoid word-splitting issues)
+EXCLUDE_DIRS=(
+    --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=coverage
+    --exclude-dir=.setup-cache --exclude-dir=build --exclude-dir=dist
+    --exclude-dir=venv --exclude-dir=.venv --exclude-dir=.dart_tool
+    --exclude-dir=Pods --exclude-dir=.gradle
+)
+EXCLUDE_FILES=(
+    --exclude=check-secrets.sh --exclude='*.lock' --exclude=package-lock.json
+    --exclude='*.md' --exclude='*.yaml' --exclude='*.yml'
+    --exclude=.env --exclude='.env.*' --exclude='*.env'
+    --exclude='*.eml' --exclude='*.mbox'
+)
+GREP_OPTS=(--binary-files=without-match)
 
 # Check each pattern
 for pattern in "${PATTERNS[@]}"; do
-    if matches=$(grep -r -i -E "$pattern" . $EXCLUDE_DIRS $EXCLUDE_FILES $GREP_OPTS 2>/dev/null || true); then
+    if matches=$(grep -r -i -E "$pattern" . "${EXCLUDE_DIRS[@]}" "${EXCLUDE_FILES[@]}" "${GREP_OPTS[@]}" 2>/dev/null || true); then
         if [[ -n "$matches" ]]; then
             # Filter out mock/test/example/placeholder patterns and env var references
             filtered_matches=$(echo "$matches" | grep -v -E "(mock|test|example|demo|fake|dummy|sample|placeholder|your-|YOUR_|\\\$[A-Z_]+|\[HIDDEN\]|\[type=|semgrep|codacy|TOKEN_HERE|KEY_HERE|SECRET_HERE|_HERE\")" || true)
