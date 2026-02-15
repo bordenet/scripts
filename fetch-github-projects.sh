@@ -21,7 +21,9 @@ BOLD='\033[1m'
 NC='\033[0m' # No Color
 # ANSI cursor control
 ERASE_LINE='\033[2K'
+# shellcheck disable=SC2034  # Used by lib/fetch-github-lib.sh
 SAVE_CURSOR='\033[s'
+# shellcheck disable=SC2034  # Used by lib/fetch-github-lib.sh
 RESTORE_CURSOR='\033[u'
 # --- Global Variables ---
 UPDATED_REPOS=()
@@ -29,6 +31,7 @@ SKIPPED_REPOS=()
 FAILED_REPOS=()
 STASH_CONFLICT_REPOS=()
 STASH_ALL=false
+# shellcheck disable=SC2034  # Used by lib/fetch-github-lib.sh
 TIMER_PID=""
 TIMER_WAS_RUNNING=false
 # Helper functions (show_timer, timer_loop, start_timer, stop_timer, update_status,
