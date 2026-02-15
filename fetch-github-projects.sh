@@ -147,8 +147,10 @@ update_repo() {
         fi
     fi
     # Fetch first to get latest remote state
+    # Use explicit refspec to ensure origin/$DEFAULT_BRANCH tracking ref is updated
+    # (git fetch origin main only updates FETCH_HEAD, not refs/remotes/origin/main)
     log_verbose "INFO: Fetching from origin/$DEFAULT_BRANCH..."
-    if ! git fetch origin "$DEFAULT_BRANCH" >/dev/null 2>&1; then
+    if ! git fetch origin "$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH" >/dev/null 2>&1; then
         if [ "$show_progress" = true ]; then
             complete_status "${RED}✗${NC} ${repo_name} (fetch failed)"
         fi
