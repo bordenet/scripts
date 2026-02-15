@@ -23,3 +23,5 @@ purge-identity/cache/*
 purge-identity/logs/*
 ADOPT-PROMPT.md
 Agents.md.original
+MODULAR-MIGRATION-PROMPT.md
+*.backup
