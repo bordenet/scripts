@@ -31,51 +31,8 @@ STASH_CONFLICT_REPOS=()
 STASH_ALL=false
 TIMER_PID=""
 TIMER_WAS_RUNNING=false
-# --- Helper Functions ---
-show_timer() {
-    local elapsed=$(($(date +%s) - start_time))
-    local minutes=$((elapsed / 60))
-    local seconds=$((elapsed % 60))
-    local cols
-    cols=$(tput cols 2>/dev/null || echo 80)
-    local timer_text
-    timer_text=$(printf "%02d:%02d" "$minutes" "$seconds")
-    local timer_pos=$((cols - 6))
-    echo -ne "${SAVE_CURSOR}\033[1;${timer_pos}H\033[43;30m ${timer_text} ${NC}${RESTORE_CURSOR}"
-}
-timer_loop() {
-    while kill -0 $$ 2>/dev/null; do
-        show_timer
-        sleep 1
-    done
-}
-start_timer() {
-    timer_loop &
-    TIMER_PID=$!
-    TIMER_WAS_RUNNING=true
-}
-stop_timer() {
-    if [ -n "$TIMER_PID" ] && kill -0 "$TIMER_PID" 2>/dev/null; then
-        kill "$TIMER_PID" 2>/dev/null || true
-        wait "$TIMER_PID" 2>/dev/null || true
-    fi
-    TIMER_PID=""
-}
-update_status() {
-    if [ "$VERBOSE" = false ]; then
-        echo -ne "${ERASE_LINE}\r$*"
-    fi
-}
-complete_status() {
-    if [ "$VERBOSE" = false ]; then
-        echo -e "${ERASE_LINE}\r$*"
-    fi
-}
-log_verbose() {
-    if [ "$VERBOSE" = true ]; then
-        echo "$*"
-    fi
-}
+# Helper functions (show_timer, timer_loop, start_timer, stop_timer, update_status,
+# complete_status, log_verbose, show_summary) are defined in lib/fetch-github-lib.sh
 # Updates a single repository
 update_repo() {
     local dir=$1
@@ -366,12 +323,9 @@ if [ "$VERBOSE" = false ]; then
     echo
     start_timer
 else
-    echo -e "${BOLD}Git Repository Updates${NC}: $DISPLAY_DIR"
-    echo
+    echo -e "${BOLD}Git Repository Updates${NC}: $DISPLAY_DIR\n"
 fi
-
 trap stop_timer EXIT
-
 repos=()
 if [ "$RECURSIVE_MODE" = true ]; then
     update_status "  Searching recursively for repositories..."
@@ -397,55 +351,29 @@ else
         repos+=(".")
     fi
 fi
-
 if [ ${#repos[@]} -eq 0 ]; then
     stop_timer
-    echo
-    echo "No Git repositories found in $TARGET_DIR"
+    echo -e "\nNo Git repositories found in $TARGET_DIR"
     exit 0
 fi
-
 log_verbose "INFO: Repositories found: ${#repos[@]}"
-
 if [ "$MENU_MODE" = true ]; then
-    # Stop timer during menu interaction
-    stop_timer
-    # Clear entire screen and redisplay header without timer
-    if [ "$VERBOSE" = false ]; then
-        clear
-        echo -e "${BOLD}Git Repository Updates${NC}: $DISPLAY_DIR\n"
-    fi
-
+    stop_timer  # Stop timer during menu interaction
+    if [ "$VERBOSE" = false ]; then clear; echo -e "${BOLD}Git Repository Updates${NC}: $DISPLAY_DIR\n"; fi
     echo "Select a repository to update:"
-    for i in "${!repos[@]}"; do
-        printf "%3d) %s\n" "$((i+1))" "${repos[$i]%/}"
-    done
-    echo
-
-    read -r -p "Enter number (or 'all'): " choice
-    echo
-
+    for i in "${!repos[@]}"; do printf "%3d) %s\n" "$((i+1))" "${repos[$i]%/}"; done
+    echo; read -r -p "Enter number (or 'all'): " choice; echo
     if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#repos[@]}" ]; then
-        # Single repo - no timer needed for quick operation
         update_repo "${repos[$((choice-1))]}"
     elif [ "$choice" == "all" ]; then
-        # Multiple repos - restart timer if not verbose
-        if [ "$VERBOSE" = false ]; then
-            start_timer
-        fi
-        for dir in "${repos[@]}"; do
-            update_repo "$dir"
-        done
+        [ "$VERBOSE" = false ] && start_timer
+        for dir in "${repos[@]}"; do update_repo "$dir"; done
     else
-        echo "Invalid selection."
-        exit 1
+        echo "Invalid selection."; exit 1
     fi
 else
-    for dir in "${repos[@]}"; do
-        update_repo "$dir"
-    done
+    for dir in "${repos[@]}"; do update_repo "$dir"; done
 fi
-
 stop_timer
 if [ "$VERBOSE" = false ]; then
     echo -ne "${ERASE_LINE}\r"
@@ -457,36 +385,8 @@ fi
 end_time=$(date +%s)
 execution_time=$((end_time - start_time))
 
-echo -e "\n${BOLD}Summary${NC} (${execution_time}s)"
-
-if [ ${#UPDATED_REPOS[@]} -gt 0 ]; then
-    echo -e "${GREEN}✓ Updated (${#UPDATED_REPOS[@]}):${NC}"
-    for repo in "${UPDATED_REPOS[@]}"; do
-        echo "  • $repo"
-    done
-fi
-
-if [ ${#STASH_CONFLICT_REPOS[@]} -gt 0 ]; then
-    echo -e "${YELLOW}⚠ Stash conflicts (${#STASH_CONFLICT_REPOS[@]}):${NC}"
-    for repo in "${STASH_CONFLICT_REPOS[@]}"; do
-        echo "  • $repo (run 'git stash pop' manually)"
-    done
-fi
-
-if [ ${#SKIPPED_REPOS[@]} -gt 0 ]; then
-    echo -e "${YELLOW}⊘ Skipped (${#SKIPPED_REPOS[@]}):${NC}"
-    for repo in "${SKIPPED_REPOS[@]}"; do
-        echo "  • $repo"
-    done
-fi
-
-if [ ${#FAILED_REPOS[@]} -gt 0 ]; then
-    echo -e "${RED}✗ Failed (${#FAILED_REPOS[@]}):${NC}"
-    for repo in "${FAILED_REPOS[@]}"; do
-        echo "  • $repo"
-    done
+# Use library function for summary display
+if ! show_summary "$execution_time"; then
     exit 1
 fi
-
-echo -e "\n${GREEN}✓${NC} All repositories processed successfully!"
 exit 0
