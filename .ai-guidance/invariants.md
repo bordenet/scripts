@@ -15,7 +15,7 @@ wc -l Agents.md .ai-guidance/*.md 2>/dev/null
 | File | Limit | Action if exceeded |
 |------|-------|-------------------|
 | `Agents.md` | 150 lines | Extract to `.ai-guidance/*.md` |
-| `.ai-guidance/*.md` | 50 lines | Split into sub-directory (e.g., `testing/unit.md`) |
+| `.ai-guidance/*.md` | 250 lines | Split into sub-directory (e.g., `testing/unit.md`) |
 
 ### If ANY threshold exceeded:
 
@@ -38,18 +38,18 @@ Before completing any refactor:
 1. `cat Agents.md > /tmp/original.md`
 2. `mkdir -p .ai-guidance`
 3. Classify content by topic
-4. Extract to sub-files (≤50 lines each)
+4. Extract to sub-files (≤250 lines each)
 5. Update loading table in Agents.md
 6. Verify: `wc -l Agents.md` ≤150
 
 ## Refactoring: .ai-guidance/*.md → sub-directory
 
-If a sub-file like `testing.md` exceeds 50 lines:
+If a sub-file like `testing.md` exceeds 250 lines:
 
 1. `mkdir -p .ai-guidance/testing`
 2. Split into: `testing/unit.md`, `testing/integration.md`, etc.
 3. Replace original with index: `testing.md` → references sub-files
-4. Verify: each new file ≤50 lines
+4. Verify: each new file ≤250 lines
 
 ## Recovery
 
