@@ -1,8 +1,8 @@
 # GitHub Copilot Custom Instructions
 
-See **[../Agents.md](../Agents.md)** for all AI guidance.
+See **[../AGENTS.md](../AGENTS.md)** for all AI guidance.
 
 ## Summary
 
 This project uses the Golden Agents Framework for AI coding assistant guidance.
-All instructions are consolidated in Agents.md at the project root.
+All instructions are consolidated in AGENTS.md at the project root.
