@@ -4,17 +4,17 @@
 
 ## Recursive Self-Management Protocol
 
-After editing ANY guidance file (`Agents.md` or `.ai-guidance/*.md`):
+After editing ANY guidance file (`AGENTS.md` or `.ai-guidance/*.md`):
 
 ```bash
-wc -l Agents.md .ai-guidance/*.md 2>/dev/null
+wc -l AGENTS.md .ai-guidance/*.md 2>/dev/null
 ```
 
 ### Thresholds
 
 | File | Limit | Action if exceeded |
 |------|-------|-------------------|
-| `Agents.md` | 250 lines | Extract to `.ai-guidance/*.md` |
+| `AGENTS.md` | 250 lines | Extract to `.ai-guidance/*.md` |
 | `.ai-guidance/*.md` | 250 lines | Split into sub-directory (e.g., `testing/unit.md`) |
 
 ### If ANY threshold exceeded:
@@ -33,14 +33,14 @@ Before completing any refactor:
 - [ ] No custom rules deleted (only moved or split)
 - [ ] Diff shows reorganization, not deletion
 
-## Refactoring: Agents.md → .ai-guidance/
+## Refactoring: AGENTS.md → .ai-guidance/
 
-1. `cat Agents.md > /tmp/original.md`
+1. `cat AGENTS.md > /tmp/original.md`
 2. `mkdir -p .ai-guidance`
 3. Classify content by topic
 4. Extract to sub-files (≤250 lines each)
-5. Update loading table in Agents.md
-6. Verify: `wc -l Agents.md` ≤250
+5. Update loading table in AGENTS.md
+6. Verify: `wc -l AGENTS.md` ≤250
 
 ## Refactoring: .ai-guidance/*.md → sub-directory
 

@@ -9,8 +9,8 @@ Minimal core with on-demand module loading. Templates at: `$HOME/.golden-agents/
 <!-- GOLDEN:self-manage:start -->
 ## ⚠️ Before ANY Task
 1. Load `.ai-guidance/invariants.md` — contains critical rules
-2. After editing ANY guidance file, check: `wc -l Agents.md .ai-guidance/*.md 2>/dev/null`
-   - `Agents.md` >150 lines → refactor into `.ai-guidance/`
+2. After editing ANY guidance file, check: `wc -l AGENTS.md .ai-guidance/*.md 2>/dev/null`
+   - `AGENTS.md` >150 lines → refactor into `.ai-guidance/`
    - Any `.ai-guidance/*.md` >250 lines → split into sub-directory
 <!-- GOLDEN:self-manage:end -->
 <!-- GOLDEN:framework:start -->
@@ -125,7 +125,7 @@ grep -r "FILENAME" --include="*.md" --include="*.sh" .
 
 **Failure Case 1: Incomplete deletion (2025-11-25)**
 - **What happened**: Deleted TECHNICAL_DEBT.md without checking references
-- **Impact**: Left broken links in README.md and Agents.md
+- **Impact**: Left broken links in README.md and AGENTS.md
 - **Root cause**: Didn't search for references before deletion
 - **Prevention**: ALWAYS `grep -r "FILENAME"` before deleting
 
@@ -162,7 +162,7 @@ grep -r "FILENAME" --include="*.md" --include="*.sh" .
 - **Impact**: Audit revealed 24 out of 30 scripts (80%) lacked mandatory --verbose flag
 - **Root cause**:
   - STYLE_GUIDE.md added --verbose requirement but never enforced retroactively
-  - Agents.md pre-commit checklist didn't explicitly verify --verbose presence
+  - AGENTS.md pre-commit checklist didn't explicitly verify --verbose presence
   - validate-script-compliance.sh didn't catch this violation
   - Scripts were grandfathered in without compliance audit
 - **Prevention**:
