@@ -90,6 +90,12 @@ update_repo() {
         fi
     fi
     log_verbose "INFO: Default branch: $DEFAULT_BRANCH"
+
+    # Get current branch for feature branch handling
+    local CURRENT_BRANCH
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+    log_verbose "INFO: Current branch: $CURRENT_BRANCH"
+
     if [ -z "$DEFAULT_BRANCH" ] || [ "$DEFAULT_BRANCH" = "HEAD" ]; then
         if [ "$show_progress" = true ]; then
             complete_status "${YELLOW}⊘${NC} ${repo_name} (detached HEAD or no branch, skipped)"
@@ -171,6 +177,45 @@ update_repo() {
         return 1
     fi
 
+    # Classify branch type for merge handling
+    local branch_type
+    branch_type=$(classify_branch "$CURRENT_BRANCH" "$DEFAULT_BRANCH")
+    log_verbose "INFO: Branch type: $branch_type"
+
+    # Handle ambiguous branches (release/*, hotfix/*, etc.)
+    if [ "$branch_type" = "ambiguous" ]; then
+        if [ "$show_progress" = true ]; then
+            complete_status "${YELLOW}⊘${NC} ${repo_name} ($CURRENT_BRANCH, ambiguous branch skipped)"
+        fi
+        log_verbose "INFO: Ambiguous branch pattern, skipping"
+        AMBIGUOUS_BRANCH_REPOS+=("$repo_name ($CURRENT_BRANCH)")
+        popd > /dev/null || return
+        return 0
+    fi
+
+    # Safety checks for merge mode
+    if [ "$MERGE_MODE" = true ] && [ "$branch_type" = "feature" ]; then
+        if is_shallow_clone; then
+            if [ "$show_progress" = true ]; then
+                complete_status "${YELLOW}⊘${NC} ${repo_name} (shallow clone, merge skipped)"
+            fi
+            log_verbose "WARN: Shallow clone detected, skipping merge"
+            SKIPPED_REPOS+=("$repo_name: shallow clone")
+            popd > /dev/null || return
+            return 0
+        fi
+
+        if has_lock_file; then
+            if [ "$show_progress" = true ]; then
+                complete_status "${YELLOW}⊘${NC} ${repo_name} (locked by another process)"
+            fi
+            log_verbose "WARN: Repository locked, skipping"
+            SKIPPED_REPOS+=("$repo_name: locked")
+            popd > /dev/null || return
+            return 0
+        fi
+    fi
+
     LOCAL=$(git rev-parse HEAD 2>/dev/null)
     REMOTE=$(git rev-parse "origin/$DEFAULT_BRANCH" 2>/dev/null)
     BASE=$(git merge-base HEAD "origin/$DEFAULT_BRANCH" 2>/dev/null || echo "")
@@ -242,8 +287,81 @@ update_repo() {
                     fi
                 fi
             fi
+        elif [ "$branch_type" = "feature" ] && [ "$MERGE_MODE" = true ]; then
+            # Feature branch with --merge enabled - attempt safe merge
+            local merge_stats
+            merge_stats=$(get_merge_stats "$DEFAULT_BRANCH")
+            log_verbose "INFO: Feature branch merge stats: $merge_stats"
+
+            if [[ "$merge_stats" == "0 commits behind" ]]; then
+                if [ "$show_progress" = true ]; then
+                    complete_status "${BLUE}•${NC} ${repo_name} ($CURRENT_BRANCH, up to date with $DEFAULT_BRANCH)"
+                fi
+                log_verbose "INFO: Feature branch already up to date with $DEFAULT_BRANCH"
+                popd > /dev/null || return
+                return 0
+            fi
+
+            # In interactive mode (not --all), prompt user
+            if [ "$MENU_MODE" = true ] || [ "$RECURSIVE_MODE" != true ]; then
+                stop_timer
+                echo -ne "${ERASE_LINE}\r"
+                echo -e "${YELLOW}${repo_name}${NC} ($CURRENT_BRANCH) is $merge_stats"
+                echo -n "  Merge $DEFAULT_BRANCH into $CURRENT_BRANCH? [y/n] "
+                read -r merge_response
+                if [[ ! "$merge_response" =~ ^[Yy] ]]; then
+                    if [ "$show_progress" = true ]; then
+                        complete_status "${YELLOW}⊘${NC} ${repo_name} ($CURRENT_BRANCH, user declined merge)"
+                    fi
+                    SKIPPED_REPOS+=("$repo_name ($CURRENT_BRANCH): user declined")
+                    # Restart timer
+                    if [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ]; then
+                        start_timer
+                    fi
+                    popd > /dev/null || return
+                    return 0
+                fi
+                # Restart timer
+                if [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ]; then
+                    start_timer
+                fi
+            fi
+
+            # Perform safe merge
+            log_verbose "INFO: Attempting safe merge of $DEFAULT_BRANCH into $CURRENT_BRANCH..."
+            local merge_result
+            merge_result=$(safe_merge_main "$DEFAULT_BRANCH")
+            log_verbose "INFO: Merge result: $merge_result"
+
+            case "$merge_result" in
+                SUCCESS)
+                    if [ "$show_progress" = true ]; then
+                        complete_status "${GREEN}✓${NC} ${repo_name} ($CURRENT_BRANCH → merged $DEFAULT_BRANCH)"
+                    fi
+                    MERGED_REPOS+=("$repo_name ($CURRENT_BRANCH → merged $DEFAULT_BRANCH)")
+                    ;;
+                CONFLICT)
+                    if [ "$show_progress" = true ]; then
+                        complete_status "${RED}✗${NC} ${repo_name} ($CURRENT_BRANCH → conflict, rolled back)"
+                    fi
+                    MERGE_CONFLICT_REPOS+=("$repo_name ($CURRENT_BRANCH): merge conflict, rolled back")
+                    ;;
+                STASH_CONFLICT)
+                    if [ "$show_progress" = true ]; then
+                        complete_status "${YELLOW}⚠${NC} ${repo_name} ($CURRENT_BRANCH → merged, stash needs manual pop)"
+                    fi
+                    MERGED_REPOS+=("$repo_name ($CURRENT_BRANCH → merged, stash conflict)")
+                    STASH_CONFLICT_REPOS+=("$repo_name")
+                    ;;
+                STASH_FAILED)
+                    if [ "$show_progress" = true ]; then
+                        complete_status "${RED}✗${NC} ${repo_name} ($CURRENT_BRANCH, stash failed)"
+                    fi
+                    FAILED_REPOS+=("$repo_name: stash failed before merge")
+                    ;;
+            esac
         else
-            # Branches have diverged - cannot fast-forward
+            # Branches have diverged - cannot fast-forward (and not in merge mode or not feature branch)
             if [ "$show_progress" = true ]; then
                 complete_status "${RED}✗${NC} ${repo_name} (diverged)"
             fi
