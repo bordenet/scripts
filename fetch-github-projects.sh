@@ -34,6 +34,11 @@ STASH_ALL=false
 # shellcheck disable=SC2034  # Used by lib/fetch-github-lib.sh
 TIMER_PID=""
 TIMER_WAS_RUNNING=false
+
+# SSH batch mode to prevent hanging on auth prompts
+export GIT_TERMINAL_PROMPT=0
+export GIT_SSH_COMMAND="ssh -oBatchMode=yes"
+
 # Helper functions (show_timer, timer_loop, start_timer, stop_timer, update_status,
 # complete_status, log_verbose, show_summary) are defined in lib/fetch-github-lib.sh
 # Updates a single repository
