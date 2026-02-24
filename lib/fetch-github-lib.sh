@@ -170,36 +170,78 @@ log_verbose() {
 }
 
 # --- Summary Display Function ---
-# Requires arrays: UPDATED_REPOS, STASH_CONFLICT_REPOS, SKIPPED_REPOS, FAILED_REPOS
-# Requires colors: GREEN, YELLOW, RED, BOLD, NC
+# Requires arrays: UPDATED_REPOS, MERGED_REPOS, STASH_CONFLICT_REPOS, SKIPPED_REPOS,
+#                  FAILED_REPOS, MERGE_CONFLICT_REPOS, AMBIGUOUS_BRANCH_REPOS
+# Requires colors: GREEN, YELLOW, RED, BLUE, BOLD, NC
 show_summary() {
     local execution_time=$1
+    local has_issues=false
+
     echo -e "\n${BOLD}Summary${NC} (${execution_time}s)"
+
+    # Updated repos (fast-forward pulls)
     if [ ${#UPDATED_REPOS[@]} -gt 0 ]; then
         echo -e "${GREEN}✓ Updated (${#UPDATED_REPOS[@]}):${NC}"
         for repo in "${UPDATED_REPOS[@]}"; do
             echo "  • $repo"
         done
     fi
+
+    # Merged repos (feature branch merges)
+    if [ ${#MERGED_REPOS[@]} -gt 0 ]; then
+        echo -e "${GREEN}✓ Merged (${#MERGED_REPOS[@]}):${NC}"
+        for repo in "${MERGED_REPOS[@]}"; do
+            echo "  • $repo"
+        done
+    fi
+
+    # Merge conflicts (rolled back)
+    if [ ${#MERGE_CONFLICT_REPOS[@]} -gt 0 ]; then
+        echo -e "${RED}✗ Merge conflicts (${#MERGE_CONFLICT_REPOS[@]}):${NC}"
+        for repo in "${MERGE_CONFLICT_REPOS[@]}"; do
+            echo "  • $repo"
+        done
+        has_issues=true
+    fi
+
+    # Stash conflicts
     if [ ${#STASH_CONFLICT_REPOS[@]} -gt 0 ]; then
         echo -e "${YELLOW}⚠ Stash conflicts (${#STASH_CONFLICT_REPOS[@]}):${NC}"
         for repo in "${STASH_CONFLICT_REPOS[@]}"; do
             echo "  • $repo (run 'git stash pop' manually)"
         done
     fi
+
+    # Ambiguous branches skipped
+    if [ ${#AMBIGUOUS_BRANCH_REPOS[@]} -gt 0 ]; then
+        echo -e "${BLUE}ℹ Ambiguous branches skipped (${#AMBIGUOUS_BRANCH_REPOS[@]}):${NC}"
+        for repo in "${AMBIGUOUS_BRANCH_REPOS[@]}"; do
+            echo "  • $repo"
+        done
+    fi
+
+    # Other skipped repos
     if [ ${#SKIPPED_REPOS[@]} -gt 0 ]; then
         echo -e "${YELLOW}⊘ Skipped (${#SKIPPED_REPOS[@]}):${NC}"
         for repo in "${SKIPPED_REPOS[@]}"; do
             echo "  • $repo"
         done
     fi
+
+    # Failed repos
     if [ ${#FAILED_REPOS[@]} -gt 0 ]; then
         echo -e "${RED}✗ Failed (${#FAILED_REPOS[@]}):${NC}"
         for repo in "${FAILED_REPOS[@]}"; do
             echo "  • $repo"
         done
+        has_issues=true
+    fi
+
+    if [ "$has_issues" = true ]; then
+        echo -e "\n${YELLOW}⚠${NC} Some repositories had issues. Review above."
         return 1
     fi
+
     echo -e "\n${GREEN}✓${NC} All repositories processed successfully!"
     return 0
 }
