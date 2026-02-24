@@ -35,6 +35,12 @@ STASH_ALL=false
 TIMER_PID=""
 TIMER_WAS_RUNNING=false
 
+# Merge mode globals
+MERGE_MODE=false
+MERGE_CONFLICT_REPOS=()
+MERGED_REPOS=()
+AMBIGUOUS_BRANCH_REPOS=()
+
 # SSH batch mode to prevent hanging on auth prompts
 export GIT_TERMINAL_PROMPT=0
 export GIT_SSH_COMMAND="ssh -oBatchMode=yes"
@@ -279,6 +285,10 @@ while [ $# -gt 0 ]; do
             ;;
         --what-if)
             WHAT_IF=true
+            shift
+            ;;
+        --merge)
+            MERGE_MODE=true
             shift
             ;;
         *)
