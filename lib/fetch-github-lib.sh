@@ -274,3 +274,45 @@ get_merge_stats() {
     fi
 }
 
+# Perform safe merge with automatic rollback on conflict
+# Arguments: default_branch
+# Output: "SUCCESS", "CONFLICT", "STASH_CONFLICT", or "STASH_FAILED"
+# Returns: 0=success, 1=conflict (rolled back), 2=stash conflict (merge ok)
+safe_merge_main() {
+    local default_branch=$1
+    local checkpoint_head stash_created=false stash_name
+
+    checkpoint_head=$(git rev-parse HEAD)
+    stash_name="fetch-github-projects $(date +%Y%m%d-%H%M%S) on $(git branch --show-current)"
+
+    # Stash uncommitted changes (including untracked)
+    if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+        if ! git stash push -u -m "$stash_name" >/dev/null 2>&1; then
+            echo "STASH_FAILED"
+            return 1
+        fi
+        stash_created=true
+    fi
+
+    # Attempt merge
+    if ! git merge "origin/$default_branch" --no-edit >/dev/null 2>&1; then
+        # Rollback: abort merge or hard reset
+        git merge --abort 2>/dev/null || git reset --hard "$checkpoint_head" 2>/dev/null
+        # Restore stash
+        [ "$stash_created" = true ] && git stash pop >/dev/null 2>&1
+        echo "CONFLICT"
+        return 1
+    fi
+
+    # Merge succeeded - restore stash
+    if [ "$stash_created" = true ]; then
+        if ! git stash pop >/dev/null 2>&1; then
+            echo "STASH_CONFLICT"
+            return 2
+        fi
+    fi
+
+    echo "SUCCESS"
+    return 0
+}
+
