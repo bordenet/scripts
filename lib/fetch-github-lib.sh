@@ -246,3 +246,31 @@ has_lock_file() {
     [ -f ".git/index.lock" ]
 }
 
+# Get merge preview stats: commits behind, files changed, lines changed
+# Arguments: default_branch
+# Output: "5 commits, 12 files, +340/-89" or "0 commits behind"
+get_merge_stats() {
+    local default_branch=$1
+    local commits_behind files_changed lines_added lines_removed
+
+    commits_behind=$(git rev-list --count HEAD.."origin/$default_branch" 2>/dev/null || echo "?")
+
+    if [ "$commits_behind" = "0" ] || [ "$commits_behind" = "?" ]; then
+        echo "0 commits behind"
+        return
+    fi
+
+    # Get diffstat
+    local diffstat
+    diffstat=$(git diff --shortstat HEAD..."origin/$default_branch" 2>/dev/null || echo "")
+
+    if [ -n "$diffstat" ]; then
+        files_changed=$(echo "$diffstat" | grep -oE '[0-9]+ file' | grep -oE '[0-9]+' || echo "0")
+        lines_added=$(echo "$diffstat" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo "0")
+        lines_removed=$(echo "$diffstat" | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo "0")
+        echo "$commits_behind commits, $files_changed files, +${lines_added}/-${lines_removed}"
+    else
+        echo "$commits_behind commits behind"
+    fi
+}
+
