@@ -495,6 +495,17 @@ if [ ${#repos[@]} -eq 0 ]; then
     exit 0
 fi
 log_verbose "INFO: Repositories found: ${#repos[@]}"
+
+# Batch confirmation for --all --merge (or non-menu mode with --merge)
+if [ "$MENU_MODE" = false ] && [ "$MERGE_MODE" = true ] && [ "$WHAT_IF" != true ]; then
+    stop_timer
+    if ! preview_merge_candidates "${repos[@]}"; then
+        echo -e "${YELLOW}Merge cancelled by user${NC}"
+        exit 0
+    fi
+    [ "$VERBOSE" = false ] && start_timer
+fi
+
 if [ "$MENU_MODE" = true ]; then
     stop_timer  # Stop timer during menu interaction
     if [ "$VERBOSE" = false ]; then clear; echo -e "${BOLD}Git Repository Updates${NC}: $DISPLAY_DIR\n"; fi
