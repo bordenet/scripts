@@ -204,3 +204,45 @@ show_summary() {
     return 0
 }
 
+################################################################################
+# Branch Classification and Safety Functions
+################################################################################
+
+# Classify branch type: default, feature, or ambiguous
+# Arguments: current_branch, default_branch
+# Output: "default", "feature", or "ambiguous"
+classify_branch() {
+    local current_branch=$1
+    local default_branch=$2
+
+    # Check if on default branch
+    if [ "$current_branch" = "$default_branch" ]; then
+        echo "default"
+        return 0
+    fi
+
+    # Check for ambiguous branch patterns
+    case "$current_branch" in
+        release/*|hotfix/*|develop|development|staging)
+            echo "ambiguous"
+            return 2
+            ;;
+    esac
+
+    # Otherwise it's a feature branch
+    echo "feature"
+    return 1
+}
+
+# Check if repo is a shallow clone
+# Returns: 0 if shallow, 1 if not
+is_shallow_clone() {
+    [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]
+}
+
+# Check if repo has active lock file
+# Returns: 0 if locked, 1 if not
+has_lock_file() {
+    [ -f ".git/index.lock" ]
+}
+
