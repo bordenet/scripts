@@ -79,6 +79,19 @@ update_repo() {
         popd > /dev/null || return
         return 0
     fi
+
+    # Check if repo has a remote configured
+    log_verbose "INFO: Checking for remote..."
+    if ! git remote get-url origin >/dev/null 2>&1; then
+        if [ "$show_progress" = true ]; then
+            complete_status "${YELLOW}⊘${NC} ${repo_name} (no remote, skipped)"
+        fi
+        log_verbose "WARN: No origin remote configured, skipping"
+        SKIPPED_REPOS+=("$repo_name: no origin remote")
+        popd > /dev/null || return
+        return 0
+    fi
+
     log_verbose "INFO: Detecting default branch..."
     DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}' || true)
     if [ -z "$DEFAULT_BRANCH" ]; then
@@ -257,10 +270,10 @@ update_repo() {
                 MERGED_REPOS+=("$repo_name ($CURRENT_BRANCH would merge $DEFAULT_BRANCH)")
             else
                 if [ "$show_progress" = true ]; then
-                    complete_status "${RED}✗${NC} ${repo_name} [WHAT-IF: diverged, needs manual merge]"
+                    complete_status "${YELLOW}⊘${NC} ${repo_name} [WHAT-IF: diverged, needs manual merge]"
                 fi
                 log_verbose "WARN: [WHAT-IF] Branches have diverged, would need manual merge"
-                FAILED_REPOS+=("$repo_name: branches have diverged (local and remote have different commits)")
+                SKIPPED_REPOS+=("$repo_name: diverged (use --merge on feature branches)")
             fi
         fi
     else
@@ -386,10 +399,10 @@ update_repo() {
         else
             # Branches have diverged - cannot fast-forward (and not in merge mode or not feature branch)
             if [ "$show_progress" = true ]; then
-                complete_status "${RED}✗${NC} ${repo_name} (diverged)"
+                complete_status "${YELLOW}⊘${NC} ${repo_name} (diverged)"
             fi
-            log_verbose "ERROR: Branches have diverged, cannot fast-forward"
-            FAILED_REPOS+=("$repo_name: branches have diverged (local and remote have different commits)")
+            log_verbose "WARN: Branches have diverged, cannot fast-forward"
+            SKIPPED_REPOS+=("$repo_name: diverged (use --merge on feature branches)")
 
             # Restore stash if we stashed
             if [ "$has_local_changes" = true ]; then
