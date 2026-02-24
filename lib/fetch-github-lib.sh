@@ -316,3 +316,60 @@ safe_merge_main() {
     return 0
 }
 
+# Preview feature branches that will be merged (for --all --merge batch confirmation)
+# Arguments: repos array (passed by name reference in bash 4.3+, or as separate args)
+# Returns: 0 if user confirms, 1 if user cancels
+# Note: This function is called from fetch-github-projects.sh main script
+preview_merge_candidates() {
+    local candidates=()
+    local original_dir
+    original_dir=$(pwd)
+
+    # Process all repo paths passed as arguments
+    for repo_path in "$@"; do
+        if [ -d "$repo_path/.git" ]; then
+            cd "$repo_path" || continue
+            local current_branch default_branch branch_type
+            current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+            default_branch=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}')
+            [ -z "$default_branch" ] && default_branch="main"
+            branch_type=$(classify_branch "$current_branch" "$default_branch")
+
+            if [ "$branch_type" = "feature" ]; then
+                # Quick fetch to get accurate stats
+                git fetch origin "$default_branch:refs/remotes/origin/$default_branch" >/dev/null 2>&1 || true
+                local stats
+                stats=$(get_merge_stats "$default_branch")
+                if [[ "$stats" != "0 commits behind" ]]; then
+                    candidates+=("$repo_path ($current_branch): $stats")
+                fi
+            fi
+            cd "$original_dir" || return 1
+        fi
+    done
+
+    if [ ${#candidates[@]} -eq 0 ]; then
+        echo -e "${BLUE}ℹ${NC} No feature branches need merging"
+        return 0  # Still return success, just nothing to do
+    fi
+
+    echo ""
+    echo -e "${YELLOW}${#candidates[@]} repos on feature branches will merge main:${NC}"
+    for c in "${candidates[@]}"; do
+        echo "  • $c"
+    done
+    echo ""
+    read -r -p "Proceed with all merges? [y/n/list] " response
+    case "$response" in
+        [Yy]*) return 0 ;;
+        [Ll]*|[Ll]ist)
+            echo ""
+            for c in "${candidates[@]}"; do echo "  $c"; done
+            echo ""
+            read -r -p "Proceed? [y/n] " response2
+            [[ "$response2" =~ ^[Yy] ]] && return 0
+            ;;
+    esac
+    return 1
+}
+
