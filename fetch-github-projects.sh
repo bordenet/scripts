@@ -37,6 +37,7 @@ TIMER_WAS_RUNNING=false
 
 # Merge mode globals
 MERGE_MODE=false
+MERGE_BATCH_CONFIRMED=false  # Set true after batch preview confirmation
 MERGE_CONFLICT_REPOS=()
 MERGED_REPOS=()
 AMBIGUOUS_BRANCH_REPOS=()
@@ -228,17 +229,39 @@ update_repo() {
             fi
             log_verbose "INFO: [WHAT-IF] Already up to date, would skip"
         elif [ "$LOCAL" = "$BASE" ]; then
-            if [ "$show_progress" = true ]; then
-                complete_status "${GREEN}✓${NC} ${repo_name} [WHAT-IF: would update]"
+            # Check if this is a feature branch merge scenario
+            if [ "$branch_type" = "feature" ] && [ "$MERGE_MODE" = true ]; then
+                local merge_stats
+                merge_stats=$(get_merge_stats "$DEFAULT_BRANCH")
+                if [ "$show_progress" = true ]; then
+                    complete_status "${GREEN}✓${NC} ${repo_name} [WHAT-IF: would merge $DEFAULT_BRANCH ($merge_stats)]"
+                fi
+                log_verbose "INFO: [WHAT-IF] Would merge $DEFAULT_BRANCH into $CURRENT_BRANCH ($merge_stats)"
+                MERGED_REPOS+=("$repo_name ($CURRENT_BRANCH would merge $DEFAULT_BRANCH)")
+            else
+                if [ "$show_progress" = true ]; then
+                    complete_status "${GREEN}✓${NC} ${repo_name} [WHAT-IF: would update]"
+                fi
+                log_verbose "INFO: [WHAT-IF] Would fast-forward from $LOCAL to $REMOTE"
+                UPDATED_REPOS+=("$repo_name")
             fi
-            log_verbose "INFO: [WHAT-IF] Would fast-forward from $LOCAL to $REMOTE"
-            UPDATED_REPOS+=("$repo_name")
         else
-            if [ "$show_progress" = true ]; then
-                complete_status "${RED}✗${NC} ${repo_name} [WHAT-IF: diverged, needs manual merge]"
+            # Branches diverged - check if feature branch with merge enabled
+            if [ "$branch_type" = "feature" ] && [ "$MERGE_MODE" = true ]; then
+                local merge_stats
+                merge_stats=$(get_merge_stats "$DEFAULT_BRANCH")
+                if [ "$show_progress" = true ]; then
+                    complete_status "${GREEN}✓${NC} ${repo_name} [WHAT-IF: would merge $DEFAULT_BRANCH ($merge_stats)]"
+                fi
+                log_verbose "INFO: [WHAT-IF] Would merge $DEFAULT_BRANCH into $CURRENT_BRANCH ($merge_stats)"
+                MERGED_REPOS+=("$repo_name ($CURRENT_BRANCH would merge $DEFAULT_BRANCH)")
+            else
+                if [ "$show_progress" = true ]; then
+                    complete_status "${RED}✗${NC} ${repo_name} [WHAT-IF: diverged, needs manual merge]"
+                fi
+                log_verbose "WARN: [WHAT-IF] Branches have diverged, would need manual merge"
+                FAILED_REPOS+=("$repo_name: branches have diverged (local and remote have different commits)")
             fi
-            log_verbose "WARN: [WHAT-IF] Branches have diverged, would need manual merge"
-            FAILED_REPOS+=("$repo_name: branches have diverged (local and remote have different commits)")
         fi
     else
         # Check if already up to date (avoid unnecessary pull)
@@ -302,8 +325,8 @@ update_repo() {
                 return 0
             fi
 
-            # In interactive mode (not --all), prompt user
-            if [ "$MENU_MODE" = true ] || [ "$RECURSIVE_MODE" != true ]; then
+            # In interactive mode (not --all and not batch confirmed), prompt user
+            if [ "$MERGE_BATCH_CONFIRMED" != true ] && { [ "$MENU_MODE" = true ] || [ "$RECURSIVE_MODE" != true ]; }; then
                 stop_timer
                 echo -ne "${ERASE_LINE}\r"
                 echo -e "${YELLOW}${repo_name}${NC} ($CURRENT_BRANCH) is $merge_stats"
@@ -503,6 +526,7 @@ if [ "$MENU_MODE" = false ] && [ "$MERGE_MODE" = true ] && [ "$WHAT_IF" != true 
         echo -e "${YELLOW}Merge cancelled by user${NC}"
         exit 0
     fi
+    MERGE_BATCH_CONFIRMED=true  # Skip per-repo prompts since user already confirmed
     [ "$VERBOSE" = false ] && start_timer
 fi
 

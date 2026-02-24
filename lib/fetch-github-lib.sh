@@ -276,6 +276,7 @@ show_summary() {
 # Classify branch type: default, feature, or ambiguous
 # Arguments: current_branch, default_branch
 # Output: "default", "feature", or "ambiguous"
+# Always returns 0 (use output for classification, not exit code)
 classify_branch() {
     local current_branch=$1
     local default_branch=$2
@@ -290,13 +291,13 @@ classify_branch() {
     case "$current_branch" in
         release/*|hotfix/*|develop|development|staging)
             echo "ambiguous"
-            return 2
+            return 0
             ;;
     esac
 
     # Otherwise it's a feature branch
     echo "feature"
-    return 1
+    return 0
 }
 
 # Check if repo is a shallow clone
