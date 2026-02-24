@@ -54,6 +54,20 @@ OPTIONS
         Fetches latest commits to check for updates but doesn't pull.
         Safe for checking repository status before actual updates.
 
+    --merge
+        Enable feature branch merging. When on a feature branch, merges
+        origin/main (or default branch) into the current branch.
+
+        Interactive mode: prompts per-repo with commit/file stats.
+        With --all: shows batch preview, then merges all approved.
+
+        Performs safe rollback if merge conflicts occur:
+        - Stashes uncommitted changes (including untracked files)
+        - Attempts merge
+        - On conflict: aborts merge, restores stash, reports warning
+
+        Skips ambiguous branches (release/*, hotfix/*, develop) with warning.
+
     -h, --help
         Display this help message and exit.
 
@@ -89,6 +103,15 @@ EXAMPLES
     # Dry-run: check what would be updated without making changes
     ./fetch-github-projects.sh --all --what-if
     ./fetch-github-projects.sh scripts --what-if --verbose
+
+    # Merge main into feature branch (interactive)
+    ./fetch-github-projects.sh --merge .
+
+    # Batch merge main into all feature branches
+    ./fetch-github-projects.sh --all --merge ~/projects
+
+    # Preview what would be merged without executing
+    ./fetch-github-projects.sh --what-if --merge .
 
 AUTHOR
     Matt J Bordenet
