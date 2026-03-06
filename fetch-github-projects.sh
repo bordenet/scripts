@@ -308,14 +308,31 @@ update_repo() {
                     fi
                 fi
             else
-                if [ "$show_progress" = true ]; then
-                    complete_status "${RED}✗${NC} ${repo_name} (pull failed)"
-                fi
-                log_verbose "ERROR: Pull failed: $OUTPUT"
-                FAILED_REPOS+=("$repo_name: $OUTPUT")
+                # Pull failed - try reset + retry if no local changes
+                if [ "$has_local_changes" = false ]; then
+                    log_verbose "WARN: Pull failed, attempting reset + retry (no local changes)..."
+                    if git fetch origin "$DEFAULT_BRANCH" --quiet 2>/dev/null && \
+                       git reset --hard "origin/$DEFAULT_BRANCH" --quiet 2>/dev/null; then
+                        if [ "$show_progress" = true ]; then
+                            complete_status "${GREEN}✓${NC} ${repo_name} (reset to origin)"
+                        fi
+                        log_verbose "INFO: Successfully reset to origin/$DEFAULT_BRANCH"
+                        UPDATED_REPOS+=("$repo_name")
+                    else
+                        if [ "$show_progress" = true ]; then
+                            complete_status "${RED}✗${NC} ${repo_name} (pull + reset failed)"
+                        fi
+                        log_verbose "ERROR: Pull failed and reset also failed: $OUTPUT"
+                        FAILED_REPOS+=("$repo_name: $OUTPUT")
+                    fi
+                else
+                    if [ "$show_progress" = true ]; then
+                        complete_status "${RED}✗${NC} ${repo_name} (pull failed)"
+                    fi
+                    log_verbose "ERROR: Pull failed: $OUTPUT"
+                    FAILED_REPOS+=("$repo_name: $OUTPUT")
 
-                # Try to restore stash even if pull failed
-                if [ "$has_local_changes" = true ]; then
+                    # Try to restore stash even if pull failed
                     log_verbose "INFO: Attempting to restore stashed changes after failed pull..."
                     if ! git stash pop >/dev/null 2>&1; then
                         log_verbose "WARN: Stash pop also failed"
