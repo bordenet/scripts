@@ -46,14 +46,17 @@ jobs:
               ((SYNTAX_ERRORS++)) || true
             fi
 
+            # Exclusions: SC1091 (can't follow source), SC2034 (vars used in sourced files)
+            EXCLUDES="-e SC1091 -e SC2034"
+
             # 2. ShellCheck errors
-            if shellcheck -S error "$script" 2>&1 | grep -q "^In "; then
+            if shellcheck -S error $EXCLUDES "$script" 2>&1 | grep -q "^In "; then
               echo "  ✗ ShellCheck errors found"
               ((SHELLCHECK_ERRORS++)) || true
             fi
 
             # 3. ShellCheck warnings
-            if shellcheck -S warning "$script" 2>&1 | grep -q "^In "; then
+            if shellcheck -S warning $EXCLUDES "$script" 2>&1 | grep -q "^In "; then
               echo "  ✗ ShellCheck warnings found"
               ((SHELLCHECK_WARNINGS++)) || true
             fi

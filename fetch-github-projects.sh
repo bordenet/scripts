@@ -58,7 +58,8 @@ update_repo() {
     # Helper: report status, log, track in array, popd, and return
     # Usage: _report "color" "icon" "suffix" "LOG_LEVEL: msg" "ARRAY_NAME" ["entry"]
     _report() {
-        local color=$1 icon=$2 suffix=$3 log_msg=$4 arr=${5:-} entry=${6:-"$repo_name: $suffix"}
+        local color=$1 icon=$2 suffix=$3 log_msg=$4 arr=${5:-}
+        local entry=${6:-"$repo_name: $suffix"}
         [ "$show_progress" = true ] && complete_status "${color}${icon}${NC} ${repo_name}${suffix:+ ($suffix)}"
         log_verbose "$log_msg"
         [ -n "$arr" ] && eval "$arr+=(\"$entry\")"
