@@ -14,110 +14,31 @@ NAME
 
 SYNOPSIS
     fetch-github-projects.sh [OPTIONS] [DIRECTORY]
-    fetch-github-projects.sh --all [DIRECTORY]
-    fetch-github-projects.sh -r|--recursive [DIRECTORY]
-    fetch-github-projects.sh [DIRECTORY] -r|--recursive
 
 DESCRIPTION
-    Updates all Git repositories in a directory with minimal output. By default,
-    presents an interactive menu to select which repository to update. Can also
-    update all repositories automatically.
-
-    By default, searches up to 2 levels deep. Use -r or --recursive for unlimited
-    recursion through all subdirectories.
-
-    Uses 'git pull --ff-only' to safely update repositories. Repositories with
-    divergent branches will be reported as failed and require manual intervention.
-
-    Checks if the script's own repository needs updating before processing other
-    repos to prevent running outdated versions.
-
-    Features live timer and inline status updates for clean, minimal output.
+    Updates all Git repositories in a directory. By default, presents an
+    interactive menu. Searches up to 2 levels deep (-r for unlimited).
+    Uses 'git pull --ff-only' for safe updates. Self-update check included.
 
 OPTIONS
-    --all
-        Skip interactive menu and update ALL repositories automatically.
-        Implies --recursive: searches all subdirectories for git repositories.
-
-    -r, --recursive
-        Recursive mode: searches all subdirectories for git repositories.
-        Still shows interactive menu unless combined with --all.
-        Can be used as first argument or second argument after directory.
-
-    -v, --verbose
-        Verbose mode: shows detailed INFO-level logs for each repository.
-        Displays branch detection, local changes check, and pull output.
-        Disables inline status updates and timer display.
-
-    --what-if
-        Dry-run mode: shows what would be updated without making changes.
-        Fetches latest commits to check for updates but doesn't pull.
-        Safe for checking repository status before actual updates.
-
-    --merge
-        Enable feature branch merging. When on a feature branch, merges
-        origin/main (or default branch) into the current branch.
-
-        Interactive mode: prompts per-repo with commit/file stats.
-        With --all: shows batch preview, then merges all approved.
-
-        Performs safe rollback if merge conflicts occur:
-        - Stashes uncommitted changes (including untracked files)
-        - Attempts merge
-        - On conflict: aborts merge, restores stash, reports warning
-
-        Skips ambiguous branches (release/*, hotfix/*, develop) with warning.
-
-    -h, --help
-        Display this help message and exit.
+    --all           Update ALL repos automatically (implies --recursive)
+    -r, --recursive Search all subdirectories (still shows menu unless --all)
+    -v, --verbose   Show detailed INFO-level logs per repository
+    --what-if       Dry-run: check for updates without pulling
+    --merge         Merge origin/main into feature branches (safe rollback
+                    on conflict; skips ambiguous branches like release/*)
+    -h, --help      Display this help message
 
 ARGUMENTS
-    DIRECTORY
-        Target directory containing Git repositories. Default: . (current directory)
-
-PLATFORM
-    Cross-platform (macOS, Linux, WSL)
-    Compatible with Bash 3.2+ (macOS default)
+    DIRECTORY       Target directory (default: current directory)
 
 EXAMPLES
-    # Interactive menu mode (default, 2 levels deep)
-    ./fetch-github-projects.sh
-
-    # Interactive menu with recursive search
-    ./fetch-github-projects.sh -r
-    ./fetch-github-projects.sh /path/to/repos -r
-
-    # Update all repos automatically (2 levels deep)
-    ./fetch-github-projects.sh --all
-
-    # Update all repos recursively without menu
-    ./fetch-github-projects.sh --all -r
-    ./fetch-github-projects.sh --all /path/to/repos -r
-
-    # Update specific directory with verbose output
-    ./fetch-github-projects.sh scripts --verbose
-
-    # Update all with detailed logging
-    ./fetch-github-projects.sh --all --verbose
-
-    # Dry-run: check what would be updated without making changes
-    ./fetch-github-projects.sh --all --what-if
-    ./fetch-github-projects.sh scripts --what-if --verbose
-
-    # Merge main into feature branch (interactive)
-    ./fetch-github-projects.sh --merge .
-
-    # Batch merge main into all feature branches
-    ./fetch-github-projects.sh --all --merge ~/projects
-
-    # Preview what would be merged without executing
-    ./fetch-github-projects.sh --what-if --merge .
-
-AUTHOR
-    Matt J Bordenet
-
-SEE ALSO
-    git-pull(1), git-fetch(1)
+    ./fetch-github-projects.sh                    # Interactive menu
+    ./fetch-github-projects.sh --all              # Update all repos
+    ./fetch-github-projects.sh --all -r -v        # Recursive + verbose
+    ./fetch-github-projects.sh --all --what-if    # Dry-run
+    ./fetch-github-projects.sh --merge .          # Merge main into feature branches
+    ./fetch-github-projects.sh --all --merge      # Batch merge all feature branches
 
 EOF
     exit 0

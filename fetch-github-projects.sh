@@ -53,71 +53,50 @@ update_repo() {
     local dir=$1
     local repo_name="${dir%/}"
     local show_progress=false
-    if [ "$VERBOSE" = true ] || [ "${#repos[@]}" -gt 1 ]; then
-        show_progress=true
-    fi
+    [ "$VERBOSE" = true ] || [ "${#repos[@]}" -gt 1 ] && show_progress=true
 
-    if [ "$show_progress" = true ]; then
-        update_status "  Updating ${repo_name}..."
-    fi
+    # Helper: report status, log, track in array, popd, and return
+    # Usage: _report "color" "icon" "suffix" "LOG_LEVEL: msg" "ARRAY_NAME" ["entry"]
+    _report() {
+        local color=$1 icon=$2 suffix=$3 log_msg=$4 arr=${5:-} entry=${6:-"$repo_name: $suffix"}
+        [ "$show_progress" = true ] && complete_status "${color}${icon}${NC} ${repo_name}${suffix:+ ($suffix)}"
+        log_verbose "$log_msg"
+        [ -n "$arr" ] && eval "$arr+=(\"$entry\")"
+    }
+
+    [ "$show_progress" = true ] && update_status "  Updating ${repo_name}..."
     log_verbose "INFO: Processing repository: $repo_name"
     pushd "$dir" > /dev/null || {
-        if [ "$show_progress" = true ]; then
-            complete_status "${RED}✗${NC} ${repo_name} (failed to enter directory)"
-        fi
-        log_verbose "ERROR: Failed to enter directory: $dir"
-        FAILED_REPOS+=("$repo_name: failed to enter directory")
+        _report "$RED" "✗" "failed to enter directory" "ERROR: Failed to enter directory: $dir" "FAILED_REPOS"
         return 1
     }
-    log_verbose "INFO: Checking repository status..."
+
     if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
-        if [ "$show_progress" = true ]; then
-            complete_status "${YELLOW}⊘${NC} ${repo_name} (empty repository, skipped)"
-        fi
-        log_verbose "WARN: Empty repository, skipping"
-        SKIPPED_REPOS+=("$repo_name: empty repository")
-        popd > /dev/null || return
-        return 0
+        _report "$YELLOW" "⊘" "empty repository, skipped" "WARN: Empty repository, skipping" "SKIPPED_REPOS" "$repo_name: empty repository"
+        popd > /dev/null || return; return 0
     fi
 
-    # Check if repo has a remote configured
-    log_verbose "INFO: Checking for remote..."
     if ! git remote get-url origin >/dev/null 2>&1; then
-        if [ "$show_progress" = true ]; then
-            complete_status "${YELLOW}⊘${NC} ${repo_name} (no remote, skipped)"
-        fi
-        log_verbose "WARN: No origin remote configured, skipping"
-        SKIPPED_REPOS+=("$repo_name: no origin remote")
-        popd > /dev/null || return
-        return 0
+        _report "$YELLOW" "⊘" "no remote, skipped" "WARN: No origin remote configured, skipping" "SKIPPED_REPOS" "$repo_name: no origin remote"
+        popd > /dev/null || return; return 0
     fi
 
     log_verbose "INFO: Detecting default branch..."
     DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}' || true)
     if [ -z "$DEFAULT_BRANCH" ]; then
-        if git show-ref --quiet refs/heads/main; then
-            DEFAULT_BRANCH="main"
-        elif git show-ref --quiet refs/heads/master; then
-            DEFAULT_BRANCH="master"
-        else
-            DEFAULT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-        fi
+        if git show-ref --quiet refs/heads/main; then DEFAULT_BRANCH="main"
+        elif git show-ref --quiet refs/heads/master; then DEFAULT_BRANCH="master"
+        else DEFAULT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); fi
     fi
     log_verbose "INFO: Default branch: $DEFAULT_BRANCH"
 
-    # Get current branch for feature branch handling
     local CURRENT_BRANCH
     CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
     log_verbose "INFO: Current branch: $CURRENT_BRANCH"
 
     if [ -z "$DEFAULT_BRANCH" ] || [ "$DEFAULT_BRANCH" = "HEAD" ]; then
-        if [ "$show_progress" = true ]; then
-            complete_status "${YELLOW}⊘${NC} ${repo_name} (detached HEAD or no branch, skipped)"
-        fi
-        log_verbose "WARN: Detached HEAD or no branch, skipping"
-        SKIPPED_REPOS+=("$repo_name: detached HEAD or no branch")
-        popd > /dev/null || return
-        return 0
+        _report "$YELLOW" "⊘" "detached HEAD or no branch, skipped" "WARN: Detached HEAD or no branch, skipping" "SKIPPED_REPOS" "$repo_name: detached HEAD or no branch"
+        popd > /dev/null || return; return 0
     fi
     log_verbose "INFO: Checking for local changes..."
     local has_local_changes=false
@@ -131,102 +110,54 @@ update_repo() {
             do_stash=true
             log_verbose "INFO: Auto-stashing (user selected 'all')"
         else
-            # Stop timer during prompt to avoid visual interference
             stop_timer
             echo -ne "${ERASE_LINE}\r"
             echo -ne "${YELLOW}${repo_name}${NC} has local changes. Stash and pull? [y/n/a] "
             read -r stash_choice
             case "$stash_choice" in
-                [Yy])
-                    do_stash=true
-                    ;;
-                [Aa])
-                    do_stash=true
-                    STASH_ALL=true
-                    ;;
+                [Yy]) do_stash=true ;;
+                [Aa]) do_stash=true; STASH_ALL=true ;;
                 *)
-                    if [ "$show_progress" = true ]; then
-                        complete_status "${YELLOW}⊘${NC} ${repo_name} (local changes, skipped)"
-                    fi
-                    log_verbose "WARN: User declined to stash, skipping"
-                    SKIPPED_REPOS+=("$repo_name: has local changes (user skipped)")
+                    _report "$YELLOW" "⊘" "local changes, skipped" "WARN: User declined to stash, skipping" "SKIPPED_REPOS" "$repo_name: has local changes (user skipped)"
                     popd > /dev/null || return
-                    # Restart timer if we were showing progress
-                    if [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ]; then
-                        start_timer
-                    fi
-                    return 0
-                    ;;
+                    [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ] && start_timer
+                    return 0 ;;
             esac
-            # Restart timer after prompt
-            if [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ]; then
-                start_timer
-            fi
+            [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ] && start_timer
         fi
-
         if [ "$do_stash" = true ]; then
             log_verbose "INFO: Stashing local changes..."
             if ! git stash push -m "fetch-github-projects auto-stash" >/dev/null 2>&1; then
-                if [ "$show_progress" = true ]; then
-                    complete_status "${RED}✗${NC} ${repo_name} (stash failed)"
-                fi
-                log_verbose "ERROR: Failed to stash changes"
-                FAILED_REPOS+=("$repo_name: stash failed")
-                popd > /dev/null || return
-                return 1
+                _report "$RED" "✗" "stash failed" "ERROR: Failed to stash changes" "FAILED_REPOS"
+                popd > /dev/null || return; return 1
             fi
         fi
     fi
-    # Fetch first to get latest remote state
-    # Use explicit refspec to ensure origin/$DEFAULT_BRANCH tracking ref is updated
-    # (git fetch origin main only updates FETCH_HEAD, not refs/remotes/origin/main)
+
+    # Fetch latest remote state (explicit refspec to update tracking ref)
     log_verbose "INFO: Fetching from origin/$DEFAULT_BRANCH..."
     if ! git fetch origin "$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH" >/dev/null 2>&1; then
-        if [ "$show_progress" = true ]; then
-            complete_status "${RED}✗${NC} ${repo_name} (fetch failed)"
-        fi
-        log_verbose "ERROR: Fetch failed"
-        FAILED_REPOS+=("$repo_name: fetch failed")
-        popd > /dev/null || return
-        return 1
+        _report "$RED" "✗" "fetch failed" "ERROR: Fetch failed" "FAILED_REPOS"
+        popd > /dev/null || return; return 1
     fi
 
-    # Classify branch type for merge handling
     local branch_type
     branch_type=$(classify_branch "$CURRENT_BRANCH" "$DEFAULT_BRANCH")
     log_verbose "INFO: Branch type: $branch_type"
 
-    # Handle ambiguous branches (release/*, hotfix/*, etc.)
     if [ "$branch_type" = "ambiguous" ]; then
-        if [ "$show_progress" = true ]; then
-            complete_status "${YELLOW}⊘${NC} ${repo_name} ($CURRENT_BRANCH, ambiguous branch skipped)"
-        fi
-        log_verbose "INFO: Ambiguous branch pattern, skipping"
-        AMBIGUOUS_BRANCH_REPOS+=("$repo_name ($CURRENT_BRANCH)")
-        popd > /dev/null || return
-        return 0
+        _report "$YELLOW" "⊘" "$CURRENT_BRANCH, ambiguous branch skipped" "INFO: Ambiguous branch pattern, skipping" "AMBIGUOUS_BRANCH_REPOS" "$repo_name ($CURRENT_BRANCH)"
+        popd > /dev/null || return; return 0
     fi
 
-    # Safety checks for merge mode
     if [ "$MERGE_MODE" = true ] && [ "$branch_type" = "feature" ]; then
         if is_shallow_clone; then
-            if [ "$show_progress" = true ]; then
-                complete_status "${YELLOW}⊘${NC} ${repo_name} (shallow clone, merge skipped)"
-            fi
-            log_verbose "WARN: Shallow clone detected, skipping merge"
-            SKIPPED_REPOS+=("$repo_name: shallow clone")
-            popd > /dev/null || return
-            return 0
+            _report "$YELLOW" "⊘" "shallow clone, merge skipped" "WARN: Shallow clone detected, skipping merge" "SKIPPED_REPOS" "$repo_name: shallow clone"
+            popd > /dev/null || return; return 0
         fi
-
         if has_lock_file; then
-            if [ "$show_progress" = true ]; then
-                complete_status "${YELLOW}⊘${NC} ${repo_name} (locked by another process)"
-            fi
-            log_verbose "WARN: Repository locked, skipping"
-            SKIPPED_REPOS+=("$repo_name: locked")
-            popd > /dev/null || return
-            return 0
+            _report "$YELLOW" "⊘" "locked by another process" "WARN: Repository locked, skipping" "SKIPPED_REPOS" "$repo_name: locked"
+            popd > /dev/null || return; return 0
         fi
     fi
 
@@ -237,102 +168,45 @@ update_repo() {
     if [ "$WHAT_IF" = true ]; then
         log_verbose "INFO: [WHAT-IF] Checking if update needed..."
         if [ "$LOCAL" = "$REMOTE" ]; then
-            if [ "$show_progress" = true ]; then
-                complete_status "${BLUE}•${NC} ${repo_name} [WHAT-IF: would skip, already up to date]"
-            fi
-            log_verbose "INFO: [WHAT-IF] Already up to date, would skip"
+            _report "$BLUE" "•" "WHAT-IF: would skip, already up to date" "INFO: [WHAT-IF] Already up to date"
+        elif [ "$branch_type" = "feature" ] && [ "$MERGE_MODE" = true ]; then
+            local merge_stats; merge_stats=$(get_merge_stats "$DEFAULT_BRANCH")
+            _report "$GREEN" "✓" "WHAT-IF: would merge $DEFAULT_BRANCH ($merge_stats)" \
+                "INFO: [WHAT-IF] Would merge $DEFAULT_BRANCH into $CURRENT_BRANCH ($merge_stats)" \
+                "MERGED_REPOS" "$repo_name ($CURRENT_BRANCH would merge $DEFAULT_BRANCH)"
         elif [ "$LOCAL" = "$BASE" ]; then
-            # Check if this is a feature branch merge scenario
-            if [ "$branch_type" = "feature" ] && [ "$MERGE_MODE" = true ]; then
-                local merge_stats
-                merge_stats=$(get_merge_stats "$DEFAULT_BRANCH")
-                if [ "$show_progress" = true ]; then
-                    complete_status "${GREEN}✓${NC} ${repo_name} [WHAT-IF: would merge $DEFAULT_BRANCH ($merge_stats)]"
-                fi
-                log_verbose "INFO: [WHAT-IF] Would merge $DEFAULT_BRANCH into $CURRENT_BRANCH ($merge_stats)"
-                MERGED_REPOS+=("$repo_name ($CURRENT_BRANCH would merge $DEFAULT_BRANCH)")
-            else
-                if [ "$show_progress" = true ]; then
-                    complete_status "${GREEN}✓${NC} ${repo_name} [WHAT-IF: would update]"
-                fi
-                log_verbose "INFO: [WHAT-IF] Would fast-forward from $LOCAL to $REMOTE"
-                UPDATED_REPOS+=("$repo_name")
-            fi
+            _report "$GREEN" "✓" "WHAT-IF: would update" "INFO: [WHAT-IF] Would fast-forward" "UPDATED_REPOS" "$repo_name"
         else
-            # Branches diverged - check if feature branch with merge enabled
-            if [ "$branch_type" = "feature" ] && [ "$MERGE_MODE" = true ]; then
-                local merge_stats
-                merge_stats=$(get_merge_stats "$DEFAULT_BRANCH")
-                if [ "$show_progress" = true ]; then
-                    complete_status "${GREEN}✓${NC} ${repo_name} [WHAT-IF: would merge $DEFAULT_BRANCH ($merge_stats)]"
-                fi
-                log_verbose "INFO: [WHAT-IF] Would merge $DEFAULT_BRANCH into $CURRENT_BRANCH ($merge_stats)"
-                MERGED_REPOS+=("$repo_name ($CURRENT_BRANCH would merge $DEFAULT_BRANCH)")
-            else
-                if [ "$show_progress" = true ]; then
-                    complete_status "${YELLOW}⊘${NC} ${repo_name} [WHAT-IF: diverged, needs manual merge]"
-                fi
-                log_verbose "WARN: [WHAT-IF] Branches have diverged, would need manual merge"
-                SKIPPED_REPOS+=("$repo_name: diverged (use --merge on feature branches)")
-            fi
+            _report "$YELLOW" "⊘" "WHAT-IF: diverged, needs manual merge" \
+                "WARN: [WHAT-IF] Branches have diverged" "SKIPPED_REPOS" "$repo_name: diverged (use --merge on feature branches)"
         fi
     else
-        # Check if already up to date (avoid unnecessary pull)
         if [ "$LOCAL" = "$REMOTE" ]; then
-            if [ "$show_progress" = true ]; then
-                complete_status "${BLUE}•${NC} ${repo_name}"
-            fi
-            log_verbose "INFO: Already up to date"
-        # Check if we can fast-forward (local is ancestor of remote)
+            _report "$BLUE" "•" "" "INFO: Already up to date"
         elif [ "$LOCAL" = "$BASE" ]; then
+            # Can fast-forward
             log_verbose "INFO: Pulling latest changes from origin/$DEFAULT_BRANCH..."
             if OUTPUT=$(git pull --ff-only origin "$DEFAULT_BRANCH" 2>&1); then
-                if [ "$show_progress" = true ]; then
-                    complete_status "${GREEN}✓${NC} ${repo_name} (updated)"
-                fi
-                log_verbose "INFO: Successfully updated"
+                _report "$GREEN" "✓" "updated" "INFO: Successfully updated" "UPDATED_REPOS" "$repo_name"
                 log_verbose "INFO: $OUTPUT"
-                UPDATED_REPOS+=("$repo_name")
-
-                # Pop stash if we stashed earlier
                 if [ "$has_local_changes" = true ]; then
-                    log_verbose "INFO: Restoring stashed changes..."
                     if ! git stash pop >/dev/null 2>&1; then
-                        if [ "$show_progress" = true ]; then
-                            complete_status "${YELLOW}⚠${NC} ${repo_name} (updated, stash pop failed - changes remain in stash)"
-                        fi
-                        log_verbose "WARN: Stash pop failed, changes remain in stash. Run 'git stash pop' manually."
-                        STASH_CONFLICT_REPOS+=("$repo_name")
+                        _report "$YELLOW" "⚠" "updated, stash pop failed" "WARN: Stash pop failed, run 'git stash pop' manually" "STASH_CONFLICT_REPOS" "$repo_name"
                     else
                         log_verbose "INFO: Stashed changes restored successfully"
                     fi
                 fi
             else
-                # Pull failed - try reset + retry if no local changes
                 if [ "$has_local_changes" = false ]; then
-                    log_verbose "WARN: Pull failed, attempting reset + retry (no local changes)..."
+                    log_verbose "WARN: Pull failed, attempting reset + retry..."
                     if git fetch origin "$DEFAULT_BRANCH" --quiet 2>/dev/null && \
                        git reset --hard "origin/$DEFAULT_BRANCH" --quiet 2>/dev/null; then
-                        if [ "$show_progress" = true ]; then
-                            complete_status "${GREEN}✓${NC} ${repo_name} (reset to origin)"
-                        fi
-                        log_verbose "INFO: Successfully reset to origin/$DEFAULT_BRANCH"
-                        UPDATED_REPOS+=("$repo_name")
+                        _report "$GREEN" "✓" "reset to origin" "INFO: Successfully reset to origin/$DEFAULT_BRANCH" "UPDATED_REPOS" "$repo_name"
                     else
-                        if [ "$show_progress" = true ]; then
-                            complete_status "${RED}✗${NC} ${repo_name} (pull + reset failed)"
-                        fi
-                        log_verbose "ERROR: Pull failed and reset also failed: $OUTPUT"
-                        FAILED_REPOS+=("$repo_name: $OUTPUT")
+                        _report "$RED" "✗" "pull + reset failed" "ERROR: Pull and reset both failed: $OUTPUT" "FAILED_REPOS" "$repo_name: $OUTPUT"
                     fi
                 else
-                    if [ "$show_progress" = true ]; then
-                        complete_status "${RED}✗${NC} ${repo_name} (pull failed)"
-                    fi
-                    log_verbose "ERROR: Pull failed: $OUTPUT"
-                    FAILED_REPOS+=("$repo_name: $OUTPUT")
-
-                    # Try to restore stash even if pull failed
+                    _report "$RED" "✗" "pull failed" "ERROR: Pull failed: $OUTPUT" "FAILED_REPOS" "$repo_name: $OUTPUT"
                     log_verbose "INFO: Attempting to restore stashed changes after failed pull..."
                     if ! git stash pop >/dev/null 2>&1; then
                         log_verbose "WARN: Stash pop also failed"
@@ -341,21 +215,13 @@ update_repo() {
                 fi
             fi
         elif [ "$branch_type" = "feature" ] && [ "$MERGE_MODE" = true ]; then
-            # Feature branch with --merge enabled - attempt safe merge
-            local merge_stats
-            merge_stats=$(get_merge_stats "$DEFAULT_BRANCH")
+            local merge_stats; merge_stats=$(get_merge_stats "$DEFAULT_BRANCH")
             log_verbose "INFO: Feature branch merge stats: $merge_stats"
-
             if [[ "$merge_stats" == "0 commits behind" ]]; then
-                if [ "$show_progress" = true ]; then
-                    complete_status "${BLUE}•${NC} ${repo_name} ($CURRENT_BRANCH, up to date with $DEFAULT_BRANCH)"
-                fi
-                log_verbose "INFO: Feature branch already up to date with $DEFAULT_BRANCH"
-                popd > /dev/null || return
-                return 0
+                _report "$BLUE" "•" "$CURRENT_BRANCH, up to date with $DEFAULT_BRANCH" "INFO: Feature branch already up to date"
+                popd > /dev/null || return; return 0
             fi
-
-            # In interactive mode (not --all and not batch confirmed), prompt user
+            # Interactive prompt (not --all and not batch confirmed)
             if [ "$MERGE_BATCH_CONFIRMED" != true ] && { [ "$MENU_MODE" = true ] || [ "$RECURSIVE_MODE" != true ]; }; then
                 stop_timer
                 echo -ne "${ERASE_LINE}\r"
@@ -363,65 +229,25 @@ update_repo() {
                 echo -n "  Merge $DEFAULT_BRANCH into $CURRENT_BRANCH? [y/n] "
                 read -r merge_response
                 if [[ ! "$merge_response" =~ ^[Yy] ]]; then
-                    if [ "$show_progress" = true ]; then
-                        complete_status "${YELLOW}⊘${NC} ${repo_name} ($CURRENT_BRANCH, user declined merge)"
-                    fi
-                    SKIPPED_REPOS+=("$repo_name ($CURRENT_BRANCH): user declined")
-                    # Restart timer
-                    if [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ]; then
-                        start_timer
-                    fi
-                    popd > /dev/null || return
-                    return 0
+                    _report "$YELLOW" "⊘" "$CURRENT_BRANCH, user declined merge" "INFO: User declined merge" "SKIPPED_REPOS" "$repo_name ($CURRENT_BRANCH): user declined"
+                    [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ] && start_timer
+                    popd > /dev/null || return; return 0
                 fi
-                # Restart timer
-                if [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ]; then
-                    start_timer
-                fi
+                [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ] && start_timer
             fi
-
-            # Perform safe merge
             log_verbose "INFO: Attempting safe merge of $DEFAULT_BRANCH into $CURRENT_BRANCH..."
-            local merge_result
-            merge_result=$(safe_merge_main "$DEFAULT_BRANCH")
+            local merge_result; merge_result=$(safe_merge_main "$DEFAULT_BRANCH")
             log_verbose "INFO: Merge result: $merge_result"
-
             case "$merge_result" in
-                SUCCESS)
-                    if [ "$show_progress" = true ]; then
-                        complete_status "${GREEN}✓${NC} ${repo_name} ($CURRENT_BRANCH → merged $DEFAULT_BRANCH)"
-                    fi
-                    MERGED_REPOS+=("$repo_name ($CURRENT_BRANCH → merged $DEFAULT_BRANCH)")
-                    ;;
-                CONFLICT)
-                    if [ "$show_progress" = true ]; then
-                        complete_status "${RED}✗${NC} ${repo_name} ($CURRENT_BRANCH → conflict, rolled back)"
-                    fi
-                    MERGE_CONFLICT_REPOS+=("$repo_name ($CURRENT_BRANCH): merge conflict, rolled back")
-                    ;;
+                SUCCESS)   _report "$GREEN" "✓" "$CURRENT_BRANCH → merged $DEFAULT_BRANCH" "INFO: Merge succeeded" "MERGED_REPOS" "$repo_name ($CURRENT_BRANCH → merged $DEFAULT_BRANCH)" ;;
+                CONFLICT)  _report "$RED" "✗" "$CURRENT_BRANCH → conflict, rolled back" "ERROR: Merge conflict" "MERGE_CONFLICT_REPOS" "$repo_name ($CURRENT_BRANCH): merge conflict, rolled back" ;;
                 STASH_CONFLICT)
-                    if [ "$show_progress" = true ]; then
-                        complete_status "${YELLOW}⚠${NC} ${repo_name} ($CURRENT_BRANCH → merged, stash needs manual pop)"
-                    fi
-                    MERGED_REPOS+=("$repo_name ($CURRENT_BRANCH → merged, stash conflict)")
-                    STASH_CONFLICT_REPOS+=("$repo_name")
-                    ;;
-                STASH_FAILED)
-                    if [ "$show_progress" = true ]; then
-                        complete_status "${RED}✗${NC} ${repo_name} ($CURRENT_BRANCH, stash failed)"
-                    fi
-                    FAILED_REPOS+=("$repo_name: stash failed before merge")
-                    ;;
+                    _report "$YELLOW" "⚠" "$CURRENT_BRANCH → merged, stash needs manual pop" "WARN: Stash conflict after merge" "MERGED_REPOS" "$repo_name ($CURRENT_BRANCH → merged, stash conflict)"
+                    STASH_CONFLICT_REPOS+=("$repo_name") ;;
+                STASH_FAILED) _report "$RED" "✗" "$CURRENT_BRANCH, stash failed" "ERROR: Stash failed before merge" "FAILED_REPOS" "$repo_name: stash failed before merge" ;;
             esac
         else
-            # Branches have diverged - cannot fast-forward (and not in merge mode or not feature branch)
-            if [ "$show_progress" = true ]; then
-                complete_status "${YELLOW}⊘${NC} ${repo_name} (diverged)"
-            fi
-            log_verbose "WARN: Branches have diverged, cannot fast-forward"
-            SKIPPED_REPOS+=("$repo_name: diverged (use --merge on feature branches)")
-
-            # Restore stash if we stashed
+            _report "$YELLOW" "⊘" "diverged" "WARN: Branches have diverged, cannot fast-forward" "SKIPPED_REPOS" "$repo_name: diverged (use --merge on feature branches)"
             if [ "$has_local_changes" = true ]; then
                 log_verbose "INFO: Restoring stashed changes..."
                 git stash pop >/dev/null 2>&1 || true
@@ -431,78 +257,36 @@ update_repo() {
     popd > /dev/null || return
 }
 # --- Main Script ---
-MENU_MODE=true
-TARGET_DIR=""
-RECURSIVE_MODE=false
-VERBOSE=false
-WHAT_IF=false
+MENU_MODE=true; TARGET_DIR=""; RECURSIVE_MODE=false; VERBOSE=false; WHAT_IF=false
 while [ $# -gt 0 ]; do
     case "$1" in
-        -h|--help)
-            show_help
-            ;;
-        --all)
-            MENU_MODE=false
-            RECURSIVE_MODE=true  # --all implies recursive search
-            shift
-            ;;
-        -r|--recursive)
-            RECURSIVE_MODE=true
-            shift
-            ;;
-        -v|--verbose)
-            VERBOSE=true
-            shift
-            ;;
-        --what-if)
-            WHAT_IF=true
-            shift
-            ;;
-        --merge)
-            MERGE_MODE=true
-            shift
-            ;;
-        *)
-            TARGET_DIR="$1"
-            MENU_MODE=false  # Directory argument disables menu mode
-            shift
-            ;;
+        -h|--help) show_help ;;
+        --all)       MENU_MODE=false; RECURSIVE_MODE=true; shift ;;
+        -r|--recursive) RECURSIVE_MODE=true; shift ;;
+        -v|--verbose)   VERBOSE=true; shift ;;
+        --what-if)      WHAT_IF=true; shift ;;
+        --merge)        MERGE_MODE=true; shift ;;
+        *)              TARGET_DIR="$1"; MENU_MODE=false; shift ;;
     esac
 done
-if [ -z "$TARGET_DIR" ]; then
-    # Always default to current directory
-    TARGET_DIR="."
-fi
+[ -z "$TARGET_DIR" ] && TARGET_DIR="."
 start_time=$(date +%s)
-if [ ! -d "$TARGET_DIR" ]; then
-    echo "Error: Directory not found: $TARGET_DIR"
-    exit 1
-fi
+[ ! -d "$TARGET_DIR" ] && echo "Error: Directory not found: $TARGET_DIR" && exit 1
 TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 log_verbose "INFO: Target directory: $TARGET_DIR"
-log_verbose "INFO: Menu mode: $MENU_MODE"
-log_verbose "INFO: Recursive mode: $RECURSIVE_MODE"
-log_verbose "INFO: Verbose mode: $VERBOSE"
+log_verbose "INFO: Menu=$MENU_MODE Recursive=$RECURSIVE_MODE Verbose=$VERBOSE"
 # --- Self-Update Check ---
 if [ -d "$SCRIPT_DIR/.git" ]; then
     log_verbose "INFO: Checking if scripts repository needs updating..."
     pushd "$SCRIPT_DIR" > /dev/null || exit
-    # Disable git prompts to prevent hanging on credential/passphrase prompts
-    # Use || true to prevent script exit when upstream branch is not configured
     GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -oBatchMode=yes" timeout 10 git fetch origin > /dev/null 2>&1 || true
     LOCAL=$(git rev-parse @ 2>/dev/null || true)
     REMOTE=$(git rev-parse '@{u}' 2>/dev/null || true)
-
     if [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
         echo "⚠️  WARNING: The scripts repository itself has updates available!"
-        echo "   This script may be out of date. Consider updating it first:"
         echo "   cd $SCRIPT_DIR && git pull origin main"
         read -t 15 -r -p "   Continue anyway? [y/N] (auto-No in 15s): " REPLY || REPLY="n"
-        if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
-            echo "   Exiting. Please update the scripts repo first."
-            popd > /dev/null || exit
-            exit 0
-        fi
+        [[ ! "$REPLY" =~ ^[Yy]$ ]] && echo "   Exiting." && popd > /dev/null && exit 0
     fi
     popd > /dev/null || exit
 fi
