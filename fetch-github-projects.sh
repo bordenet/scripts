@@ -62,7 +62,7 @@ update_repo() {
         local entry=${6:-"$repo_name: $suffix"}
         [ "$show_progress" = true ] && complete_status "${color}${icon}${NC} ${repo_name}${suffix:+ ($suffix)}"
         log_verbose "$log_msg"
-        [ -n "$arr" ] && eval "$arr+=(\"$entry\")"
+        if [ -n "$arr" ]; then eval "$arr+=(\"$entry\")"; fi
     }
 
     [ "$show_progress" = true ] && update_status "  Updating ${repo_name}..."
