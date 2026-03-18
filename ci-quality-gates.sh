@@ -86,7 +86,7 @@ OVERSIZED_SCRIPTS=0
 # Find all .sh files (excluding hidden directories)
 log_verbose "Searching for shell scripts (excluding hidden directories)"
 while IFS= read -r -d '' script; do
-  ((TOTAL_SCRIPTS++))
+  ((TOTAL_SCRIPTS++)) || true
   echo "Checking: $script"
   log_verbose "Validating script: $script"
 
@@ -94,7 +94,7 @@ while IFS= read -r -d '' script; do
   log_verbose "Running syntax check (bash -n)"
   if ! bash -n "$script" 2>/dev/null; then
     echo "  ✗ Syntax error"
-    ((SYNTAX_ERRORS++))
+    ((SYNTAX_ERRORS++)) || true
   fi
   
   # 2. ShellCheck errors (if available)
@@ -104,14 +104,14 @@ while IFS= read -r -d '' script; do
     log_verbose "Running ShellCheck for errors"
     if shellcheck -S error $sc_excludes "$script" 2>&1 | grep -q "^In "; then
       echo "  ✗ ShellCheck errors found"
-      ((SHELLCHECK_ERRORS++))
+      ((SHELLCHECK_ERRORS++)) || true
     fi
 
     # 3. ShellCheck warnings
     log_verbose "Running ShellCheck for warnings"
     if shellcheck -S warning $sc_excludes "$script" 2>&1 | grep -q "^In "; then
       echo "  ✗ ShellCheck warnings found"
-      ((SHELLCHECK_WARNINGS++))
+      ((SHELLCHECK_WARNINGS++)) || true
     fi
   else
     log_verbose "ShellCheck not available, skipping lint checks"
@@ -120,14 +120,14 @@ while IFS= read -r -d '' script; do
   # 4. Check shebang
   if ! head -1 "$script" | grep -q "^#!/usr/bin/env bash"; then
     echo "  ✗ Wrong shebang (expected: #!/usr/bin/env bash)"
-    ((WRONG_SHEBANG++))
+    ((WRONG_SHEBANG++)) || true
   fi
   
   # 5. Check error handling (skip bu.sh, mu.sh, and lib files)
   if [[ ! "$script" =~ (bu\.sh|mu\.sh|/lib/) ]]; then
     if ! grep -q "^set -euo pipefail" "$script"; then
       echo "  ✗ Missing error handling (set -euo pipefail)"
-      ((MISSING_ERROR_HANDLING++))
+      ((MISSING_ERROR_HANDLING++)) || true
     fi
   fi
   
@@ -135,7 +135,7 @@ while IFS= read -r -d '' script; do
   LINE_COUNT=$(wc -l < "$script")
   if [ "$LINE_COUNT" -gt 400 ]; then
     echo "  ✗ Script exceeds 400 lines ($LINE_COUNT lines)"
-    ((OVERSIZED_SCRIPTS++))
+    ((OVERSIZED_SCRIPTS++)) || true
   fi
   
 done < <(find . -type f -name "*.sh" ! -path "*/.*" -print0)
