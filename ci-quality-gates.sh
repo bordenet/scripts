@@ -100,7 +100,7 @@ while IFS= read -r -d '' script; do
   # 2. ShellCheck errors (if available)
   # Exclusions: SC1091 (can't follow source), SC2034 (vars used in sourced files)
   if command -v shellcheck >/dev/null 2>&1; then
-    local sc_excludes="-e SC1091 -e SC2034"
+    sc_excludes="-e SC1091 -e SC2034"
     log_verbose "Running ShellCheck for errors"
     if shellcheck -S error $sc_excludes "$script" 2>&1 | grep -q "^In "; then
       echo "  ✗ ShellCheck errors found"
