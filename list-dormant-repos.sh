@@ -14,10 +14,10 @@
 # Usage: ./list-dormant-repos.sh
 #
 # Configuration:
-#   Before running, update the GITHUB_ORG, GITHUB_API_URL, and GITHUB_TOKEN
-#   variables within this script. The GITHUB_TOKEN requires sufficient
-#   permissions to access the repositories in the specified GitHub
-#   organization.
+#   Set these environment variables before running:
+#   - GITHUB_ORG:     GitHub organization name
+#   - GITHUB_API_URL: GitHub API URL (for GitHub Enterprise)
+#   - GITHUB_TOKEN:   Personal access token with repo read permissions
 #
 # Dependencies: curl, jq, git, date
 #
@@ -30,8 +30,6 @@
 # Exit immediately if a command exits with a non-zero status.
 
 set -euo pipefail
-
-set -e
 
 # --- Argument Defaults ---
 VERBOSE=false
@@ -62,7 +60,7 @@ PLATFORM
     Cross-platform (macOS, Linux, WSL)
 
 CONFIGURATION
-    Before running, update these variables within the script:
+    Set these environment variables before running:
     • GITHUB_ORG - GitHub organization name
     • GITHUB_API_URL - GitHub API URL (for GitHub Enterprise)
     • GITHUB_TOKEN - Personal access token with repository read permissions

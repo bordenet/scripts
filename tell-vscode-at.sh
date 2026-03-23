@@ -155,9 +155,12 @@ parse_time() {
         target_min="00"
 
         # Convert to 24-hour
-        if [[ "${ampm,,}" == "pm" ]] && [[ "$target_hour" -ne 12 ]]; then
+        # Convert AM/PM to lowercase portably (Bash 3.2 compatible)
+        local ampm_lower
+        ampm_lower=$(printf '%s' "$ampm" | tr '[:upper:]' '[:lower:]')
+        if [[ "$ampm_lower" == "pm" ]] && [[ "$target_hour" -ne 12 ]]; then
             target_hour=$((target_hour + 12))
-        elif [[ "${ampm,,}" == "am" ]] && [[ "$target_hour" -eq 12 ]]; then
+        elif [[ "$ampm_lower" == "am" ]] && [[ "$target_hour" -eq 12 ]]; then
             target_hour=0
         fi
     elif [[ "$time_str" =~ ^([0-9]{1,2}):([0-9]{2})[[:space:]]*(AM|PM|am|pm)$ ]]; then
@@ -166,10 +169,12 @@ parse_time() {
         target_min="${BASH_REMATCH[2]}"
         local ampm="${BASH_REMATCH[3]}"
 
-        # Convert to 24-hour
-        if [[ "${ampm,,}" == "pm" ]] && [[ "$target_hour" -ne 12 ]]; then
+        # Convert AM/PM to lowercase portably (Bash 3.2 compatible)
+        local ampm_lower
+        ampm_lower=$(printf '%s' "$ampm" | tr '[:upper:]' '[:lower:]')
+        if [[ "$ampm_lower" == "pm" ]] && [[ "$target_hour" -ne 12 ]]; then
             target_hour=$((target_hour + 12))
-        elif [[ "${ampm,,}" == "am" ]] && [[ "$target_hour" -eq 12 ]]; then
+        elif [[ "$ampm_lower" == "am" ]] && [[ "$target_hour" -eq 12 ]]; then
             target_hour=0
         fi
     elif [[ "$time_str" =~ ^([0-9]{1,2}):([0-9]{2})$ ]]; then

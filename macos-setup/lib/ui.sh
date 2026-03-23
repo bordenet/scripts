@@ -124,15 +124,19 @@ timed_confirm() {
     local default="${3:-N}"
     local response
 
+    # Normalize default to uppercase portably (Bash 3.2 compatible)
+    local default_upper
+    default_upper=$(printf '%s' "$default" | tr '[:lower:]' '[:upper:]')
+
     # Determine prompt hint and default behavior
     local hint="y/N"
-    if [[ "${default^^}" == "Y" ]]; then
+    if [[ "$default_upper" == "Y" ]]; then
         hint="Y/n"
     fi
 
     if [ "$VERBOSE" = true ]; then
         local ask_default="n"
-        [[ "${default^^}" == "Y" ]] && ask_default="y"
+        [[ "$default_upper" == "Y" ]] && ask_default="y"
         if ask_yes_no "$prompt" "$ask_default"; then
             return 0
         else
@@ -147,7 +151,7 @@ timed_confirm() {
             esac
         else
             echo "" # New line after timeout
-            if [[ "${default^^}" == "Y" ]]; then
+            if [[ "$default_upper" == "Y" ]]; then
                 return 0  # Caller requested YES on timeout
             else
                 echo "  ⏭ Timed out — skipping (use -y to auto-accept)"

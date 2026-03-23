@@ -10,16 +10,13 @@
 #
 # Platform: Cross-platform
 #
-# Usage: ./enumerate-gh-repos.sh <GitHub_API_Token>
-#
-# Arguments:
-#   <GitHub_API_Token>: A personal access token with sufficient permissions to
-#                       access the repositories in the specified GitHub
-#                       Enterprise instance.
+# Usage: ./enumerate-gh-repos.sh [OPTIONS]
 #
 # Configuration:
-#   Before running, update the GITHUB_URL and GITHUB_ORG variables within
-#   this script.
+#   Set these environment variables before running:
+#   - GITHUB_URL:   GitHub Enterprise URL
+#   - GITHUB_ORG:   GitHub organization name
+#   - GITHUB_TOKEN: Personal access token with repo read permissions
 #
 # Dependencies: curl, jq, git, mktemp
 #
@@ -33,8 +30,6 @@
 
 set -euo pipefail
 
-set -e
-
 # --- Argument Defaults ---
 VERBOSE=false
 
@@ -45,7 +40,7 @@ NAME
     enumerate-gh-repos.sh - Enumerate and analyze GitHub repositories
 
 SYNOPSIS
-    enumerate-gh-repos.sh [OPTIONS] <GITHUB_API_TOKEN>
+    enumerate-gh-repos.sh [OPTIONS]
 
 DESCRIPTION
     Enumerates repositories within a specified GitHub Enterprise instance and
@@ -154,14 +149,6 @@ if [[ -z "$GITHUB_URL" || -z "$GITHUB_ORG" || -z "$GITHUB_TOKEN" ]]; then
 fi
 
 # --- Functions ---
-
-# Function to print usage information and exit.
-usage() {
-    echo "Usage: export GITHUB_TOKEN='...' && $0"
-    echo "Required env vars: GITHUB_URL, GITHUB_ORG, GITHUB_TOKEN"
-    echo "Use --help for more information."
-    exit 1
-}
 
 # Function to clean up the temporary directory on script exit.
 cleanup() {

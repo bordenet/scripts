@@ -16,8 +16,6 @@ set -euo pipefail
 #                        If not provided, a default prompt will be used.
 # Dependencies: VS Code, osascript (macOS), pgrep
 #
-#!/bin/bash
-
 # --- Defaults ---
 PROJECT_PATH=""  # Must be provided via --project or first positional arg
 PROMPT="Proceed, noting I have made additions to CLAUDE.md which I need you to factor into the plan."
@@ -79,6 +77,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# --- Validate required args ---
+if [[ -z "$PROJECT_PATH" ]]; then
+  echo "Error: No project path specified. Use --project <path> or pass as first argument." >&2
+  show_help >&2
+  exit 1
+fi
+
 # --- Script Logic ---
 log_verbose "Starting resume-claude.sh with prompt: $PROMPT"
 log_verbose "Project path: $PROJECT_PATH"
@@ -94,12 +99,6 @@ else
   echo "Starting VS Code fresh..."
   code "$PROJECT_PATH"
   sleep 5
-fi
-
-# Validate project path is set
-if [[ -z "$PROJECT_PATH" ]]; then
-  echo "Error: No project path specified. Use --project <path> or pass as first argument." >&2
-  exit 1
 fi
 
 # Sanitize prompt for AppleScript (escape backslashes and double quotes)

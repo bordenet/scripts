@@ -20,8 +20,6 @@
 
 set -euo pipefail
 
-set -e
-
 # Argument defaults
 VERBOSE=false
 
