@@ -2,6 +2,11 @@
 .DS_Store
 git_reset.log
 
+# Packet capture artifacts
+captures/*.pcap
+captures/*.log
+captures/*.pid
+
 # AI assistant rules
 .github/instructions/codacy.instructions.md
 .cursor/rules/codacy.mdc
