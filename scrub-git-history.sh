@@ -60,14 +60,14 @@ log_verbose() {
 
 # USAGE
 usage() {
-  echo "Usage: $0 [--file <path-to-file.txt>] [--preview] [--verbose] [path1 path2 ...]" >&2
-  echo "" >&2
-  echo "  --file <file>   : Path to a .txt file with one path/glob per line" >&2
-  echo "  --preview       : Show affected commits without rewriting history" >&2
-  echo "  --verbose       : Enable verbose logging to show detailed operations" >&2
-  echo "" >&2
-  echo "Use 'man git-filter-repo' for path/glob format details." >&2
-  exit 1
+  echo "Usage: $0 [--file <path-to-file.txt>] [--preview] [--verbose] [path1 path2 ...]"
+  echo ""
+  echo "  -h, --help      : Show this help message"
+  echo "  --file <file>   : Path to a .txt file with one path/glob per line"
+  echo "  --preview       : Show affected commits without rewriting history"
+  echo "  --verbose       : Enable verbose logging to show detailed operations"
+  echo ""
+  echo "Use 'man git-filter-repo' for path/glob format details."
 }
 
 # --- CHECKS -------------------------------------------------------------------
@@ -105,9 +105,10 @@ while [[ "$#" -gt 0 ]]; do
   case "$1" in
     -h|--help)
       usage
+      exit 0
       ;;
     --file)
-      [[ "$#" -lt 2 ]] && { echo "Error: Missing argument for --file." >&2; usage; }
+      [[ "$#" -lt 2 ]] && { echo "Error: Missing argument for --file." >&2; usage >&2; exit 1; }
       FILE="$2"
       shift 2
 
@@ -138,7 +139,8 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     -*)
       echo "Error: Unknown option '$1'." >&2
-      usage
+      usage >&2
+      exit 1
       ;;
     *)
       PATHS+=("$1")
@@ -149,7 +151,8 @@ done
 
 if [[ "${#PATHS[@]}" -eq 0 ]]; then
   echo "Error: No paths provided. Use positional arguments or the --file option." >&2
-  usage
+  usage >&2
+  exit 1
 fi
 
 # --- CORE LOGIC ---------------------------------------------------------------

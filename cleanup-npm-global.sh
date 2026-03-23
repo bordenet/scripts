@@ -92,7 +92,9 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         *)
-            break
+            echo "Error: Unknown option: $1" >&2
+            echo "Use --help for usage information" >&2
+            exit 1
             ;;
     esac
 done
