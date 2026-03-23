@@ -40,7 +40,7 @@ install_component() {
 
       # Add to shell profile for persistence
       SHELL_PROFILE=""
-      if [ -n "$ZSH_VERSION" ]; then
+      if [ -n "${ZSH_VERSION:-}" ]; then
         SHELL_PROFILE="$HOME/.zshrc"
       elif [ -n "$BASH_VERSION" ]; then
         SHELL_PROFILE="$HOME/.bash_profile"

@@ -71,13 +71,22 @@ log_verbose "Using LAN IP: $LAN_IP"
 
 # Kill existing Ollama process on port 11434
 log_verbose "Checking for existing Ollama process on port 11434"
-PID=$(lsof -iTCP:11434 -sTCP:LISTEN -t)
+PID=$(lsof -iTCP:11434 -sTCP:LISTEN -t 2>/dev/null || true)
 if [ -n "$PID" ]; then
-  echo "🛑 Killing existing Ollama process (PID $PID)"
-  log_verbose "Running: kill -9 $PID"
-  kill -9 "$PID" || true
+  # Verify it's actually an Ollama process before killing
+  PID_CMD=$(ps -p "$PID" -o comm= 2>/dev/null || true)
+  if [[ "$PID_CMD" == *"ollama"* ]]; then
+    echo "🛑 Killing existing Ollama process (PID $PID)"
+    log_verbose "Running: kill $PID (command: $PID_CMD)"
+    kill "$PID" || true
+    sleep 1
+  else
+    echo "⚠️  Port 11434 is in use by '$PID_CMD' (PID $PID), not Ollama"
+    echo "   Please free the port manually before starting Ollama."
+    exit 1
+  fi
 else
-  log_verbose "No existing Ollama process found on port 11434"
+  log_verbose "No existing process found on port 11434"
 fi
 
 # Start Ollama bound to LAN IP

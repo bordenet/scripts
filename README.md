@@ -1,6 +1,6 @@
 # Scripts
 
-Utility scripts for macOS and Linux. Bash 4.0+, ShellCheck-clean.
+Utility scripts for macOS and Linux. Bash 3.2+, ShellCheck-clean.
 
 [![Quality Gates](https://github.com/bordenet/scripts/actions/workflows/quality-gates.yml/badge.svg)](https://github.com/bordenet/scripts/actions/workflows/quality-gates.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)

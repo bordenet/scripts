@@ -19,7 +19,7 @@ set -euo pipefail
 #!/bin/bash
 
 # --- Defaults ---
-PROJECT_PATH="/Users/$(whoami)/GitHub/RecipeArchive"
+PROJECT_PATH=""  # Must be provided via --project or first positional arg
 PROMPT="Proceed, noting I have made additions to CLAUDE.md which I need you to factor into the plan."
 VERBOSE=false
 
@@ -31,16 +31,17 @@ log_verbose() {
 
 show_help() {
   cat <<EOF
-Usage: $0 [options]
+Usage: $0 --project <path> [options]
 
 Options:
+  --project <path>      Path to the project to open in VS Code (required)
   -p, --prompt <text>   Prompt string to send to Claude
   -v, --verbose         Enable verbose logging
-  ?, --help             Show this help message
+  -h, --help            Show this help message
 
 Examples:
-  $0 -p "Resume where we left off"
-  $0 --verbose
+  $0 --project ~/GitHub/MyProject -p "Resume where we left off"
+  $0 --project . --verbose
 EOF
 }
 
@@ -48,6 +49,10 @@ EOF
 while [[ $# -gt 0 ]]; do
   key="$1"
   case $key in
+    --project)
+      PROJECT_PATH="$2"
+      shift 2
+      ;;
     -p|--prompt)
       PROMPT="$2"
       shift 2
@@ -56,14 +61,20 @@ while [[ $# -gt 0 ]]; do
       VERBOSE=true
       shift
       ;;
-    \?|--help)
+    -h|--help)
       show_help
       exit 0
       ;;
     *)
-      echo "Unknown option: $1"
-      show_help
-      exit 1
+      # Treat first positional arg as project path
+      if [[ -z "$PROJECT_PATH" && ! "$1" =~ ^- ]]; then
+        PROJECT_PATH="$1"
+        shift
+      else
+        echo "Unknown option: $1"
+        show_help
+        exit 1
+      fi
       ;;
   esac
 done
@@ -85,6 +96,15 @@ else
   sleep 5
 fi
 
+# Validate project path is set
+if [[ -z "$PROJECT_PATH" ]]; then
+  echo "Error: No project path specified. Use --project <path> or pass as first argument." >&2
+  exit 1
+fi
+
+# Sanitize prompt for AppleScript (escape backslashes and double quotes)
+SAFE_PROMPT=$(printf '%s' "$PROMPT" | sed 's/\\/\\\\/g; s/"/\\"/g')
+
 log_verbose "Initiating AppleScript automation sequence"
 echo "Activating VS Code and using integrated terminal..."
 osascript <<EOF
@@ -95,6 +115,8 @@ end tell
 delay 2
 
 tell application "System Events"
+	set promptText to "${SAFE_PROMPT}"
+
 	tell process "Code"
 		-- Ensure terminal panel is open/focused
 		click menu item "Terminal" of menu "View" of menu bar 1
@@ -115,7 +137,7 @@ tell application "System Events"
 	delay 1
 
 	-- Now send the action string
-	keystroke "$PROMPT"
+	keystroke promptText
 	keystroke return
 
 	delay 10

@@ -83,11 +83,27 @@ PIDFILE="${CAP_DIR}/tcpdump-rotate.pid"
 # Stop the capture process
 if [ -f "$PIDFILE" ]; then
     PID=$(cat "$PIDFILE")
-    if kill -0 "$PID" 2>/dev/null; then
-        echo "Stopping tcpdump process (PID $PID)..."
-        sudo kill "$PID"
+    # Validate PID is numeric
+    if ! [[ "$PID" =~ ^[0-9]+$ ]]; then
+        echo "Error: PID file contains invalid value: '$PID'" >&2
         rm "$PIDFILE"
-        echo "✓ Packet capture rotation stopped"
+        exit 1
+    fi
+    # Verify PID belongs to a tcpdump process before killing
+    PID_CMD=$(ps -p "$PID" -o comm= 2>/dev/null || true)
+    if [[ "$PID_CMD" == *"tcpdump"* ]]; then
+        echo "Stopping tcpdump process (PID $PID)..."
+        if sudo kill "$PID"; then
+            rm "$PIDFILE"
+            echo "✓ Packet capture rotation stopped"
+        else
+            echo "Error: Failed to kill tcpdump (PID $PID). Check sudo permissions." >&2
+            exit 1
+        fi
+    elif kill -0 "$PID" 2>/dev/null; then
+        echo "Error: PID $PID is running '$PID_CMD', not tcpdump. Refusing to kill." >&2
+        echo "Remove $PIDFILE manually if stale." >&2
+        exit 1
     else
         echo "Warning: Process $PID not running, removing stale PID file"
         rm "$PIDFILE"

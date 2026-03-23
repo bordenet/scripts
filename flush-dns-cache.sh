@@ -194,7 +194,7 @@ flush_dns_linux() {
 flush_dns_windows() {
     echo "Flushing DNS cache on Windows (Git Bash/MSYS)..."
     # On native Windows (Git Bash, MSYS, Cygwin), call ipconfig directly
-    ipconfig //flushdns || {
+    ipconfig /flushdns || {
         echo "⚠️  Warning: Failed to flush DNS cache. May require administrator privileges."
         echo "   Try running as Administrator."
     }

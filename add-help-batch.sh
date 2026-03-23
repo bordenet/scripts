@@ -93,12 +93,17 @@ for script in "${SCRIPTS[@]}"; do
     log_verbose "Extracted description: $desc"
     
     # Create temp file with help function
+    # Preserve original file permissions
+    orig_perms=$(stat -f '%Lp' "$script" 2>/dev/null || stat -c '%a' "$script" 2>/dev/null || echo "755")
+
     awk -v desc="$desc" '
-    BEGIN { added = 0 }
+    BEGIN { added = 0; in_header = 0 }
     /^#!/ { print; next }
-    /^# -+$/ { skip = 1; next }
-    skip && /^# -+$/ { skip = 0; next }
-    skip { next }
+    /^# -{3,}$/ {
+        if (in_header == 0) { in_header = 1; next }
+        else { in_header = 0; next }
+    }
+    in_header { next }
     /^set -euo pipefail/ {
         print
         print ""
@@ -142,7 +147,7 @@ for script in "${SCRIPTS[@]}"; do
         next
     }
     { print }
-    ' "$script" > "$script.tmp" && mv "$script.tmp" "$script"
+    ' "$script" > "$script.tmp" && chmod "$orig_perms" "$script.tmp" && mv "$script.tmp" "$script"
 
     log_verbose "Successfully added help function to $script"
     echo "  ✓ Added help to $script"

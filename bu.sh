@@ -316,7 +316,8 @@ fi
 # Software updates can take a long time, don't retry
 # 10 minute timeout ensures script doesn't hang indefinitely
 update_status "  Checking for macOS updates (may take several minutes)..."
-if timeout 600 sudo softwareupdate --all --install --force -R >/dev/null 2>&1; then
+# Note: -R (restart) flag removed — OS restarts should require explicit user action
+if timeout 600 sudo softwareupdate --all --install --force >/dev/null 2>&1; then
     complete_status "${GREEN}✓${NC} macOS software updates"
     log_success "macOS software updates completed"
 else

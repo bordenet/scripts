@@ -59,7 +59,7 @@ NOTES
     - Compression is logged to LOG_FILE
     - Shows before/after directory sizes
     - Progress counter shows files processed
-    - Requires zstd to be installed at /opt/bin/zstd
+    - Requires zstd to be installed and available in PATH
 
 SEE ALSO
     compress-pcap-gzip.sh(1), zstd(1), tcpdump(8)
@@ -82,10 +82,12 @@ done
 
 # --- Configuration ---
 SOURCE_DIR="${1:-$HOME/network-diagnostics/captures}"
-LOG_FILE="${2:-/volume1/Network-Diagnostics/compression.log}"
+LOG_FILE="${2:-$HOME/network-diagnostics/compression.log}"
 
 # --- Start ---
 start_time=$(date +%s)
+# Ensure log directory exists
+mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
 echo "=== Compression started at $(date) ===" >> "$LOG_FILE"
 
 # Function to get human-readable size
@@ -106,7 +108,7 @@ count=0
 find "$SOURCE_DIR" -type f -name '*.pcap' | while read -r file; do
   count=$((count + 1))
   echo "[$count/$total_files] Compressing: $file" | tee -a "$LOG_FILE"
-  /opt/bin/zstd -19 --rm "$file"
+  zstd -19 --rm "$file"
 done
 
 # Record final size

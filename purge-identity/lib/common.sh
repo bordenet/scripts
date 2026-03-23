@@ -14,8 +14,12 @@
 # - Display/UI functions
 # - Safety functions
 # - Discovery helpers
+#
+# NOTE: This file sources sub-modules below, then intentionally redefines
+# several functions (logging, timer, cleanup, etc.) with enhanced versions.
+# The functions in this file take precedence over the sub-module versions.
 
-# Source all library modules
+# Source all library modules (base implementations)
 PURGE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=purge-identity/lib/utils.sh
 source "$PURGE_LIB_DIR/utils.sh"

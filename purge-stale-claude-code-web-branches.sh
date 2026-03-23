@@ -206,7 +206,11 @@ if [ ${#BRANCHES[@]} -eq 0 ]; then
 fi
 
 # Sort branches by timestamp (oldest first)
-mapfile -t BRANCHES < <(printf '%s\n' "${BRANCHES[@]}" | sort -t'|' -k2 -n)
+SORTED_BRANCHES=()
+while IFS= read -r line; do
+    [[ -n "$line" ]] && SORTED_BRANCHES+=("$line")
+done < <(printf '%s\n' "${BRANCHES[@]}" | sort -t'|' -k2 -n)
+BRANCHES=("${SORTED_BRANCHES[@]}")
 
 # --- Main Loop ---
 if [ "$ALL_MODE" = true ]; then

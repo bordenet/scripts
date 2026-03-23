@@ -26,12 +26,12 @@ SAVE_CURSOR='\033[s'
 # shellcheck disable=SC2034  # Used by lib/fetch-github-lib.sh
 RESTORE_CURSOR='\033[u'
 # --- Global Variables ---
+# shellcheck disable=SC2034  # Arrays populated by _report() via indirect reference
 UPDATED_REPOS=()
 SKIPPED_REPOS=()
 FAILED_REPOS=()
 STASH_CONFLICT_REPOS=()
 STASH_ALL=false
-# shellcheck disable=SC2034  # Used by lib/fetch-github-lib.sh
 TIMER_PID=""
 TIMER_WAS_RUNNING=false
 
@@ -62,6 +62,7 @@ update_repo() {
         local entry=${6:-"$repo_name: $suffix"}
         [ "$show_progress" = true ] && complete_status "${color}${icon}${NC} ${repo_name}${suffix:+ ($suffix)}"
         log_verbose "$log_msg"
+        # Safe indirect array append — arr names are hardcoded constants from callers
         if [ -n "$arr" ]; then eval "$arr+=(\"$entry\")"; fi
     }
 
@@ -199,8 +200,12 @@ update_repo() {
                 fi
             else
                 if [ "$has_local_changes" = false ]; then
-                    log_verbose "WARN: Pull failed, attempting reset + retry..."
-                    if git fetch origin "$DEFAULT_BRANCH" --quiet 2>/dev/null && \
+                    log_verbose "WARN: Pull failed. Checking for unpushed local commits..."
+                    local local_ahead
+                    local_ahead=$(git rev-list --count "origin/$DEFAULT_BRANCH"..HEAD 2>/dev/null || echo "0")
+                    if [ "$local_ahead" -gt 0 ]; then
+                        _report "$RED" "✗" "pull failed (has $local_ahead unpushed commit(s))" "ERROR: Pull failed and repo has unpushed commits — refusing to reset" "FAILED_REPOS" "$repo_name: has unpushed commits"
+                    elif git fetch origin "$DEFAULT_BRANCH" --quiet 2>/dev/null && \
                        git reset --hard "origin/$DEFAULT_BRANCH" --quiet 2>/dev/null; then
                         _report "$GREEN" "✓" "reset to origin" "INFO: Successfully reset to origin/$DEFAULT_BRANCH" "UPDATED_REPOS" "$repo_name"
                     else

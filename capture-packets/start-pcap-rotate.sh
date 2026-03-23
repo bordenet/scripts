@@ -119,7 +119,13 @@ echo "Creating capture directory if it doesn't exist: ${CAP_DIR}"
 mkdir -p "$CAP_DIR"
 
 echo "Checking for available disk space..."
-avail_kb=$(df --output=avail -k "$CAP_DIR" | tail -n1)
+# macOS uses BSD df (no --output), Linux uses GNU df
+if df --output=avail -k "$CAP_DIR" >/dev/null 2>&1; then
+    avail_kb=$(df --output=avail -k "$CAP_DIR" | tail -n1)
+else
+    # BSD df: available space is column 4
+    avail_kb=$(df -k "$CAP_DIR" | tail -n1 | awk '{print $4}')
+fi
 avail_gb=$((avail_kb / 1024 / 1024))
 
 if [ "$avail_gb" -lt "$MIN_FREE_GB" ]; then

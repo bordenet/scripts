@@ -45,7 +45,7 @@ delete_chrome_profiles() {
             if [[ -f "$login_db" ]]; then
                 local temp_db="/tmp/chrome_login_check_$$.db"
                 if cp "$login_db" "$temp_db" 2>/dev/null; then
-                    if sqlite3 "$temp_db" "SELECT username_value FROM logins WHERE username_value = '$identity';" 2>/dev/null | grep -q .; then
+                    if sqlite3 "$temp_db" "SELECT username_value FROM logins WHERE username_value = '$(printf '%s' "$identity" | sed "s/'/''/g")';" 2>/dev/null | grep -q .; then
                         is_match=true
                         log "DEBUG" "Found $identity in Chrome passwords: $profile_name"
                     fi
@@ -110,7 +110,7 @@ delete_edge_profiles() {
             if [[ -f "$login_db" ]]; then
                 local temp_db="/tmp/edge_login_check_$$.db"
                 if cp "$login_db" "$temp_db" 2>/dev/null; then
-                    if sqlite3 "$temp_db" "SELECT username_value FROM logins WHERE username_value = '$identity';" 2>/dev/null | grep -q .; then
+                    if sqlite3 "$temp_db" "SELECT username_value FROM logins WHERE username_value = '$(printf '%s' "$identity" | sed "s/'/''/g")';" 2>/dev/null | grep -q .; then
                         is_match=true
                         log "DEBUG" "Found $identity in Edge passwords: $profile_name"
                     fi
@@ -168,7 +168,10 @@ delete_firefox_profiles() {
             if [[ -f "$places_db" ]]; then
                 local temp_db="/tmp/firefox_places_check_$$.db"
                 if cp "$places_db" "$temp_db" 2>/dev/null; then
-                    if sqlite3 "$temp_db" "SELECT url FROM moz_places WHERE url LIKE '%$identity%';" 2>/dev/null | grep -q .; then
+                    # Escape SQL special chars: ' → '', % → \%, _ → \_
+                    local safe_id
+                    safe_id=$(printf '%s' "$identity" | sed "s/'/''/g; s/%/\\\\%/g; s/_/\\\\_/g")
+                    if sqlite3 "$temp_db" "SELECT url FROM moz_places WHERE url LIKE '%${safe_id}%' ESCAPE '\\';" 2>/dev/null | grep -q .; then
                         is_match=true
                         log "DEBUG" "Found $identity in Firefox history: $profile_name"
                     fi
