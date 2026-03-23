@@ -24,6 +24,7 @@ RESUME_SCRIPT="$SCRIPT_DIR/resume-claude.sh"
 DRY_RUN=false
 VERBOSE=false
 PROMPT=""
+PROJECT_PATH=""
 HOURS=0
 MINUTES=0
 
@@ -35,9 +36,10 @@ log_verbose() {
 
 # --- Usage function ---
 usage() {
-  echo "Usage: $0 [--hours N] [--minutes N] [-p prompt] [--dry-run] [--verbose]"
+  echo "Usage: $0 --project <path> [--hours N] [--minutes N] [-p prompt] [--dry-run]"
   echo ""
   echo "Options:"
+  echo "  --project PATH  Project path to pass to resume-claude.sh"
   echo "  --hours N       Number of hours to wait before running"
   echo "  -m, --minutes N Number of minutes to wait before running"
   echo "  -p, --prompt    Prompt string to pass to resume-claude.sh"
@@ -50,13 +52,23 @@ usage() {
 # --- Argument parsing ---
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --hours) HOURS="$2"; shift 2 ;;
-    -m|--minutes) MINUTES="$2"; shift 2 ;;
-    -p|--prompt) PROMPT="$2"; shift 2 ;;
+    --hours)
+      [[ $# -ge 2 ]] || { echo "Error: --hours requires a value" >&2; exit 1; }
+      HOURS="$2"; shift 2 ;;
+    -m|--minutes)
+      [[ $# -ge 2 ]] || { echo "Error: --minutes requires a value" >&2; exit 1; }
+      MINUTES="$2"; shift 2 ;;
+    -p|--prompt)
+      [[ $# -ge 2 ]] || { echo "Error: --prompt requires a value" >&2; exit 1; }
+      PROMPT="$2"; shift 2 ;;
+    --project)
+      [[ $# -ge 2 ]] || { echo "Error: --project requires a value" >&2; exit 1; }
+      PROJECT_PATH="$2"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
     -v|--verbose) VERBOSE=true; shift ;;
     -h|--help) usage ;;
-    *) echo "Unknown option: $1"; usage ;;
+    -*) echo "Error: Unknown option: $1" >&2; exit 1 ;;
+    *) echo "Error: Unexpected argument: $1" >&2; exit 1 ;;
   esac
 done
 
@@ -68,8 +80,8 @@ log_verbose "Parsed hours: $HOURS, minutes: $MINUTES"
 log_verbose "Total delay: $TOTAL_SECONDS seconds"
 
 if [[ $TOTAL_SECONDS -le 0 ]]; then
-  echo "⚠️  No valid delay specified. Use --hours or -m."
-  usage
+  echo "⚠️  No valid delay specified. Use --hours or -m." >&2
+  exit 1
 fi
 
 # --- Compute target wall-clock time ---
@@ -96,10 +108,13 @@ fi
 
 # --- Keep system awake while waiting ---
 log_verbose "Starting caffeinate to prevent sleep during countdown"
-echo "⚡ Using caffeinate to keep macOS awake..."
-caffeinate -dimsu &
-CAFFEINATE_PID=$!
-log_verbose "Caffeinate PID: $CAFFEINATE_PID"
+CAFFEINATE_PID=""
+if [[ "$(uname -s)" == "Darwin" ]] && command -v caffeinate >/dev/null 2>&1; then
+  echo "⚡ Using caffeinate to keep macOS awake..."
+  caffeinate -dimsu &
+  CAFFEINATE_PID=$!
+  log_verbose "Caffeinate PID: $CAFFEINATE_PID"
+fi
 
 # --- Countdown ticker (per second) ---
 SECONDS_LEFT=$TOTAL_SECONDS
@@ -127,13 +142,20 @@ done
 echo ""
 
 # --- Execute resume script ---
-log_verbose "Stopping caffeinate (PID: $CAFFEINATE_PID)"
-kill $CAFFEINATE_PID >/dev/null 2>&1 || true
+if [[ -n "$CAFFEINATE_PID" ]]; then
+  log_verbose "Stopping caffeinate (PID: $CAFFEINATE_PID)"
+  kill "$CAFFEINATE_PID" >/dev/null 2>&1 || true
+fi
+
+RESUME_ARGS=(-p "$PROMPT")
+if [[ -n "${PROJECT_PATH:-}" ]]; then
+  RESUME_ARGS=(--project "$PROJECT_PATH" "${RESUME_ARGS[@]}")
+fi
 
 if [[ -x "$RESUME_SCRIPT" ]]; then
-  log_verbose "Executing: $RESUME_SCRIPT -p \"$PROMPT\""
-  echo "🚀 Running $RESUME_SCRIPT -p \"$PROMPT\"..."
-  "$RESUME_SCRIPT" -p "$PROMPT"
+  log_verbose "Executing: $RESUME_SCRIPT ${RESUME_ARGS[*]}"
+  echo "🚀 Running $RESUME_SCRIPT ${RESUME_ARGS[*]}..."
+  "$RESUME_SCRIPT" "${RESUME_ARGS[@]}"
 else
   echo "❌ Error: $RESUME_SCRIPT not found or not executable."
   exit 1

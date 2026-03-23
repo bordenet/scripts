@@ -123,8 +123,12 @@ main() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --suggest) ACTION="suggest"; shift ;;
-      --message) COMMIT_MSG="$2"; shift 2 ;;
-      --repo) REPO_URL_PARAM="$2"; shift 2 ;;
+      --message)
+        [[ $# -ge 2 ]] || { echo "Error: --message requires a value" >&2; exit 1; }
+        COMMIT_MSG="$2"; shift 2 ;;
+      --repo)
+        [[ $# -ge 2 ]] || { echo "Error: --repo requires a value" >&2; exit 1; }
+        REPO_URL_PARAM="$2"; shift 2 ;;
       --what-if) WHAT_IF="true"; shift ;;  # Explicit what-if (already default)
       --force)
         WHAT_IF=""
@@ -273,8 +277,9 @@ EDITOREOF
   # Apply custom commit message if provided
   if [ -n "$COMMIT_MSG" ]; then
     log_verbose "Amending squashed commit with message: $COMMIT_MSG"
-    git commit --amend --message "$COMMIT_MSG" --no-edit 2>/dev/null || \
-      git commit --amend --message "$COMMIT_MSG" 2>/dev/null || true
+    if ! git commit --amend --message "$COMMIT_MSG" --no-edit 2>/dev/null; then
+      echo "⚠️  Warning: Failed to amend commit message" >&2
+    fi
   fi
 
   NEW_TOTAL=$(git rev-list --count HEAD)
@@ -284,7 +289,7 @@ EDITOREOF
   echo "Check history with: git log --oneline --graph --decorate --all"
 
   echo "👉 To push this cleaned history, run:"
-  echo "   git push origin $BRANCH --force"
+  echo "   git push origin $BRANCH --force-with-lease"
 }
 
 main "$@"

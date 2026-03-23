@@ -48,10 +48,12 @@ while [[ $# -gt 0 ]]; do
   key="$1"
   case $key in
     --project)
+      [[ $# -ge 2 ]] || { echo "Error: --project requires a value" >&2; exit 1; }
       PROJECT_PATH="$2"
       shift 2
       ;;
     -p|--prompt)
+      [[ $# -ge 2 ]] || { echo "Error: --prompt requires a value" >&2; exit 1; }
       PROMPT="$2"
       shift 2
       ;;

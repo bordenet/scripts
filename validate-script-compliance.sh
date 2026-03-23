@@ -262,7 +262,7 @@ generate_report() {
     "total_issues": $TOTAL_ISSUES,
     "compliance_rate": $(awk "BEGIN {printf \"%.2f\", ($PASSED_SCRIPTS / $TOTAL_SCRIPTS) * 100}")
   },
-  "standards_reference": "STYLE_GUIDE.md v1.2"
+  "standards_reference": "STYLE_GUIDE.md v2.3"
 }
 EOF
 }

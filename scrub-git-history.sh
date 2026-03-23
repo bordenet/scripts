@@ -70,33 +70,7 @@ usage() {
   echo "Use 'man git-filter-repo' for path/glob format details."
 }
 
-# --- CHECKS -------------------------------------------------------------------
-
-# Check for git-filter-repo
-log_verbose "Checking for git-filter-repo installation"
-if ! command -v git-filter-repo &> /dev/null; then
-  echo "Error: git-filter-repo not installed. Try: pip install git-filter-repo" >&2
-  exit 2
-fi
-log_verbose "git-filter-repo found"
-
-# Check if inside a Git repository
-log_verbose "Verifying inside a Git repository"
-if ! git rev-parse --is-inside-work-tree &> /dev/null; then
-  echo "Error: Not inside a Git repository." >&2
-  exit 3
-fi
-log_verbose "Git repository verified"
-
-# Check for existing backup branch to prevent accidental overwrite
-log_verbose "Checking for existing backup branch: $BACKUP_BRANCH"
-if git show-ref --verify --quiet "refs/heads/$BACKUP_BRANCH"; then
-  echo "Error: Backup branch '$BACKUP_BRANCH' already exists. Please delete it or rename it before running." >&2
-  exit 5
-fi
-log_verbose "No existing backup branch found"
-
-# --- ARG PARSING --------------------------------------------------------------
+# --- ARG PARSING (before dependency checks so --help always works) ------------
 
 PREVIEW=false
 PATHS=()
@@ -154,6 +128,29 @@ if [[ "${#PATHS[@]}" -eq 0 ]]; then
   usage >&2
   exit 1
 fi
+
+# --- DEPENDENCY & ENVIRONMENT CHECKS -----------------------------------------
+
+log_verbose "Checking for git-filter-repo installation"
+if ! command -v git-filter-repo &> /dev/null; then
+  echo "Error: git-filter-repo not installed. Try: pip install git-filter-repo" >&2
+  exit 2
+fi
+log_verbose "git-filter-repo found"
+
+log_verbose "Verifying inside a Git repository"
+if ! git rev-parse --is-inside-work-tree &> /dev/null; then
+  echo "Error: Not inside a Git repository." >&2
+  exit 3
+fi
+log_verbose "Git repository verified"
+
+log_verbose "Checking for existing backup branch: $BACKUP_BRANCH"
+if git show-ref --verify --quiet "refs/heads/$BACKUP_BRANCH"; then
+  echo "Error: Backup branch '$BACKUP_BRANCH' already exists. Please delete it or rename it before running." >&2
+  exit 5
+fi
+log_verbose "No existing backup branch found"
 
 # --- CORE LOGIC ---------------------------------------------------------------
 

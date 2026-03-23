@@ -46,15 +46,15 @@ $what_if || { rm -rf ~/Library/Containers/com.apple.AMPArtworkAgent 2>/dev/null 
 # 4. Dev Caches (VS Code/Edge safe trim)
 echo "  Removing: Dev caches (VS Code, Edge, Xcode, brew, pip, node-gyp)"
 if ! $what_if; then
-    find ~/Library/Application\ Support/Code -name "CachedExtensions" -o -name "workspaceStorage" 2>/dev/null | xargs rm -rf 2>/dev/null || true
-    find ~/Library/Application\ Support/Microsoft\ Edge -name Cache -o -name "Code Cache" 2>/dev/null | xargs rm -rf 2>/dev/null || true
+    find ~/Library/Application\ Support/Code \( -name "CachedExtensions" -o -name "workspaceStorage" \) -print0 2>/dev/null | xargs -0 rm -rf 2>/dev/null || true
+    find ~/Library/Application\ Support/Microsoft\ Edge \( -name Cache -o -name "Code Cache" \) -print0 2>/dev/null | xargs -0 rm -rf 2>/dev/null || true
     rm -rf ~/Library/Caches/{Homebrew,pip,node-gyp,go-build,bun,com.microsoft.*VSCode*} 2>/dev/null || true
     rm -rf ~/Library/Developer/Xcode/DerivedData/* 2>/dev/null || true
 fi
 
 if ! $what_if; then
     after=$(df ~/ | awk 'NR==2 {print $4*1024}')
-    saved_mb=$(((before-after)/1024))
+    saved_mb=$(((after-before)/1024))
     echo "✅ TOTAL SAVED: ${saved_mb}MB | $(df -h ~ | awk 'NR==2 {print $4}')"
 else
     echo ""

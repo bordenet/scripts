@@ -200,7 +200,7 @@ count_loc() {
     log "Counting lines of code for: $repo_name"
     log_verbose "Using find to count all non-hidden files"
     # This command finds all files, excludes dotfiles/dot-directories, and counts their lines.
-    find "$clone_dir" -type f ! -path "*/\.*" -exec wc -l {} + | awk '{total += $1} END {print total}'
+    find "$clone_dir" -type f ! -path "*/\.*" -exec wc -l {} + | tail -n 1 | awk '{print $1}'
 }
 
 # --- Main Script ---

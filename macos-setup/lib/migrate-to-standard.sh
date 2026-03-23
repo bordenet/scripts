@@ -16,10 +16,10 @@
 #   - shellcheck (brew install shellcheck)
 ################################################################################
 
-readonly SCRIPT_DIR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly REPO_ROOT
+readonly SCRIPT_DIR
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+readonly REPO_ROOT
 readonly SCRIPTS_DIR="$REPO_ROOT/scripts"
 
 # Colors

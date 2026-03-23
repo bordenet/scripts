@@ -242,7 +242,7 @@ update_repo() {
                 [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ] && start_timer
             fi
             log_verbose "INFO: Attempting safe merge of $DEFAULT_BRANCH into $CURRENT_BRANCH..."
-            local merge_result; merge_result=$(safe_merge_main "$DEFAULT_BRANCH")
+            local merge_result; merge_result=$(safe_merge_main "$DEFAULT_BRANCH") || true
             log_verbose "INFO: Merge result: $merge_result"
             case "$merge_result" in
                 SUCCESS)   _report "$GREEN" "✓" "$CURRENT_BRANCH → merged $DEFAULT_BRANCH" "INFO: Merge succeeded" "MERGED_REPOS" "$repo_name ($CURRENT_BRANCH → merged $DEFAULT_BRANCH)" ;;

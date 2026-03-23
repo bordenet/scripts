@@ -108,12 +108,12 @@ get_pattern_details() {
     
     echo "=== Pattern Details ==="
     echo "Boosters/Buzzwords:"
-    echo "$content" | grep -oEi "$SLOP_BOOSTERS|$SLOP_BUZZWORDS" | sort | uniq -c | sort -rn | head -5
+    echo "$content" | grep -oEi "$SLOP_BOOSTERS|$SLOP_BUZZWORDS" 2>/dev/null | sort | uniq -c | sort -rn | head -5 || true
     echo ""
     echo "Filler phrases:"
-    echo "$content" | grep -oEi "$SLOP_FILLER" | sort | uniq -c | sort -rn | head -5
+    echo "$content" | grep -oEi "$SLOP_FILLER" 2>/dev/null | sort | uniq -c | sort -rn | head -5 || true
     echo ""
     echo "Structural patterns:"
-    echo "$content" | grep -oEi "$SLOP_STRUCTURAL" | sort | uniq -c | sort -rn | head -5
+    echo "$content" | grep -oEi "$SLOP_STRUCTURAL" 2>/dev/null | sort | uniq -c | sort -rn | head -5 || true
 }
 
