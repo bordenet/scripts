@@ -207,8 +207,9 @@ function transformOutput(text) {
 
 function runCommand(command, args) {
     try {
-        const fullCommand = `node "${superpowersCodex}" ${command} ${args.join(' ')}`;
-        const output = execSync(fullCommand, { encoding: 'utf8', cwd: homeDir, stdio: ['pipe', 'pipe', 'pipe'] });
+        // Use execFileSync to avoid shell injection — args are passed as array, not concatenated
+        const cmdArgs = [superpowersCodex, command, ...args];
+        const output = require('child_process').execFileSync('node', cmdArgs, { encoding: 'utf8', cwd: homeDir, stdio: ['pipe', 'pipe', 'pipe'] });
         return transformOutput(output);
     } catch (error) {
         if (error.stdout) return transformOutput(error.stdout);

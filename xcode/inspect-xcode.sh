@@ -16,8 +16,8 @@
 #         NOTES:  This script is intended to be a general-purpose tool for
 #                 inspecting Xcode projects. It is not a replacement for
 #                 more specialized tools like SwiftLint or OCLint.
-#        AUTHOR:  Gemini
-#       COMPANY:  Google
+#        AUTHOR:  Matt Bordenet (AI-assisted)
+#       COMPANY:  ---
 #       VERSION:  2.0
 #       CREATED:  2025-10-29
 #      REVISION:  ---

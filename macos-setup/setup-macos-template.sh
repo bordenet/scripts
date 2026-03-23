@@ -94,8 +94,14 @@ if [ ! -d "$COMPONENTS_DIR" ]; then
 fi
 
 # Source all components in numeric order
+# Skip 21-25 (mobile sub-components) — they are invoked by 20-mobile.sh coordinator
 for component_file in "$COMPONENTS_DIR"/*.sh; do
     if [ -f "$component_file" ]; then
+        basename_file=$(basename "$component_file")
+        case "$basename_file" in
+            2[1-5]-*) continue ;;  # Sub-components of 20-mobile.sh (21-25)
+        esac
+
         # ADOPTION NOTE: Component sourcing happens here
         # Each component exports an install_component() function
         # shellcheck disable=SC1090  # Dynamic component loading by design

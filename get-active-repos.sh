@@ -118,11 +118,18 @@ while [ $# -gt 0 ]; do
 done
 
 # --- Configuration ---
-# !!! IMPORTANT !!!
-# UPDATE THESE VARIABLES BEFORE RUNNING THE SCRIPT
-GITHUB_ORG="ORG-NAME-HERE"
-GITHUB_API_URL="https://GHE-URL-HERE/api/v3"
-GITHUB_TOKEN="TOKEN_HERE"
+# Set these via environment variables or pass as arguments
+GITHUB_ORG="${GITHUB_ORG:-}"
+GITHUB_API_URL="${GITHUB_API_URL:-}"
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+
+if [[ -z "$GITHUB_ORG" || -z "$GITHUB_API_URL" || -z "$GITHUB_TOKEN" ]]; then
+    echo "Error: Required environment variables not set." >&2
+    echo "  export GITHUB_ORG='your-org'" >&2
+    echo "  export GITHUB_API_URL='https://github.example.com/api/v3'" >&2
+    echo "  export GITHUB_TOKEN='ghp_...'" >&2
+    exit 1
+fi
 
 # --- Script Setup ---
 start_time=$(date +%s)
@@ -138,8 +145,12 @@ log_verbose() {
     fi
 }
 
-# Calculate the date one year ago.
-ONE_YEAR_AGO=$(date -u -v-1y +'%Y-%m-%dT%H:%M:%SZ')
+# Calculate the date one year ago (macOS and GNU compatible).
+if date -u -v-1y +'%Y' >/dev/null 2>&1; then
+    ONE_YEAR_AGO=$(date -u -v-1y +'%Y-%m-%dT%H:%M:%SZ')
+else
+    ONE_YEAR_AGO=$(date -u -d '1 year ago' +'%Y-%m-%dT%H:%M:%SZ')
+fi
 
 log_verbose "Verbose mode enabled"
 log_verbose "Configuration: GITHUB_ORG=$GITHUB_ORG, GITHUB_API_URL=$GITHUB_API_URL"
@@ -172,7 +183,9 @@ fetch_all_repos() {
 # Function to count lines of code in a repository.
 count_loc() {
     local repo_name=$1
-    local repo_url="https://x-access-token:$GITHUB_TOKEN@GHE-URL-HERE/$GITHUB_ORG/$repo_name.git"
+    local github_host
+    github_host=$(echo "$GITHUB_API_URL" | sed 's|https\?://||; s|/api/v3||')
+    local repo_url="https://x-access-token:$GITHUB_TOKEN@$github_host/$GITHUB_ORG/$repo_name.git"
     local clone_dir="$TEMP_DIR/$repo_name"
 
     echo "Cloning $repo_name to count lines of code..."
@@ -189,7 +202,10 @@ count_loc() {
 # --- Main Script ---
 
 # Get all repositories.
-mapfile -t all_repos < <(fetch_all_repos)
+all_repos=()
+while IFS= read -r repo; do
+    [[ -n "$repo" ]] && all_repos+=("$repo")
+done < <(fetch_all_repos)
 
 if [ "${#all_repos[@]}" -eq 0 ]; then
     echo "Error: No repositories found for organization '$GITHUB_ORG'. Check configuration and token permissions."

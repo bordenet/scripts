@@ -37,7 +37,9 @@ spinner() {
         elapsed=$((elapsed + 1))
         # Check timeout (elapsed * delay = seconds)
         if [ $elapsed -gt $((timeout_seconds * 10)) ]; then
-            kill -9 $pid 2>/dev/null
+            kill "$pid" 2>/dev/null || true
+            sleep 1
+            kill -9 "$pid" 2>/dev/null || true
             printf "    \b\b\b\b"
             return 124  # Timeout exit code
         fi
@@ -62,14 +64,15 @@ run_phase() {
 
     # Ensure log file is writable by creating it first
     touch "$log_file" 2>/dev/null || {
-        # If touch fails, try with sudo
+        # If touch fails, try with sudo and fix ownership
         sudo touch "$log_file" 2>/dev/null || {
             echo "✗"
             ERRORS+=("$phase_name failed - cannot create log file $log_file")
             return 1
         }
-        # Make it writable by current user
-        sudo chmod 666 "$log_file" 2>/dev/null
+        # Make it writable by current user (owner rw, group/other read-only)
+        sudo chown "$(id -u):$(id -g)" "$log_file" 2>/dev/null || true
+        chmod 644 "$log_file" 2>/dev/null || true
     }
 
     # Run command in background
@@ -113,7 +116,9 @@ wait_with_timeout() {
         elapsed=$((elapsed + 1))
         # Check timeout (elapsed * delay = seconds)
         if [ $elapsed -gt $((timeout_seconds * 10)) ]; then
-            kill -9 $pid 2>/dev/null
+            kill "$pid" 2>/dev/null || true
+            sleep 1
+            kill -9 "$pid" 2>/dev/null || true
             return 124  # Timeout exit code
         fi
     done

@@ -74,7 +74,10 @@ done
 # Get files to check
 if [[ "$STAGED" == "true" ]]; then
     # Get staged README files
-    mapfile -t FILES < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -i "readme\.md$" || true)
+    FILES=()
+    while IFS= read -r f; do
+        [[ -n "$f" ]] && FILES+=("$f")
+    done < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -i "readme\.md$" || true)
 fi
 
 if [[ ${#FILES[@]} -eq 0 ]]; then

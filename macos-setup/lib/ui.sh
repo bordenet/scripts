@@ -112,31 +112,47 @@ check_failed() {
 # User Confirmation
 ################################################################################
 
+# timed_confirm PROMPT [TIMEOUT] [DEFAULT]
+# DEFAULT: "Y" = accept on timeout, "N" = skip on timeout (default: "N")
 timed_confirm() {
     if [ "$AUTO_YES" = true ]; then
         return 0
     fi
 
     local prompt="$1"
-    local timeout=10
+    local timeout="${2:-10}"
+    local default="${3:-N}"
     local response
 
+    # Determine prompt hint and default behavior
+    local hint="y/N"
+    if [[ "${default^^}" == "Y" ]]; then
+        hint="Y/n"
+    fi
+
     if [ "$VERBOSE" = true ]; then
-        if ask_yes_no "$prompt" "y"; then
+        local ask_default="n"
+        [[ "${default^^}" == "Y" ]] && ask_default="y"
+        if ask_yes_no "$prompt" "$ask_default"; then
             return 0
         else
             return 1
         fi
     else
-        if read -t $timeout -p "${prompt} (Y/n, ${timeout}s timeout): " response; then
-            response=${response:-y}
+        if read -t "$timeout" -p "${prompt} (${hint}, ${timeout}s timeout): " response; then
+            response=${response:-$default}
             case "$response" in
                 [yY]|[yY][eE][sS]) return 0 ;;
                 *) return 1 ;;
             esac
         else
             echo "" # New line after timeout
-            return 0  # Default to yes on timeout in compact mode
+            if [[ "${default^^}" == "Y" ]]; then
+                return 0  # Caller requested YES on timeout
+            else
+                echo "  ⏭ Timed out — skipping (use -y to auto-accept)"
+                return 1  # Default to NO on timeout for safety
+            fi
         fi
     fi
 }

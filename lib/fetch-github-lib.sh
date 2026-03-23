@@ -45,14 +45,20 @@ EOF
 }
 
 # Recursively finds all git repositories
-# Note: Uses eval for Bash 3.2 compatibility (macOS default)
+# Populates the named array variable with discovered repo paths
 find_repos_recursive() {
     local search_dir=$1
     local array_name=$2
 
+    # Validate array_name is a legal identifier (prevent injection)
+    if [[ ! "$array_name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+        echo "ERROR: Invalid array name: $array_name" >&2
+        return 1
+    fi
+
     while IFS= read -r -d '' git_dir; do
-        repo_dir="${git_dir%/.git}"
-        eval "$array_name+=(\"$repo_dir\")"
+        # Safe indirect array append — name is validated above
+        eval "$array_name+=(\"${git_dir%/.git}\")"
     done < <(find "$search_dir" -name ".git" -type d -print0 2>/dev/null)
 }
 

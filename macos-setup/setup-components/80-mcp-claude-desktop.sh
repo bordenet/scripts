@@ -79,9 +79,6 @@ install_component() {
         "GITHUB_PERSONAL_ACCESS_TOKEN": ""
       }
     },
-      "command": "npx",
-      "env": {}
-    },
     "flutter-mcp": {
       "command": "npx",
       "args": ["-y", "flutter-mcp"],

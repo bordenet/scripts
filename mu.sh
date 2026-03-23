@@ -266,7 +266,7 @@ if command -v pip3 &> /dev/null; then
         printf "%-30s" "pip3 update packages..."
         (
             set +o pipefail  # Disable pipefail for this section
-            outdated=$(pip3 list --outdated --format=freeze 2>/dev/null | cut -d= -f1)
+            outdated=$(pip3 list --outdated 2>/dev/null | tail -n +3 | awk '{print $1}')
             if [ -n "$outdated" ]; then
                 echo "$outdated" | xargs -n1 pip3 install --upgrade
             fi
@@ -308,7 +308,7 @@ if command -v pip &> /dev/null && [[ $(pip --version) == *"python 2"* ]]; then
     printf "%-30s" "pip update packages..."
     (
         set +o pipefail  # Disable pipefail for this section
-        outdated=$(pip list --outdated --format=freeze 2>/dev/null | cut -d= -f1)
+        outdated=$(pip list --outdated 2>/dev/null | tail -n +3 | awk '{print $1}')
         if [ -n "$outdated" ]; then
             echo "$outdated" | xargs -n1 pip install --upgrade
         fi
@@ -346,7 +346,7 @@ if grep -qi microsoft /proc/version 2>/dev/null; then
 
     # Ensure log file is writable
     touch "$LOG_DIR/mu_winget.log" 2>/dev/null || sudo touch "$LOG_DIR/mu_winget.log" 2>/dev/null
-    [ -f "$LOG_DIR/mu_winget.log" ] && sudo chmod 666 "$LOG_DIR/mu_winget.log" 2>/dev/null
+    [ -f "$LOG_DIR/mu_winget.log" ] && chmod 644 "$LOG_DIR/mu_winget.log" 2>/dev/null || true
 
     # Note: winget may require UAC elevation for package installs
     # Use --accept-package-agreements, --accept-source-agreements, and --disable-interactivity

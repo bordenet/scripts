@@ -254,10 +254,17 @@ send_to_vscode() {
 
     log_verbose "Looking for VS Code window with subtitle: $subtitle"
 
+    # Sanitize inputs for AppleScript (escape backslashes and double quotes)
+    local safe_subtitle safe_message
+    safe_subtitle=$(printf '%s' "$subtitle" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    safe_message=$(printf '%s' "$message" | sed 's/\\/\\\\/g; s/"/\\"/g')
+
     # AppleScript to find window and send keystrokes
     osascript <<EOF
 tell application "System Events"
     set vscodeName to "Code"
+    set targetSubtitle to "${safe_subtitle}"
+    set targetMessage to "${safe_message}"
 
     -- Check if VS Code is running
     if not (exists process vscodeName) then
@@ -269,14 +276,14 @@ tell application "System Events"
         set foundWindow to missing value
         repeat with w in windows
             set windowTitle to name of w as string
-            if windowTitle contains "$subtitle" then
+            if windowTitle contains targetSubtitle then
                 set foundWindow to w
                 exit repeat
             end if
         end repeat
 
         if foundWindow is missing value then
-            error "No VS Code window found with subtitle: $subtitle"
+            error "No VS Code window found with subtitle: " & targetSubtitle
         end if
 
         -- Bring window to front
@@ -285,7 +292,7 @@ tell application "System Events"
         delay 0.5
 
         -- Type the message
-        keystroke "$message"
+        keystroke targetMessage
         delay 0.1
 
         -- Press Enter

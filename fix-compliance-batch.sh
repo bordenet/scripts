@@ -102,6 +102,9 @@ while IFS= read -r -d '' script; do
     fi
     
     # Find first non-comment, non-shebang line and add set -euo pipefail before it
+    # Preserve original file permissions
+    orig_perms=$(stat -f '%Lp' "$script" 2>/dev/null || stat -c '%a' "$script" 2>/dev/null || echo "755")
+
     awk '
         BEGIN { added = 0 }
         /^#!/ { print; next }
@@ -114,7 +117,7 @@ while IFS= read -r -d '' script; do
             added = 1
         }
         { print }
-    ' "$script" > "$script.tmp" && mv "$script.tmp" "$script"
+    ' "$script" > "$script.tmp" && chmod "$orig_perms" "$script.tmp" && mv "$script.tmp" "$script"
 
     log_verbose "Added error handling to $script"
     echo "   ✓ Added to $(basename "$script")"

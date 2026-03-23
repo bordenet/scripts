@@ -52,10 +52,13 @@ set -euo pipefail
 trap cleanup EXIT
 
 WORKDIR=""
+EDITOR_SCRIPT=""
 
 cleanup() {
-  # The WORKDIR variable will be set if we cloned a repo into a temp directory.
-  if [ -n "${WORKDIR:-}" ] && [ -d "$WORKDIR" ]; then
+  # Clean up temp files
+  rm -f "${TMPFILE:-}" "${EDITOR_SCRIPT:-}" 2>/dev/null || true
+  # Only remove WORKDIR on failure — on success, the user needs to push from it
+  if [ "${SQUASH_FAILED:-true}" = "true" ] && [ -n "${WORKDIR:-}" ] && [ -d "$WORKDIR" ]; then
     echo "🧹 Cleaning up temporary directory: $WORKDIR"
     rm -rf "$WORKDIR"
   fi
@@ -184,7 +187,7 @@ main() {
     COMMIT_MSG="Squash of commits $START-$END"
   fi
 
-  BRANCH="main"
+  BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")
   TMPFILE="$(mktemp)"
   log_verbose "Created temporary file: $TMPFILE"
 
@@ -227,37 +230,32 @@ main() {
     exit 0
   fi
 
-  log_verbose "Starting interactive rebase from root"
-  git rebase -i --root --quiet || true
-
-  TODO_FILE="$(git rev-parse --git-path rebase-merge/git-rebase-todo 2>/dev/null || true)"
-  if [ ! -f "$TODO_FILE" ]; then
-    abort "Could not find git rebase todo file."
-  fi
-
-  i=0
-  while IFS= read -r line; do
-    i=$((i+1))
-    if [ $i -lt "$START" ]; then
-      echo "$line" >> "$TMPFILE"
-    elif [ $i -eq "$START" ]; then
-      echo "$line" >> "$TMPFILE"
-    elif [ $i -le "$END" ]; then
-      echo "${line/pick/squash}" >> "$TMPFILE"
+  # Create a script that edits the rebase todo file inline
+  # GIT_SEQUENCE_EDITOR is called with the todo file path as $1
+  # Use global EDITOR_SCRIPT so cleanup() trap can access it
+  EDITOR_SCRIPT=$(mktemp)
+  cat > "$EDITOR_SCRIPT" <<EDITOREOF
+#!/usr/bin/env bash
+set -euo pipefail
+TODO="\$1"
+TMPOUT="\$(mktemp)"
+i=0
+while IFS= read -r line; do
+    i=\$((i+1))
+    if [ \$i -gt $START ] && [ \$i -le $END ]; then
+        echo "\${line/pick/squash}" >> "\$TMPOUT"
     else
-      echo "$line" >> "$TMPFILE"
+        echo "\$line" >> "\$TMPOUT"
     fi
-  done < "$TODO_FILE"
-
-  mv "$TMPFILE" "$TODO_FILE"
-
-  MSG_FILE="$(git rev-parse --git-path rebase-merge/message 2>/dev/null || true)"
-  if [ -n "$MSG_FILE" ]; then
-    echo "$COMMIT_MSG" > "$MSG_FILE"
-  fi
+done < "\$TODO"
+mv "\$TMPOUT" "\$TODO"
+EDITOREOF
+  chmod +x "$EDITOR_SCRIPT"
+  log_verbose "Created rebase editor script: $EDITOR_SCRIPT"
 
   echo "🚀 Starting rebase (squashing commits $START-$END)..."
-  if ! git rebase --continue; then
+  log_verbose "Running rebase with GIT_SEQUENCE_EDITOR"
+  if ! GIT_SEQUENCE_EDITOR="$EDITOR_SCRIPT" GIT_EDITOR="true" git rebase -i --root; then
     echo "⚠️ Rebase paused due to conflicts."
     echo "The temporary repository is located at: $WORKDIR"
     echo "To resolve, please perform the following steps in that directory:"
@@ -267,6 +265,16 @@ main() {
     # Disable the cleanup trap so the user can fix the conflict.
     trap - EXIT
     exit 1
+  fi
+
+  SQUASH_FAILED=false
+  rm -f "${EDITOR_SCRIPT:-}" 2>/dev/null || true
+
+  # Apply custom commit message if provided
+  if [ -n "$COMMIT_MSG" ]; then
+    log_verbose "Amending squashed commit with message: $COMMIT_MSG"
+    git commit --amend --message "$COMMIT_MSG" --no-edit 2>/dev/null || \
+      git commit --amend --message "$COMMIT_MSG" 2>/dev/null || true
   fi
 
   NEW_TOTAL=$(git rev-list --count HEAD)

@@ -6,15 +6,14 @@
 #              passed to 'resume-claude.sh' and includes a dry-run option.
 #              On macOS, it uses 'caffeinate' to prevent the system from sleeping
 #              during the waiting period.
-# Usage: ./schedule-claude.sh [-h <hours>] [-m <minutes>] [-p <prompt>] [--dry-run]
+# Usage: ./schedule-claude.sh [--hours N] [-m <minutes>] [-p <prompt>] [--dry-run]
 # Arguments:
-#   -h, --hours: Number of hours to wait before running 'resume-claude.sh'.
+#   --hours: Number of hours to wait before running 'resume-claude.sh'.
 #   -m, --minutes: Number of minutes to wait before running 'resume-claude.sh'.
 #   -p, --prompt: Prompt string to pass to 'resume-claude.sh'.
 #   --dry-run: Show what would happen without executing the scheduled script.
+#   -h, --help: Show help message.
 # Dependencies: resume-claude.sh (must be in the same directory), date, caffeinate (macOS)
-#
-#!/bin/bash
 
 # --- Configuration ---
 
@@ -36,27 +35,27 @@ log_verbose() {
 
 # --- Usage function ---
 usage() {
-  echo "Usage: $0 [-h hours] [-m minutes] [-p prompt] [--dry-run] [--verbose]"
+  echo "Usage: $0 [--hours N] [--minutes N] [-p prompt] [--dry-run] [--verbose]"
   echo ""
   echo "Options:"
-  echo "  -h, --hours     Number of hours to wait before running"
-  echo "  -m, --minutes   Number of minutes to wait before running"
+  echo "  --hours N       Number of hours to wait before running"
+  echo "  -m, --minutes N Number of minutes to wait before running"
   echo "  -p, --prompt    Prompt string to pass to resume-claude.sh"
   echo "  --dry-run       Show what would happen without executing"
   echo "  -v, --verbose   Enable verbose logging"
-  echo "  -?, --help      Show this help message"
-  exit 1
+  echo "  -h, --help      Show this help message"
+  exit 0
 }
 
 # --- Argument parsing ---
 while [[ $# -gt 0 ]]; do
   case $1 in
-    -h|--hours) HOURS="$2"; shift 2 ;;
+    --hours) HOURS="$2"; shift 2 ;;
     -m|--minutes) MINUTES="$2"; shift 2 ;;
     -p|--prompt) PROMPT="$2"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
     -v|--verbose) VERBOSE=true; shift ;;
-    -\?|--help) usage ;;
+    -h|--help) usage ;;
     *) echo "Unknown option: $1"; usage ;;
   esac
 done
@@ -69,7 +68,7 @@ log_verbose "Parsed hours: $HOURS, minutes: $MINUTES"
 log_verbose "Total delay: $TOTAL_SECONDS seconds"
 
 if [[ $TOTAL_SECONDS -le 0 ]]; then
-  echo "⚠️  No valid delay specified. Use -h or -m."
+  echo "⚠️  No valid delay specified. Use --hours or -m."
   usage
 fi
 

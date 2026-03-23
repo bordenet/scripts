@@ -59,18 +59,14 @@ OPTIONS
     -v, --verbose
         Enable verbose output showing detailed progress information.
 
-ARGUMENTS
-    GITHUB_API_TOKEN
-        A personal access token with sufficient permissions to access the
-        repositories in the specified GitHub Enterprise instance.
-
 PLATFORM
     Cross-platform (macOS, Linux, WSL)
 
 CONFIGURATION
-    Before running, update these variables within the script:
-    • GITHUB_URL - GitHub Enterprise URL (e.g., https://github.example.com)
-    • GITHUB_ORG - GitHub organization name
+    Set these environment variables before running:
+    • GITHUB_URL  - GitHub Enterprise URL (e.g., https://github.example.com)
+    • GITHUB_ORG  - GitHub organization name
+    • GITHUB_TOKEN - Personal access token with repo read permissions
 
 DEPENDENCIES
     • curl - For API requests
@@ -83,8 +79,13 @@ OUTPUT
     Format: repo    lines-of-code    last-push
 
 EXAMPLES
+    # Set required environment variables
+    export GITHUB_URL='https://github.example.com'
+    export GITHUB_ORG='my-org'
+    export GITHUB_TOKEN='ghp_...'
+
     # Enumerate all repositories
-    ./enumerate-gh-repos.sh ghp_abc123xyz789
+    ./enumerate-gh-repos.sh
 
     # Display help
     ./enumerate-gh-repos.sh --help
@@ -127,18 +128,37 @@ while [ $# -gt 0 ]; do
 done
 
 # --- Configuration ---
-# !!! IMPORTANT !!!
-# UPDATE THESE VARIABLES BEFORE RUNNING THE SCRIPT
-GITHUB_URL="GHE-URL-HERE"
-GITHUB_ORG="ORG-NAME-HERE"
-LOG_FILE="github_enum.log"
+# Set these via environment variables
+GITHUB_URL="${GITHUB_URL:-}"
+GITHUB_ORG="${GITHUB_ORG:-}"
+LOG_FILE="${LOG_FILE:-github_enum.log}"
+
+# Accept token from environment variable (preferred) or positional argument (legacy)
+GITHUB_TOKEN="${GITHUB_TOKEN:-${1:-}}"
+if [[ -n "${1:-}" ]]; then
+    echo "Warning: Passing tokens as arguments is insecure (visible in ps/history)." >&2
+    echo "  Prefer: export GITHUB_TOKEN='ghp_...' && $0" >&2
+    shift
+    if [[ $# -gt 0 ]]; then
+        echo "Error: Unexpected arguments: $*" >&2
+        exit 1
+    fi
+fi
+
+if [[ -z "$GITHUB_URL" || -z "$GITHUB_ORG" || -z "$GITHUB_TOKEN" ]]; then
+    echo "Error: Required configuration not set." >&2
+    echo "  export GITHUB_URL='https://github.example.com'" >&2
+    echo "  export GITHUB_ORG='your-org'" >&2
+    echo "  export GITHUB_TOKEN='ghp_...'" >&2
+    exit 1
+fi
 
 # --- Functions ---
 
 # Function to print usage information and exit.
 usage() {
-    echo "Usage: $0 <GitHub API Token>"
-    echo "Please provide a GitHub API token as an argument."
+    echo "Usage: export GITHUB_TOKEN='...' && $0"
+    echo "Required env vars: GITHUB_URL, GITHUB_ORG, GITHUB_TOKEN"
     echo "Use --help for more information."
     exit 1
 }
@@ -202,11 +222,6 @@ count_loc() {
 start_time=$(date +%s)
 
 # Check for API token argument.
-if [ "$#" -ne 1 ]; then
-    usage
-fi
-GITHUB_TOKEN=$1
-
 log_verbose "Verbose mode enabled"
 log_verbose "Configuration: GITHUB_URL=$GITHUB_URL, GITHUB_ORG=$GITHUB_ORG"
 

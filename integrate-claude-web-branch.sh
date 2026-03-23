@@ -196,9 +196,14 @@ else
     # Try creating PR directly; if it fails with ambiguous revision, fetch the branch
     log_verbose "Running gh pr create --base $MAIN_BRANCH --head $BRANCH_NAME --fill"
     if PR_OUTPUT=$(gh pr create --base "$MAIN_BRANCH" --head "$BRANCH_NAME" --fill 2>&1); then
-        PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
-        PR_URL=$(echo "$PR_OUTPUT" | grep -oE 'https://[^ ]+')
-        complete_status "${GREEN}✓${NC} Created PR #$PR_NUMBER"
+        # gh pr create returns a URL like https://github.com/owner/repo/pull/123
+        PR_URL=$(echo "$PR_OUTPUT" | grep -oE 'https://[^ ]+' | head -1)
+        PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+        # Fallback: query gh for the PR number if URL parsing failed
+        if [[ -z "$PR_NUMBER" ]]; then
+            PR_NUMBER=$(gh pr list --head "$BRANCH_NAME" --json number --jq '.[0].number' 2>/dev/null || true)
+        fi
+        complete_status "${GREEN}✓${NC} Created PR #${PR_NUMBER:-unknown}"
     else
         # Check if PR already exists
         if echo "$PR_OUTPUT" | grep -q "already exists"; then
@@ -234,9 +239,12 @@ else
                 # Try creating PR again
                 update_status "  Creating pull request..."
                 if PR_OUTPUT=$(gh pr create --base "$MAIN_BRANCH" --head "$BRANCH_NAME" --fill 2>&1); then
-                    PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
-                    PR_URL=$(echo "$PR_OUTPUT" | grep -oE 'https://[^ ]+')
-                    complete_status "${GREEN}✓${NC} Created PR #$PR_NUMBER"
+                    PR_URL=$(echo "$PR_OUTPUT" | grep -oE 'https://[^ ]+' | head -1)
+                    PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+                    if [[ -z "$PR_NUMBER" ]]; then
+                        PR_NUMBER=$(gh pr list --head "$BRANCH_NAME" --json number --jq '.[0].number' 2>/dev/null || true)
+                    fi
+                    complete_status "${GREEN}✓${NC} Created PR #${PR_NUMBER:-unknown}"
                 # Check for "could not find any commits" error on retry
                 elif echo "$PR_OUTPUT" | grep -q "could not find any commits"; then
                     complete_status "${RED}✗${NC} No new commits to merge"

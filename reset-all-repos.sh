@@ -255,10 +255,24 @@ true > "$LOG_FILE"
 
 log_message "Starting git reset script in directory: $SEARCH_DIR"
 
+# Validate search directory exists
+if [[ ! -d "$SEARCH_DIR" ]]; then
+  echo "Error: Directory does not exist: $SEARCH_DIR" >&2
+  exit 1
+fi
+
 # Find and count git repositories.
 log_verbose "Searching for git repositories in: $SEARCH_DIR"
-repo_list=$(find "$SEARCH_DIR" -type d -name ".git")
-repo_count=$(echo "$repo_list" | wc -l)
+repo_list=$(find "$SEARCH_DIR" -type d -name ".git" 2>&1) || {
+  echo "Error: Failed to search directory: $SEARCH_DIR" >&2
+  echo "$repo_list" >&2
+  exit 1
+}
+if [[ -z "$repo_list" ]]; then
+  echo "No git repositories found in: $SEARCH_DIR"
+  exit 0
+fi
+repo_count=$(echo "$repo_list" | wc -l | tr -d ' ')
 log_verbose "Found $repo_count git repositories"
 
 # What-if mode (default)
