@@ -192,7 +192,7 @@ count_loc() {
 
     log_verbose "Counting lines using git ls-files"
     # Using git ls-files to respect .gitignore, then counting lines.
-    lines_of_code=$(cd "$clone_dir" && git ls-files | xargs wc -l | tail -n 1 | awk '{print $1}')
+    lines_of_code=$(cd "$clone_dir" && git ls-files -z | xargs -0 wc -l | tail -n 1 | awk '{print $1}')
 
     echo "$lines_of_code"
 }
@@ -218,6 +218,11 @@ for repo in "${all_repos[@]}"; do
     echo "Checking activity for: $repo"
     response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$GITHUB_API_URL/repos/$GITHUB_ORG/$repo")
     last_pushed=$(echo "$response" | jq -r '.pushed_at')
+
+    if [[ "$last_pushed" == "null" || -z "$last_pushed" ]]; then
+        echo "  -> No push data available (empty repo?)"
+        continue
+    fi
 
     if [[ "$last_pushed" > "$ONE_YEAR_AGO" ]]; then
         echo "  -> Active. Last push: $last_pushed"

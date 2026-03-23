@@ -100,14 +100,17 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --instance)
+            [[ $# -ge 2 ]] || { echo "Error: --instance requires a value" >&2; exit 1; }
             INSTANCE="$2"
             shift 2
             ;;
         --message)
+            [[ $# -ge 2 ]] || { echo "Error: --message requires a value" >&2; exit 1; }
             MESSAGE="$2"
             shift 2
             ;;
         --at)
+            [[ $# -ge 2 ]] || { echo "Error: --at requires a value" >&2; exit 1; }
             AT_TIME="$2"
             shift 2
             ;;

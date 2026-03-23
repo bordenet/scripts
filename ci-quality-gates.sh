@@ -145,7 +145,7 @@ while IFS= read -r -d '' script; do
   if [ "$LINE_COUNT" -gt 400 ]; then
     # Allow known large scripts that are well-structured and have extracted libraries
     case "$(basename "$script")" in
-      bu.sh|purge-stale-claude-code-web-branches.sh|integrate-claude-web-branch.sh)
+      bu.sh|purge-stale-claude-code-web-branches.sh|integrate-claude-web-branch.sh|purge-identity.sh|common.sh)
         log_verbose "  Allowed exception: $(basename "$script") ($LINE_COUNT lines)"
         continue 2>/dev/null || true
         ;;

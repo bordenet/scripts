@@ -20,7 +20,7 @@ show_timer() {
     local timer_pos=$((cols - ${#timer_text}))
 
     # Save cursor, move to top right, print timer (yellow on black), restore cursor
-    echo -ne "${SAVE_CURSOR}\033[1;${timer_pos}H\033[33;40m${timer_text}\033[0m${RESTORE_CURSOR}"
+    echo -ne "\033[s\033[1;${timer_pos}H\033[33;40m${timer_text}\033[0m\033[u"
 }
 
 timer_loop() {

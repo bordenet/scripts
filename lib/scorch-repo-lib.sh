@@ -206,33 +206,46 @@ get_ignored_files() {
     # Change to repo directory
     pushd "$repo_dir" > /dev/null || return 1
 
-    # Check if .gitignore exists
-    if [[ ! -f .gitignore ]]; then
-        log_info "No .gitignore found in $repo_dir"
-        popd > /dev/null || return 0
-        return 0
-    fi
-
-    # Use git check-ignore in batch mode for efficiency
+    # Use git check-ignore to find ignored paths (works with .gitignore, nested
+    # gitignores, and .git/info/exclude)
     # Find all files and directories, then check them all at once
-    {
+    local raw_items=()
+    while IFS= read -r item; do
+        # Skip .env files
+        if is_env_file "$item"; then
+            log_info "Protecting .env file: $item"
+            continue
+        fi
+        # For directories, check if they contain .env files
+        if [[ -d "$item" ]]; then
+            if find "$item" -type f -name ".env*" -print -quit 2>/dev/null | grep -q .; then
+                log_warning "Skipping directory $item (contains .env file)"
+                continue
+            fi
+        fi
+        raw_items+=("$item")
+    done < <({
         find . -type f 2>/dev/null | grep -v '^\./\.git/'
         find . -type d 2>/dev/null | grep -v '^\./\.git' | grep -v '^\.$'
-    } | git check-ignore --stdin 2>/dev/null | while IFS= read -r item; do
-        # Skip .env files
-        if ! is_env_file "$item"; then
-            # For directories, check if they contain .env files
-            if [[ -d "$item" ]]; then
-                if find "$item" -type f -name ".env*" -print -quit 2>/dev/null | grep -q .; then
-                    log_warning "Skipping directory $item (contains .env file)"
-                    continue
-                fi
+    } | git check-ignore --stdin 2>/dev/null || true)
+
+    # Deduplicate: if a directory is in the list, remove its children
+    # (deleting the directory handles them)
+    local filtered_items=()
+    for item in "${raw_items[@]}"; do
+        local is_child=false
+        for dir in "${raw_items[@]}"; do
+            if [[ "$dir" != "$item" && -d "$dir" && "$item" == "$dir/"* ]]; then
+                is_child=true
+                break
             fi
-            echo "$item"
-        else
-            log_info "Protecting .env file: $item"
+        done
+        if [[ "$is_child" == false ]]; then
+            filtered_items+=("$item")
         fi
     done
+
+    printf '%s\n' "${filtered_items[@]}"
 
     popd > /dev/null || return 0
 }

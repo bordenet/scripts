@@ -75,14 +75,24 @@ echo "Starting background packet capture with rotation..."
 sudo tcpdump -i en0 -nn -tttt -G 600 -W 48 \
   -w /volume1/captures/capture-%Y-%m-%d_%H-%M-%S.pcap \
   '(host 1.1.1.1 or host 8.8.8.8) and (tcp[tcpflags] & (tcp-rst|tcp-fin) != 0 or icmp or arp)' &
+BG_PID=$!
+
+# Ensure background capture is stopped on exit/interrupt
+cleanup_captures() {
+  echo ""
+  echo "Stopping background capture (PID: $BG_PID)..."
+  sudo kill "$BG_PID" 2>/dev/null || true
+  wait "$BG_PID" 2>/dev/null || true
+}
+trap cleanup_captures EXIT INT TERM
 
 # --- Foreground Capture ---
 echo "Starting foreground packet capture..."
 # Note: This command will run indefinitely until manually stopped (e.g., with Ctrl+C).
 # The script will not proceed beyond this point until the foreground tcpdump process is terminated.
-sudo tcpdump -i en0 -n '(host 1.1.1.1 or host 8.8.8.8) and (tcp[tcpflags] & (tcp-rst|tcp-fin) != 0)'
+sudo tcpdump -i en0 -n '(host 1.1.1.1 or host 8.8.8.8) and (tcp[tcpflags] & (tcp-rst|tcp-fin) != 0)' || true
 
-echo "Packet capture stopped."
+echo "Packet capture stopped (both foreground and background)."
 
 # --- Completion ---
 # End timer

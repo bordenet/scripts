@@ -81,7 +81,8 @@ init_logging() {
     find "$LOG_DIR" -name "purge-identity-*.log" -mtime +1 -delete 2>/dev/null || true
 
     # Set up trap for cleanup on exit
-    trap 'cleanup_on_exit' EXIT INT TERM
+    trap 'cleanup_on_exit' EXIT
+    trap 'cleanup_on_signal' INT TERM
 }
 
 # Log message to file and optionally to console
@@ -181,8 +182,18 @@ get_elapsed_time() {
 # -----------------------------------------------------------------------------
 
 cleanup_on_exit() {
+    local exit_code=$?
     stop_timer
-    log "INFO" "Script exiting (elapsed: $(get_elapsed_time))"
+    log "INFO" "Script exiting with code $exit_code (elapsed: $(get_elapsed_time))"
+}
+
+# Signal-specific handler that actually exits
+cleanup_on_signal() {
+    echo "" >&2
+    echo "Interrupted. Cleaning up..." >&2
+    stop_timer
+    log "WARN" "Script interrupted by signal (elapsed: $(get_elapsed_time))"
+    exit 130
 }
 
 # -----------------------------------------------------------------------------
@@ -191,7 +202,7 @@ cleanup_on_exit() {
 
 # Display script header
 display_header() {
-    clear
+    [[ -t 1 && -n "${TERM:-}" ]] && clear
     echo -e "${CYAN}${BOLD}"
     echo "╔═══════════════════════════════════════════════════════════════╗"
     echo "║                                                               ║"

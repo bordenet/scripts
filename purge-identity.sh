@@ -66,6 +66,7 @@ fi
 # -----------------------------------------------------------------------------
 
 # Don't exit on error - we handle errors explicitly and continue
+set +e
 set -o pipefail
 
 # -----------------------------------------------------------------------------
@@ -370,7 +371,9 @@ main() {
     # PHASE 1: Discovery for specific email
     echo "▶ Discovering locations of ${TARGET_EMAIL}..."
     echo
-    discover_single_identity "$TARGET_EMAIL"
+    if ! discover_single_identity "$TARGET_EMAIL"; then
+        log "WARN" "discover_single_identity returned non-zero for $TARGET_EMAIL"
+    fi
 
     # Check if anything was found
     if [[ ${DISCOVERED_IDENTITIES[$TARGET_EMAIL]:-0} -eq 0 ]]; then

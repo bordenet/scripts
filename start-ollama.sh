@@ -54,10 +54,10 @@ done
 
 # Detect LAN IP (Wi-Fi or Ethernet)
 log_verbose "Attempting to detect LAN IP from en0 (Wi-Fi)"
-LAN_IP=$(ipconfig getifaddr en0)
+LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || true)
 if [ -z "$LAN_IP" ]; then
   log_verbose "en0 not available, trying en1 (Ethernet)"
-  LAN_IP=$(ipconfig getifaddr en1)
+  LAN_IP=$(ipconfig getifaddr en1 2>/dev/null || true)
 fi
 
 # Sanity check
@@ -90,6 +90,6 @@ else
 fi
 
 # Start Ollama bound to LAN IP
-echo "🚀 Starting Ollama with OLLAMA_HOST=$LAN_IP"
-log_verbose "Running: OLLAMA_HOST=$LAN_IP ollama serve"
-OLLAMA_HOST="$LAN_IP" ollama serve
+echo "🚀 Starting Ollama with OLLAMA_HOST=${LAN_IP}:11434"
+log_verbose "Running: OLLAMA_HOST=${LAN_IP}:11434 ollama serve"
+OLLAMA_HOST="${LAN_IP}:11434" ollama serve

@@ -207,8 +207,17 @@ reset_git_repo() {
       log_message "Entered directory: $repo_path"
 
       # Determine the default branch (main or master)
-      branch=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's|^refs/remotes/origin/||' 2>/dev/null || echo "main")
+      branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/origin/||' || echo "main")
       log_verbose "Detected default branch: $branch for $repo_path"
+
+      # Safety: refuse to reset if not on the default branch
+      local current_branch
+      current_branch=$(git branch --show-current 2>/dev/null || true)
+      if [[ -n "$current_branch" && "$current_branch" != "$branch" ]]; then
+        log_message "WARNING: $repo_path is on branch '$current_branch', not '$branch'. Skipping to avoid data loss."
+        popd > /dev/null || true
+        return 1
+      fi
 
       # Fetch and reset to the correct branch
       log_verbose "Fetching from origin for $repo_path"
@@ -346,7 +355,9 @@ while read -r git_dir; do
   display_gas_gauge "$repo_index" "$repo_count"
   printf "\n"
   
-  reset_git_repo "$repo_dir"
+  if ! reset_git_repo "$repo_dir"; then
+    log_message "WARNING: Failed to reset: $repo_dir"
+  fi
 done <<< "$repo_list"
 
 # --- Completion ---

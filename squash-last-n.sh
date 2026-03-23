@@ -134,6 +134,13 @@ if [ "$WHAT_IF" = "true" ]; then
   exit 0
 fi
 
+# --- Check for clean worktree ---
+if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+  echo "❌ Error: Working tree or index is dirty." >&2
+  echo "Please commit or stash your changes before squashing." >&2
+  exit 1
+fi
+
 # --- Execution Mode (Requires --force) ---
 echo "⚠️  EXECUTING SQUASH (--force mode)"
 echo "You are about to squash the last $N commits into one."
