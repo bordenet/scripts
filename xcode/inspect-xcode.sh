@@ -59,7 +59,9 @@ while [[ $# -gt 0 ]]; do
             show_help
             ;;
         *)
-            break
+            echo "Error: Unknown option: $1" >&2
+            echo "Use --help for usage information" >&2
+            exit 1
             ;;
     esac
 done

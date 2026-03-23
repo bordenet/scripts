@@ -92,7 +92,7 @@ usage() {
   --what-if        DEFAULT. Preview actions without executing (can be explicit).
   --force          REQUIRED to actually execute the rebase.
   --verbose        Enable verbose logging.
-  --help           Show this help message."
+  -h, --help       Show this help message."
   echo
   echo "IMPORTANT: This script defaults to --what-if mode. Use --force to actually execute."
 }
@@ -133,7 +133,7 @@ main() {
         shift
         ;;  # Disable what-if when --force is used
       --verbose) VERBOSE="true"; shift ;;
-      --help) usage; exit 0 ;;
+      -h|--help) usage; exit 0 ;;
       -*) echo "Unknown option: $1"; usage; exit 1 ;;
       *) POSITIONAL_ARGS+=("$1"); shift ;;
     esac

@@ -58,7 +58,7 @@ while [[ $# -gt 0 ]]; do
       VERBOSE=true
       shift
       ;;
-    --help)
+    -h|--help)
       echo "Usage: $0 <N> [\"Commit message\"] [--force]"
       echo ""
       echo "Arguments:"
@@ -69,7 +69,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --what-if        DEFAULT. Preview actions without executing."
       echo "  --force          REQUIRED to actually execute the squash."
       echo "  -v, --verbose    Enable verbose logging to show detailed operations."
-      echo "  --help           Show this help message."
+      echo "  -h, --help       Show this help message."
       echo ""
       echo "IMPORTANT: This script defaults to --what-if mode. Use --force to actually execute."
       exit 0
