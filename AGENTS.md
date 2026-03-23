@@ -172,6 +172,19 @@ grep -r "FILENAME" --include="*.md" --include="*.sh" .
   - When adding new requirements to STYLE_GUIDE.md, MUST update validate-script-compliance.sh
   - **NO EXCEPTIONS**: New scripts MUST pass all STYLE_GUIDE.md requirements before first commit
 
+**Failure Case 6: Pushed without checking GitHub CI (2026-03-23)**
+- **What happened**: Pushed 4 commits to main without verifying GitHub Actions CI status
+- **Impact**: CI was red for 4 consecutive commits; local `ci-quality-gates.sh` passed but GitHub workflow failed
+- **Root cause**:
+  - GitHub workflow `.github/workflows/quality-gates.yml` lacked oversized-script exemptions that local `ci-quality-gates.sh` had
+  - Local CI passed, so the divergence was invisible without checking GitHub
+  - Agent never checked GitHub Actions status after any push
+- **Prevention**:
+  - **MANDATORY**: After EVERY push, check GitHub Actions CI status via API before reporting success
+  - **MANDATORY**: When modifying local CI scripts, ALWAYS check if `.github/workflows/` has equivalent logic and keep them in sync
+  - Local CI passing is NOT sufficient — GitHub CI is the source of truth
+  - **NO EXCEPTIONS**: Never tell the user "done" after a push without confirming green CI
+
 ### The Golden Rule of Changes
 
 **NEVER make a change in isolation. ALWAYS:**
