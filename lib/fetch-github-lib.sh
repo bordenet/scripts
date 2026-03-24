@@ -59,7 +59,7 @@ find_repos_recursive() {
     while IFS= read -r -d '' git_dir; do
         # Safe indirect array append — name is validated above
         eval "$array_name+=(\"${git_dir%/.git}\")"
-    done < <(find "$search_dir" -name ".git" -type d -print0 2>/dev/null)
+    done < <(find -L "$search_dir" -name ".git" -type d -print0 2>/dev/null)
 }
 
 # --- Timer/Status Helper Functions ---
