@@ -1,0 +1,10 @@
+# Symlinked repos (managed independently)
+CallBox/
+Personal/
+Private/
+Public/
+
+# golden-agents artifacts
+ADOPT-PROMPT.md
+*.original
+
