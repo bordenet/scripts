@@ -16,6 +16,23 @@ SKILLS_DIR="$HOME/.agents/skills"
 RULES_DIR="$HOME/.augment/rules"
 VERBOSE=false
 
+# --- Portable readlink that always returns an absolute path ---
+# macOS readlink doesn't support -f; readlink returns whatever ln -s was given
+# (could be relative). This resolves to absolute so symlink comparisons work.
+resolve_link() {
+    local target
+    target=$(readlink "$1") || return 1
+    # If already absolute, return as-is
+    if [[ "$target" == /* ]]; then
+        printf '%s' "$target"
+        return
+    fi
+    # Relative: resolve against the symlink's parent directory
+    local link_dir
+    link_dir=$(cd "$(dirname "$1")" && pwd)
+    printf '%s' "$link_dir/$target"
+}
+
 # --- Colors ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -186,7 +203,7 @@ for skill_dir in "$SUPERPOWERS_DIR"/skills/*/; do
     target="$SKILLS_DIR/$skill_name"
     if [[ -L "$target" ]]; then
         # Only replace symlinks that point into superpowers (preserve user overrides)
-        current=$(readlink "$target")
+        current=$(resolve_link "$target")
         case "$current" in
             "$SUPERPOWERS_DIR/skills/"*)
                 rm -f "$target"
@@ -211,7 +228,7 @@ done
 PRUNED=0
 for entry in "$SKILLS_DIR"/*; do
     [[ -L "$entry" ]] || continue
-    link_target=$(readlink "$entry")
+    link_target=$(resolve_link "$entry")
     # Only prune symlinks that point into the superpowers skills directory
     case "$link_target" in
         "$SUPERPOWERS_DIR/skills/"*)
@@ -281,7 +298,7 @@ BROKEN=0
 for entry in "$SKILLS_DIR"/*; do
     [[ -L "$entry" ]] || continue
     # Only check superpowers-owned symlinks
-    link_target=$(readlink "$entry")
+    link_target=$(resolve_link "$entry")
     case "$link_target" in
         "$SUPERPOWERS_DIR/skills/"*)
             if [[ -f "$entry/SKILL.md" ]]; then
