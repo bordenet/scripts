@@ -44,8 +44,9 @@ EOF
     exit 0
 }
 
-# Recursively finds all git repositories
+# Recursively finds all git repositories (follows symlinks, deduplicates)
 # Populates the named array variable with discovered repo paths
+# Handles .git as directory (normal) or file (worktrees/submodules)
 find_repos_recursive() {
     local search_dir=$1
     local array_name=$2
@@ -56,10 +57,25 @@ find_repos_recursive() {
         return 1
     fi
 
+    # Track canonical paths to deduplicate (symlink + real path to same repo)
+    # Uses newline-delimited string for Bash 3.2 compatibility (no associative arrays)
+    local _seen_canonical=""
+
     while IFS= read -r -d '' git_dir; do
-        # Safe indirect array append — name is validated above
-        eval "$array_name+=(\"${git_dir%/.git}\")"
-    done < <(find -L "$search_dir" -name ".git" -type d -print0 2>/dev/null)
+        local repo_path="${git_dir%/.git}"
+        # Canonicalize to detect duplicates from symlink aliases
+        local canonical
+        canonical=$(cd "$repo_path" 2>/dev/null && pwd -P) || continue
+        # Check if already seen (grep -qxF = exact line match, fixed string)
+        if ! echo "$_seen_canonical" | grep -qxF "$canonical" 2>/dev/null; then
+            _seen_canonical="${_seen_canonical}${canonical}
+"
+            # Safe indirect array append — name is validated above, value is escaped
+            local escaped_path
+            printf -v escaped_path '%q' "$repo_path"
+            eval "$array_name+=($escaped_path)"
+        fi
+    done < <(find -L "$search_dir" \( -name ".git" -type d -o -name ".git" -type f \) -print0 2>/dev/null)
 }
 
 # --- Timer/Status Helper Functions ---
@@ -235,8 +251,11 @@ is_shallow_clone() {
 
 # Check if repo has active lock file
 # Returns: 0 if locked, 1 if not
+# Uses git rev-parse to find the correct git dir (handles worktrees)
 has_lock_file() {
-    [ -f ".git/index.lock" ]
+    local git_dir
+    git_dir=$(git rev-parse --git-dir 2>/dev/null) || return 1
+    [ -f "$git_dir/index.lock" ]
 }
 
 # Get merge preview stats: commits behind, files changed, lines changed
@@ -320,7 +339,7 @@ preview_merge_candidates() {
 
     # Process all repo paths passed as arguments
     for repo_path in "$@"; do
-        if [ -d "$repo_path/.git" ]; then
+        if [ -d "$repo_path/.git" ] || [ -f "$repo_path/.git" ]; then
             cd "$repo_path" || continue
             local current_branch default_branch branch_type
             current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
