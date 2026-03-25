@@ -63,7 +63,12 @@ update_repo() {
         [ "$show_progress" = true ] && complete_status "${color}${icon}${NC} ${repo_name}${suffix:+ ($suffix)}"
         log_verbose "$log_msg"
         # Safe indirect array append — arr names are hardcoded constants from callers
-        if [ -n "$arr" ]; then eval "$arr+=(\"$entry\")"; fi
+        # Use printf %q to escape entry value and prevent injection via repo names
+        if [ -n "$arr" ]; then
+            local escaped_entry
+            printf -v escaped_entry '%q' "$entry"
+            eval "$arr+=($escaped_entry)"
+        fi
     }
 
     [ "$show_progress" = true ] && update_status "  Updating ${repo_name}..."
@@ -282,7 +287,7 @@ TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 log_verbose "INFO: Target directory: $TARGET_DIR"
 log_verbose "INFO: Menu=$MENU_MODE Recursive=$RECURSIVE_MODE Verbose=$VERBOSE"
 # --- Self-Update Check ---
-if [ -d "$SCRIPT_DIR/.git" ]; then
+if [ -d "$SCRIPT_DIR/.git" ] || [ -f "$SCRIPT_DIR/.git" ]; then
     log_verbose "INFO: Checking if scripts repository needs updating..."
     pushd "$SCRIPT_DIR" > /dev/null || exit
     GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -oBatchMode=yes" timeout 10 git fetch origin > /dev/null 2>&1 || true
@@ -316,19 +321,33 @@ if [ "$RECURSIVE_MODE" = true ]; then
     log_verbose "INFO: Found ${#repos[@]} repositories"
 else
     # Menu mode (non-recursive): look for child git repos (up to 2 levels deep)
+    # Follows symlinks (bash globs do this implicitly) with dedup via canonical path
+    # Uses newline-delimited string for Bash 3.2 compatibility (no associative arrays)
+    _seen_canonical=""
     for dir in */; do
-        if [ -d "$dir/.git" ]; then
-            repos+=("$dir")
+        if [ -d "$dir/.git" ] || [ -f "$dir/.git" ]; then
+            _canonical=$(cd "$dir" 2>/dev/null && pwd -P) || continue
+            if ! echo "$_seen_canonical" | grep -qxF "$_canonical" 2>/dev/null; then
+                _seen_canonical="${_seen_canonical}${_canonical}
+"
+                repos+=("$dir")
+            fi
         else
             for subdir in "$dir"*/; do
-                if [ -d "$subdir/.git" ]; then
-                    repos+=("$subdir")
+                if [ -d "$subdir/.git" ] || [ -f "$subdir/.git" ]; then
+                    _canonical=$(cd "$subdir" 2>/dev/null && pwd -P) || continue
+                    if ! echo "$_seen_canonical" | grep -qxF "$_canonical" 2>/dev/null; then
+                        _seen_canonical="${_seen_canonical}${_canonical}
+"
+                        repos+=("$subdir")
+                    fi
                 fi
             done
         fi
     done
+    unset _seen_canonical _canonical
     # If no child repos found but current dir is a repo, include it
-    if [ ${#repos[@]} -eq 0 ] && [ -d ".git" ]; then
+    if [ ${#repos[@]} -eq 0 ] && { [ -d ".git" ] || [ -f ".git" ]; }; then
         repos+=(".")
     fi
 fi
