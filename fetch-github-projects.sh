@@ -111,7 +111,8 @@ update_repo() {
         has_local_changes=true
     fi
 
-    if [ "$has_local_changes" = true ]; then
+    local stash_created=false
+    if [ "$has_local_changes" = true ] && [ "$WHAT_IF" != true ]; then
         local do_stash=false
         if [ "$STASH_ALL" = true ]; then
             do_stash=true
@@ -138,12 +139,27 @@ update_repo() {
                 _report "$RED" "✗" "stash failed" "ERROR: Failed to stash changes" "FAILED_REPOS"
                 popd > /dev/null || return; return 1
             fi
+            stash_created=true
         fi
     fi
+
+    # Helper: restore stash if we created one (one-shot: clears flag after pop)
+    _restore_stash() {
+        if [ "$stash_created" = true ]; then
+            stash_created=false
+            log_verbose "INFO: Restoring stashed changes..."
+            if ! git stash pop >/dev/null 2>&1; then
+                _report "$YELLOW" "⚠" "stash pop failed" "WARN: Stash pop failed, run 'git stash pop' manually" "STASH_CONFLICT_REPOS" "$repo_name"
+            else
+                log_verbose "INFO: Stashed changes restored successfully"
+            fi
+        fi
+    }
 
     # Fetch latest remote state (explicit refspec to update tracking ref)
     log_verbose "INFO: Fetching from origin/$DEFAULT_BRANCH..."
     if ! git fetch origin "$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH" >/dev/null 2>&1; then
+        _restore_stash
         _report "$RED" "✗" "fetch failed" "ERROR: Fetch failed" "FAILED_REPOS"
         popd > /dev/null || return; return 1
     fi
@@ -153,16 +169,19 @@ update_repo() {
     log_verbose "INFO: Branch type: $branch_type"
 
     if [ "$branch_type" = "ambiguous" ]; then
+        _restore_stash
         _report "$YELLOW" "⊘" "$CURRENT_BRANCH, ambiguous branch skipped" "INFO: Ambiguous branch pattern, skipping" "AMBIGUOUS_BRANCH_REPOS" "$repo_name ($CURRENT_BRANCH)"
         popd > /dev/null || return; return 0
     fi
 
     if [ "$MERGE_MODE" = true ] && [ "$branch_type" = "feature" ]; then
         if is_shallow_clone; then
+            _restore_stash
             _report "$YELLOW" "⊘" "shallow clone, merge skipped" "WARN: Shallow clone detected, skipping merge" "SKIPPED_REPOS" "$repo_name: shallow clone"
             popd > /dev/null || return; return 0
         fi
         if has_lock_file; then
+            _restore_stash
             _report "$YELLOW" "⊘" "locked by another process" "WARN: Repository locked, skipping" "SKIPPED_REPOS" "$repo_name: locked"
             popd > /dev/null || return; return 0
         fi
@@ -183,12 +202,16 @@ update_repo() {
                 "MERGED_REPOS" "$repo_name ($CURRENT_BRANCH would merge $DEFAULT_BRANCH)"
         elif [ "$LOCAL" = "$BASE" ]; then
             _report "$GREEN" "✓" "WHAT-IF: would update" "INFO: [WHAT-IF] Would fast-forward" "UPDATED_REPOS" "$repo_name"
+        elif [ "$REMOTE" = "$BASE" ]; then
+            # Local is ahead of remote default branch — nothing to pull
+            _report "$BLUE" "•" "WHAT-IF: would skip, ahead of origin/$DEFAULT_BRANCH" "INFO: [WHAT-IF] Local branch is ahead of origin/$DEFAULT_BRANCH, nothing to pull"
         else
             _report "$YELLOW" "⊘" "WHAT-IF: diverged, needs manual merge" \
                 "WARN: [WHAT-IF] Branches have diverged" "SKIPPED_REPOS" "$repo_name: diverged (use --merge on feature branches)"
         fi
     else
         if [ "$LOCAL" = "$REMOTE" ]; then
+            _restore_stash
             _report "$BLUE" "•" "" "INFO: Already up to date"
         elif [ "$LOCAL" = "$BASE" ]; then
             # Can fast-forward
@@ -196,15 +219,9 @@ update_repo() {
             if OUTPUT=$(git pull --ff-only origin "$DEFAULT_BRANCH" 2>&1); then
                 _report "$GREEN" "✓" "updated" "INFO: Successfully updated" "UPDATED_REPOS" "$repo_name"
                 log_verbose "INFO: $OUTPUT"
-                if [ "$has_local_changes" = true ]; then
-                    if ! git stash pop >/dev/null 2>&1; then
-                        _report "$YELLOW" "⚠" "updated, stash pop failed" "WARN: Stash pop failed, run 'git stash pop' manually" "STASH_CONFLICT_REPOS" "$repo_name"
-                    else
-                        log_verbose "INFO: Stashed changes restored successfully"
-                    fi
-                fi
+                _restore_stash
             else
-                if [ "$has_local_changes" = false ]; then
+                if [ "$stash_created" != true ]; then
                     log_verbose "WARN: Pull failed. Checking for unpushed local commits..."
                     local local_ahead
                     local_ahead=$(git rev-list --count "origin/$DEFAULT_BRANCH"..HEAD 2>/dev/null || echo "0")
@@ -218,17 +235,14 @@ update_repo() {
                     fi
                 else
                     _report "$RED" "✗" "pull failed" "ERROR: Pull failed: $OUTPUT" "FAILED_REPOS" "$repo_name: $OUTPUT"
-                    log_verbose "INFO: Attempting to restore stashed changes after failed pull..."
-                    if ! git stash pop >/dev/null 2>&1; then
-                        log_verbose "WARN: Stash pop also failed"
-                        STASH_CONFLICT_REPOS+=("$repo_name")
-                    fi
+                    _restore_stash
                 fi
             fi
         elif [ "$branch_type" = "feature" ] && [ "$MERGE_MODE" = true ]; then
             local merge_stats; merge_stats=$(get_merge_stats "$DEFAULT_BRANCH")
             log_verbose "INFO: Feature branch merge stats: $merge_stats"
             if [[ "$merge_stats" == "0 commits behind" ]]; then
+                _restore_stash
                 _report "$BLUE" "•" "$CURRENT_BRANCH, up to date with $DEFAULT_BRANCH" "INFO: Feature branch already up to date"
                 popd > /dev/null || return; return 0
             fi
@@ -240,6 +254,7 @@ update_repo() {
                 echo -n "  Merge $DEFAULT_BRANCH into $CURRENT_BRANCH? [y/n] "
                 read -r merge_response
                 if [[ ! "$merge_response" =~ ^[Yy] ]]; then
+                    _restore_stash
                     _report "$YELLOW" "⊘" "$CURRENT_BRANCH, user declined merge" "INFO: User declined merge" "SKIPPED_REPOS" "$repo_name ($CURRENT_BRANCH): user declined"
                     [ "$VERBOSE" = false ] && [ "${#repos[@]}" -gt 1 ] && start_timer
                     popd > /dev/null || return; return 0
@@ -250,19 +265,31 @@ update_repo() {
             local merge_result; merge_result=$(safe_merge_main "$DEFAULT_BRANCH") || true
             log_verbose "INFO: Merge result: $merge_result"
             case "$merge_result" in
-                SUCCESS)   _report "$GREEN" "✓" "$CURRENT_BRANCH → merged $DEFAULT_BRANCH" "INFO: Merge succeeded" "MERGED_REPOS" "$repo_name ($CURRENT_BRANCH → merged $DEFAULT_BRANCH)" ;;
-                CONFLICT)  _report "$RED" "✗" "$CURRENT_BRANCH → conflict, rolled back" "ERROR: Merge conflict" "MERGE_CONFLICT_REPOS" "$repo_name ($CURRENT_BRANCH): merge conflict, rolled back" ;;
+                SUCCESS)
+                    _restore_stash
+                    _report "$GREEN" "✓" "$CURRENT_BRANCH → merged $DEFAULT_BRANCH" "INFO: Merge succeeded" "MERGED_REPOS" "$repo_name ($CURRENT_BRANCH → merged $DEFAULT_BRANCH)" ;;
+                CONFLICT)
+                    _restore_stash
+                    _report "$RED" "✗" "$CURRENT_BRANCH → conflict, rolled back" "ERROR: Merge conflict" "MERGE_CONFLICT_REPOS" "$repo_name ($CURRENT_BRANCH): merge conflict, rolled back" ;;
                 STASH_CONFLICT)
+                    _restore_stash
                     _report "$YELLOW" "⚠" "$CURRENT_BRANCH → merged, stash needs manual pop" "WARN: Stash conflict after merge" "MERGED_REPOS" "$repo_name ($CURRENT_BRANCH → merged, stash conflict)"
-                    STASH_CONFLICT_REPOS+=("$repo_name") ;;
-                STASH_FAILED) _report "$RED" "✗" "$CURRENT_BRANCH, stash failed" "ERROR: Stash failed before merge" "FAILED_REPOS" "$repo_name: stash failed before merge" ;;
+                    STASH_CONFLICT_REPOS+=("$repo_name")
+                    ;;
+                STASH_FAILED)
+                    _restore_stash
+                    _report "$RED" "✗" "$CURRENT_BRANCH, stash failed" "ERROR: Stash failed before merge" "FAILED_REPOS" "$repo_name: stash failed before merge" ;;
+                *)
+                    _restore_stash
+                    _report "$RED" "✗" "$CURRENT_BRANCH, unexpected merge result: $merge_result" "ERROR: Unexpected merge result: $merge_result" "FAILED_REPOS" "$repo_name: unexpected merge result" ;;
             esac
+        elif [ "$REMOTE" = "$BASE" ]; then
+            # Local is ahead of remote default branch — nothing to pull
+            _restore_stash
+            _report "$BLUE" "•" "ahead of origin/$DEFAULT_BRANCH" "INFO: Local branch is ahead of origin/$DEFAULT_BRANCH, nothing to pull"
         else
+            _restore_stash
             _report "$YELLOW" "⊘" "diverged" "WARN: Branches have diverged, cannot fast-forward" "SKIPPED_REPOS" "$repo_name: diverged (use --merge on feature branches)"
-            if [ "$has_local_changes" = true ]; then
-                log_verbose "INFO: Restoring stashed changes..."
-                git stash pop >/dev/null 2>&1 || true
-            fi
         fi
     fi
     popd > /dev/null || return
