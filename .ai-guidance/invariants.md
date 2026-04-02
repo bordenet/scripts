@@ -2,7 +2,7 @@
 
 ## 🔴 Wiki / Bulk Edit Verification (NON-NEGOTIABLE)
 
-**After EVERY write to any wiki or external document system (Outline, Azure DevOps wiki, Confluence, etc.):**
+**After EVERY write to any wiki or external document system (Outline, etc.):**
 
 1. **Re-fetch the page immediately** after the update API call returns.
 2. **Verify content integrity:**
@@ -36,3 +36,23 @@ When delegating wiki/document edits to sub-agents:
 - For complex mid-page edits on large pages, do the edit yourself in the main agent where you can verify the full text.
 - Sub-agents MUST echo the text length before and after their edit. If `after < before` and no content was intentionally removed, the edit is bad.
 
+---
+
+## 🔴 Chunked Operations for Broad Tasks (NON-NEGOTIABLE)
+
+**When given a broad task that touches multiple pages, documents, or files (e.g., "update all pages about X", "clean up the wiki for Y"):**
+
+1. **Plan chunks BEFORE starting.** Break the work into independent chunks of ≤5 pages/files each.
+2. **Execute one chunk at a time.** Complete the chunk, verify results, then proceed to the next.
+3. **Never attempt all pages in a single pass.** Context overflow (`augmentTooLarge`) destroys work-in-progress and forces restart from scratch.
+4. **State your chunk plan** to the user before starting: "I'll do this in N chunks: Chunk 1 = [pages], Chunk 2 = [pages], ..."
+5. **Between chunks:** Summarize what was completed and what remains. If context is getting large, tell the user you need to continue in a new conversation.
+
+**This applies to:**
+- Wiki page updates (Outline)
+- Bulk file edits across a codebase
+- Any task that processes >5 independent items sequentially
+
+| Date | Incident |
+|------|----------|
+| 2026-03-31 | Agent attempted to update 13 wiki pages in a single pass for DELTA-1142 cleanup. Hit `augmentTooLarge` error, losing all progress. Fixed by enforcing chunked operations (3 chunks of ≤5 pages). |
