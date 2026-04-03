@@ -1,43 +1,80 @@
-# superpowers-plus: GitHub-First, Then Sync to GitLab (NON-NEGOTIABLE)
+# superpowers-plus: Dev → Staging → Production (NON-NEGOTIABLE)
 
-`superpowers-plus` has two remotes:
+`superpowers-plus` uses a three-tier branching model on GitHub with a private fork sync.
 
-| Remote | URL | Role |
-|--------|-----|------|
-| `upstream` | `https://github.com/bordenet/superpowers-plus.git` | **Source of truth** — changes land here FIRST via branch → PR → merge |
-| `origin` | `https://gitlab.int.callbox.net/mbordenet/superpowers-plus.git` | **Internal fork** — ALWAYS synced from `upstream` after merge |
+| Branch | Purpose | Accepts PRs from | Merges into | Cadence |
+|--------|---------|-------------------|-------------|---------|
+| `dev` | Active development | Feature/fix branches | `staging` | Frequent — per feature/fix |
+| `staging` | Batch validation | `dev` only | `main` | Deliberate — accumulate many changes |
+| `main` | Production releases | `staging` only | Private fork sync | **Rare — explicit human decision** |
 
-**Two-step flow (both steps mandatory):**
-
-**Step 1 — GitHub (upstream):** Branch → push to `upstream` → PR on GitHub → merge to `upstream/main`.
-
-**Step 2 — GitLab (origin) sync:** Pull merged changes from `upstream/main` → push to `origin/main` to keep the internal fork synchronized.
-
-- ❌ **NEVER** push changes to `origin` (GitLab) first — GitHub is always first
-- ❌ **NEVER** commit directly to `upstream/main` or `origin/main` — always use a branch + PR
-- ❌ **NEVER** skip the GitLab sync — both remotes must stay in sync
-- ✅ **ALWAYS** branch from `upstream/main` → push to `upstream` → PR on GitHub → merge
-- ✅ **ALWAYS** after merge, pull `upstream/main` and push to `origin/main`
+**Feature flow:**
 
 ```bash
-# Step 1: GitHub PR flow
-git fetch upstream
-git checkout -b fix/my-change upstream/main
-# ... make changes, commit ...
-git push upstream fix/my-change
-# Create PR on GitHub, get it merged.
+# 1. Branch from dev — ALL work starts here
+git fetch origin
+git checkout -b feat/my-feature origin/dev
+# ... make changes, commit, battery review ...
+git push origin feat/my-feature
+# Create PR on GitHub targeting dev → merge
 
-# Step 2: Sync GitLab fork
-git checkout main
-git pull upstream main
-git push origin main
+# 2. Accumulate changes in dev until a meaningful batch is ready.
+#    DO NOT promote to staging after every feature.
+
+# 3. Promote dev → staging ONLY when explicitly asked
+#    (after multiple changes are verified working in dev)
+
+# 4. Promote staging → main ONLY when explicitly asked,
+#    after rigorous batch review of ALL changes since last release.
+
+# 5. Sync private fork AFTER production merge
+git checkout main && git pull origin main && git push gitlab main
 ```
+
+## 🔴 Source Repos vs Installed Files (NON-NEGOTIABLE)
+
+| Location | Role | Editable? |
+|----------|------|-----------|
+| `~/git/Personal/superpowers-plus/` | **Source repo** — GitHub PR workflow | ✅ YES — edit HERE |
+| `~/git/CallBox/superpowers-callbox/` | **Source repo** — private overlay | ✅ YES — edit here |
+| `~/.codex/superpowers-plus/` | **Installed copy** — deployment target | ❌ NEVER |
+| `~/.codex/skills/` | **Installed skills** — deployment target | ❌ NEVER |
+| `~/GitHub/CallBox/tools/superpowers-plus/` | **Installed copy** — CallBox deployment | ❌ NEVER |
+
+**Workflow:** Edit source repo → run `./install.sh --upgrade` → changes propagate to `~/.codex/`.
+
+- ❌ **NEVER** edit files under `~/.codex/` directly
+- ❌ **NEVER** edit `~/GitHub/CallBox/tools/superpowers-plus/` — it is a deployment target, not a working directory
+- ❌ **NEVER** commit anywhere except `~/git/Personal/superpowers-plus/`
+- ✅ To test a local change before opening a PR: edit the source repo, re-run install, verify in `~/.codex/`
+
+**Detection:** `sp-doctor` flags CRITICAL when `~/.codex/superpowers-plus` has local commits not on origin.
+
+---
+
+**Prohibitions:**
+- ❌ **NEVER** commit directly to `dev`, `staging`, or `main` — always use a branch + PR
+- ❌ **NEVER** branch features from `main` or `staging` (branch from `dev`)
+- ❌ **NEVER** push `dev` or `staging` to the private fork — only `main` is synced
+- ❌ **NEVER** skip the private fork sync after a production merge
+- ❌ **NEVER** promote `staging → main` without explicit human instruction in the current conversation
+- ❌ **NEVER** promote `dev → staging` without explicit human instruction in the current conversation
+- ❌ **NEVER** treat a single feature landing in `dev` as a reason to promote — staging must accumulate multiple verified changes
+- ✅ **Exception:** Emergency hotfixes may branch from `main`, PR into `main`, then cherry-pick back to `dev`
+
+**Staging → Main gate (MANDATORY before any promotion):**
+1. Human says explicitly "promote staging to main" or "release" in the current conversation
+2. Run a batch code review across ALL changes in staging since the last main release
+3. Show the human the review verdict before merging
+4. Human approves the merge
 
 | Date | Incident |
 |------|----------|
-| 2026-03-24 | Agent edited `doctor-checks.sh` on `origin/main` (GitLab) directly instead of going through GitHub PR. Had to discard local edits; upstream already had the fix. |
-| 2026-03-25 | Agent pushed multi-agent claim feature to `origin/main` (GitLab) first, then tried to push to GitHub after. Violated GitHub-only policy despite it being documented. |
-| 2026-03-25 | Policy corrected: GitLab sync is now a mandatory second step after every GitHub merge, not a manual Matt-only action. |
-| 2026-03-25 | Bulk wiki TOC update destroyed 5 Outline pages. Sub-agents passed truncated text to update API. New invariant: VERIFY EVERY WRITE by re-fetching immediately after update. See `.ai-guidance/invariants.md`. |
+| 2026-03-24 | Agent edited directly on private fork instead of GitHub PR. |
+| 2026-03-25 | Agent pushed to private fork first, then tried GitHub. Violated GitHub-first policy. |
+| 2026-03-25 | Bulk wiki update destroyed 5 pages. New invariant: verify every write. |
+| 2026-03-28 | Migrated from two-tier (main + sync) to three-tier (dev → staging → main). |
+| 2026-03-30 | Agent repeatedly edited `~/.codex/superpowers-plus/` directly, creating stray commits with wrong git identity that were never on GitHub. Stale fork + wrong-author commits required force-reset. |
+| 2026-04-03 | Agent operated against `~/GitHub/CallBox/tools/superpowers-plus/` (CallBox deployment target) instead of `~/git/Personal/superpowers-plus/`. Committed and pushed directly to staging from the wrong repo. Required manual sync to fix. |
 
-> ⚠️ **This workflow is SPECIFIC to `superpowers-plus` only.** Other superpowers repos (`superpowers-callbox`, `superpowers-cari`) are private CallBox repos — commit directly to them as normal.
+> ⚠️ **This workflow is SPECIFIC to `superpowers-plus` only.** Other superpowers repos are private — commit directly to them as normal.
