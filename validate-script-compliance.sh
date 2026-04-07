@@ -165,7 +165,7 @@ check_required_flags() {
     # Check for --help flag
     if ! grep -q '\-h\|--help' "$script"; then
         log_error "Missing --help flag implementation"
-        ((issues++))
+        issues=$((issues + 1))
     else
         log_info "Help flag: present"
     fi
@@ -188,7 +188,7 @@ check_header_documentation() {
     # Check for PURPOSE
     if ! grep -q '^# PURPOSE:' "$script"; then
         log_error "Missing PURPOSE in header"
-        ((issues++))
+        issues=$((issues + 1))
     else
         log_info "Header: PURPOSE present"
     fi
@@ -228,23 +228,23 @@ validate_script() {
     echo "----------------------------------------"
 
     # Run all checks
-    check_line_count "$script" || ((script_issues++))
-    check_shellcheck "$script" || ((script_issues++))
-    check_syntax "$script" || ((script_issues++))
-    check_required_flags "$script" || ((script_issues++))
-    check_header_documentation "$script" || ((script_issues++))
-    check_error_handling "$script" || ((script_issues++))
+    check_line_count "$script"           || script_issues=$((script_issues + 1))
+    check_shellcheck "$script"            || script_issues=$((script_issues + 1))
+    check_syntax "$script"               || script_issues=$((script_issues + 1))
+    check_required_flags "$script"       || script_issues=$((script_issues + 1))
+    check_header_documentation "$script" || script_issues=$((script_issues + 1))
+    check_error_handling "$script"       || script_issues=$((script_issues + 1))
 
-    ((TOTAL_SCRIPTS++))
+    TOTAL_SCRIPTS=$((TOTAL_SCRIPTS + 1))
     TOTAL_ISSUES=$((TOTAL_ISSUES + script_issues))
 
     if [[ $script_issues -eq 0 ]]; then
         log_success "All checks passed"
-        ((PASSED_SCRIPTS++))
+        PASSED_SCRIPTS=$((PASSED_SCRIPTS + 1))
         return 0
     else
         log_error "$script_issues issue(s) found"
-        ((FAILED_SCRIPTS++))
+        FAILED_SCRIPTS=$((FAILED_SCRIPTS + 1))
         return 1
     fi
 }
