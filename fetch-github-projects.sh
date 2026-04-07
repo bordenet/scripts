@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Quiet GitHub fetcher — updates all repos in a directory with minimal output
+# PURPOSE: Fetch and fast-forward all git repos in a directory with minimal output
+# USAGE: fetch-github-projects.sh [--all] [-r] [-v] [--what-if] [--merge] [DIRECTORY]
 set -euo pipefail
 # Source library functions
 # Resolve symlinks to get actual script location
@@ -26,21 +27,11 @@ SAVE_CURSOR='\033[s'
 # shellcheck disable=SC2034  # Used by lib/fetch-github-lib.sh
 RESTORE_CURSOR='\033[u'
 # --- Global Variables ---
-# shellcheck disable=SC2034  # Arrays populated by _report() via indirect reference
-UPDATED_REPOS=()
-SKIPPED_REPOS=()
-FAILED_REPOS=()
-STASH_CONFLICT_REPOS=()
-STASH_ALL=false
+# shellcheck disable=SC2034  # All populated via eval indirect reference in _report() or fetch-github-lib.sh
+declare -a UPDATED_REPOS=() SKIPPED_REPOS=() FAILED_REPOS=() STASH_CONFLICT_REPOS=() MERGE_CONFLICT_REPOS=() MERGED_REPOS=() AMBIGUOUS_BRANCH_REPOS=()
+# shellcheck disable=SC2034
 TIMER_PID=""
-TIMER_WAS_RUNNING=false
-
-# Merge mode globals
-MERGE_MODE=false
-MERGE_BATCH_CONFIRMED=false  # Set true after batch preview confirmation
-MERGE_CONFLICT_REPOS=()
-MERGED_REPOS=()
-AMBIGUOUS_BRANCH_REPOS=()
+STASH_ALL=false; TIMER_WAS_RUNNING=false; MERGE_MODE=false; MERGE_BATCH_CONFIRMED=false
 
 # SSH batch mode to prevent hanging on auth prompts
 export GIT_TERMINAL_PROMPT=0
@@ -89,7 +80,7 @@ update_repo() {
     fi
 
     log_verbose "INFO: Detecting default branch..."
-    DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}' || true)
+    DEFAULT_BRANCH=$(timeout 10 git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}' || true)
     if [ -z "$DEFAULT_BRANCH" ]; then
         if git show-ref --quiet refs/heads/main; then DEFAULT_BRANCH="main"
         elif git show-ref --quiet refs/heads/master; then DEFAULT_BRANCH="master"
@@ -105,6 +96,13 @@ update_repo() {
         _report "$YELLOW" "⊘" "detached HEAD or no branch, skipped" "WARN: Detached HEAD or no branch, skipping" "SKIPPED_REPOS" "$repo_name: detached HEAD or no branch"
         popd > /dev/null || return; return 0
     fi
+    # Reject repos already in conflict state — stashing unmerged files is unsafe
+    if git ls-files --unmerged 2>/dev/null | grep -q .; then
+        _report "$RED" "✗" "unresolved conflicts, skipped" \
+            "ERROR: Repository has unmerged files. Run 'git status' to inspect." "FAILED_REPOS"
+        popd > /dev/null || return; return 1
+    fi
+
     local has_local_changes=false stash_created=false
     if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then has_local_changes=true; fi
     if [ "$has_local_changes" = true ] && [ "$WHAT_IF" != true ]; then
@@ -141,12 +139,15 @@ update_repo() {
         if [ "$stash_created" = true ]; then
             stash_created=false
             if ! git stash pop >/dev/null 2>&1; then
-                _report "$YELLOW" "⚠" "stash pop failed" "WARN: Stash pop failed, run 'git stash pop' manually" "STASH_CONFLICT_REPOS" "$repo_name"
+                # Stash pop conflicted; conflict markers remain in place.
+                # Git keeps the stash entry intact on a conflicted pop.
+                _report "$RED" "✗" "stash pop conflicted (run: git stash list)" \
+                    "ERROR: Stash pop conflicted. Run 'git stash list' and 'git stash apply stash@{0}' to recover." "STASH_CONFLICT_REPOS"
             fi
         fi
     }
     # Fetch latest remote state
-    if ! git fetch origin "$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH" >/dev/null 2>&1; then
+    if ! timeout 10 git fetch origin "$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH" >/dev/null 2>&1; then
         _restore_stash
         _report "$RED" "✗" "fetch failed" "ERROR: Fetch failed" "FAILED_REPOS"
         popd > /dev/null || return; return 1
