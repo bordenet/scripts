@@ -45,28 +45,37 @@ EOF
 }
 
 # Recursively finds all git repositories (follows symlinks, deduplicates)
-# Populates the named array variable with discovered repo paths
+# Populates the named array variable; respects .fetchignore (paths relative to search_dir)
 # Handles .git as directory (normal) or file (worktrees/submodules)
 find_repos_recursive() {
     local search_dir=$1
     local array_name=$2
 
     # Validate array_name is a legal identifier (prevent injection)
-    if [[ ! "$array_name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
-        echo "ERROR: Invalid array name: $array_name" >&2
-        return 1
+    [[ ! "$array_name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] && { echo "ERROR: Invalid array name: $array_name" >&2; return 1; }
+
+    local search_canonical _ignore_canonical=()
+    search_canonical=$(cd "$search_dir" 2>/dev/null && pwd -P) || search_canonical="$search_dir"
+
+    # Load .fetchignore: exclude listed paths (relative to search_dir) from scanning
+    if [[ -f "${search_dir}/.fetchignore" ]]; then
+        local _ig_line _ig_canon
+        while IFS= read -r _ig_line || [[ -n "$_ig_line" ]]; do
+            [[ -z "$_ig_line" || "$_ig_line" == \#* ]] && continue
+            _ig_canon=$(cd "${search_canonical}/${_ig_line}" 2>/dev/null && pwd -P) || true
+            [[ -n "$_ig_canon" ]] && _ignore_canonical+=("$_ig_canon")
+        done < "${search_dir}/.fetchignore"
     fi
 
     # Track canonical paths to deduplicate (symlink + real path to same repo)
-    # Uses newline-delimited string for Bash 3.2 compatibility (no associative arrays)
-    local _seen_canonical=""
-
+    local _seen_canonical="" _ig
     while IFS= read -r -d '' git_dir; do
         local repo_path="${git_dir%/.git}"
-        # Canonicalize to detect duplicates from symlink aliases
         local canonical
         canonical=$(cd "$repo_path" 2>/dev/null && pwd -P) || continue
-        # Check if already seen (grep -qxF = exact line match, fixed string)
+        for _ig in "${_ignore_canonical[@]+"${_ignore_canonical[@]}"}"; do
+            [[ "$canonical" == "$_ig" ]] && continue 2
+        done
         if ! echo "$_seen_canonical" | grep -qxF "$canonical" 2>/dev/null; then
             _seen_canonical="${_seen_canonical}${canonical}
 "
