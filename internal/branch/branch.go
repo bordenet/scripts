@@ -4,7 +4,7 @@ import (
 	"math"
 	"strings"
 
-	"gitsync/internal/sync"
+	"gitsync/internal/types"
 )
 
 // ParentCandidates is the fixed ordered list of candidate parent branch names.
@@ -12,9 +12,9 @@ var ParentCandidates = []string{"main", "master", "dev", "develop", "staging"}
 
 // Classify returns the BranchType for current relative to the repo's default branch.
 // Guard order: default → ambiguous → feature.
-func Classify(current, defaultBranch string) sync.BranchType {
+func Classify(current, defaultBranch string) types.BranchType {
 	if current == defaultBranch {
-		return sync.BranchTypeDefault
+		return types.BranchTypeDefault
 	}
 	switch {
 	case strings.HasPrefix(current, "release/"),
@@ -22,9 +22,9 @@ func Classify(current, defaultBranch string) sync.BranchType {
 		current == "staging",
 		current == "develop",
 		current == "development":
-		return sync.BranchTypeAmbiguous
+		return types.BranchTypeAmbiguous
 	}
-	return sync.BranchTypeFeature
+	return types.BranchTypeFeature
 }
 
 // DetectParent returns the parent branch name by finding the candidate with the

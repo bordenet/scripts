@@ -5,26 +5,26 @@ import (
 	"testing"
 
 	"gitsync/internal/branch"
-	"gitsync/internal/sync"
+	"gitsync/internal/types"
 )
 
 func TestClassify(t *testing.T) {
 	tests := []struct {
 		current  string
 		dflt     string
-		expected sync.BranchType
+		expected types.BranchType
 	}{
-		{"main", "main", sync.BranchTypeDefault},
-		{"master", "master", sync.BranchTypeDefault},
-		{"release/1.0", "main", sync.BranchTypeAmbiguous},
-		{"hotfix/urgent", "main", sync.BranchTypeAmbiguous},
-		{"staging", "main", sync.BranchTypeAmbiguous},
-		{"develop", "main", sync.BranchTypeAmbiguous},
-		{"development", "main", sync.BranchTypeAmbiguous},
-		{"feature/my-thing", "main", sync.BranchTypeFeature},
-		{"fix/bug-123", "main", sync.BranchTypeFeature},
-		{"my-branch", "main", sync.BranchTypeFeature},
-		{"", "main", sync.BranchTypeFeature}, // empty treated as feature; detached caught earlier
+		{"main", "main", types.BranchTypeDefault},
+		{"master", "master", types.BranchTypeDefault},
+		{"release/1.0", "main", types.BranchTypeAmbiguous},
+		{"hotfix/urgent", "main", types.BranchTypeAmbiguous},
+		{"staging", "main", types.BranchTypeAmbiguous},
+		{"develop", "main", types.BranchTypeAmbiguous},
+		{"development", "main", types.BranchTypeAmbiguous},
+		{"feature/my-thing", "main", types.BranchTypeFeature},
+		{"fix/bug-123", "main", types.BranchTypeFeature},
+		{"my-branch", "main", types.BranchTypeFeature},
+		{"", "main", types.BranchTypeFeature}, // empty treated as feature; detached caught earlier
 	}
 	for _, tt := range tests {
 		t.Run(tt.current+"_vs_"+tt.dflt, func(t *testing.T) {

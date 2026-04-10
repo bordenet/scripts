@@ -1,8 +1,10 @@
 package sync
 
 import (
-	gosync "sync"
 	"sort"
+	gosync "sync"
+
+	inttypes "gitsync/internal/types"
 )
 
 // Status represents the outcome of processing a single repo.
@@ -64,12 +66,13 @@ type Action struct {
 }
 
 // BranchType classifies a branch relative to the repo's default branch.
-type BranchType int
+// Re-exported from internal/types to avoid import cycles; internal/branch uses internal/types directly.
+type BranchType = inttypes.BranchType
 
 const (
-	BranchTypeDefault   BranchType = iota
-	BranchTypeFeature
-	BranchTypeAmbiguous
+	BranchTypeDefault   = inttypes.BranchTypeDefault
+	BranchTypeFeature   = inttypes.BranchTypeFeature
+	BranchTypeAmbiguous = inttypes.BranchTypeAmbiguous
 )
 
 // RepoState holds all observed facts about a repo — populated before Decide is called.
