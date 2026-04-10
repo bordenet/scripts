@@ -30,3 +30,8 @@ ADOPT-PROMPT.md
 Agents.md.original
 MODULAR-MIGRATION-PROMPT.md
 *.backup
+
+gitsync
+gitsync_new
+.gitsync.hash
+.gitsync.lock
