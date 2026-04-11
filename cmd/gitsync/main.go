@@ -187,26 +187,38 @@ loop:
 
 func parseFlags() (gosync.Flags, []string) {
 	var (
-		all           = flag.Bool("all", false, "process all repos non-interactively")
-		recursive     = flag.Bool("recursive", false, "search all subdirectories")
+		interactive   = flag.Bool("interactive", false, "pick repos from a menu instead of syncing all")
+		recursive     = flag.Bool("recursive", false, "search all subdirectories (default: 2 levels)")
 		verbose       = flag.Bool("verbose", false, "show per-repo detail")
-		whatIf        = flag.Bool("what-if", false, "dry run")
+		whatIf        = flag.Bool("what-if", false, "dry run: show what would happen without changing anything")
 		noRebase      = flag.Bool("no-rebase", false, "skip diverged branches instead of rebasing")
-		noStash       = flag.Bool("no-stash", false, "skip repos with local changes")
-		forceRebase   = flag.Bool("force-rebase", false, "rebase pushed branches (solo only)")
-		_merge        = flag.Bool("merge", false, "no-op alias for backwards compatibility")
+		noStash       = flag.Bool("no-stash", false, "skip repos with local changes instead of stashing")
+		forceRebase   = flag.Bool("force-rebase", false, "rebase pushed branches (solo repos only)")
 		concurrency   = flag.Int("concurrency", int(math.Min(float64(runtime.NumCPU()), 8)), "max parallel repos")
 		fetchTimeout  = flag.Int("fetch-timeout", 30, "per-repo fetch timeout in seconds")
 		rebaseTimeout = flag.Int("rebase-timeout", 120, "per-repo rebase timeout in seconds")
-		dir           = flag.String("dir", ".", "target directory (default: current directory)")
+		// Deprecated/compat flags — accepted silently, have no effect.
+		_ = flag.Bool("all", false, "")
+		_ = flag.Bool("merge", false, "")
+		_ = flag.String("dir", ".", "")
 	)
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: gitsync [flags] [DIR...]\n\n")
+		fmt.Fprintf(os.Stderr, "Syncs all git repos found under DIR (default: current directory).\n")
+		fmt.Fprintf(os.Stderr, "Multiple directories may be specified; results are deduplicated.\n\n")
+		fmt.Fprintf(os.Stderr, "Flags:\n")
+		flag.VisitAll(func(f *flag.Flag) {
+			if f.Usage == "" {
+				return // skip deprecated/compat flags
+			}
+			fmt.Fprintf(os.Stderr, "  --%-20s %s\n", f.Name, f.Usage)
+		})
+	}
 	flag.Parse()
-	_ = _merge // --merge is a no-op alias
 
-	// Positional args are additional root directories; any positional arg implies --all.
+	// Positional args specify root directories to scan.
 	var targetDirs []string
 	if flag.NArg() > 0 {
-		*all = true
 		for _, arg := range flag.Args() {
 			abs, err := filepath.Abs(arg)
 			if err != nil {
@@ -215,15 +227,15 @@ func parseFlags() (gosync.Flags, []string) {
 			targetDirs = append(targetDirs, abs)
 		}
 	} else {
-		abs, err := filepath.Abs(*dir)
+		abs, err := filepath.Abs(".")
 		if err != nil {
-			abs = *dir
+			abs = "."
 		}
 		targetDirs = []string{abs}
 	}
 
 	f := gosync.Flags{
-		All:           *all,
+		All:           !*interactive, // sync-all is the default; --interactive opts out
 		Recursive:     *recursive,
 		Verbose:       *verbose,
 		WhatIf:        *whatIf,
