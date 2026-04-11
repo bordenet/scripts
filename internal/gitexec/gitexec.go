@@ -212,6 +212,13 @@ func RebaseAbort(dir string) error {
 	return err
 }
 
+// MergeAbort aborts an in-progress merge. Uses context.Background() — must not
+// be cancelled by the repo's deadline context.
+func MergeAbort(dir string) error {
+	_, err := run(context.Background(), dir, "merge", "--abort")
+	return err
+}
+
 // StashPush creates an auto-stash with the given message.
 func StashPush(ctx context.Context, dir, message string) error {
 	_, err := run(ctx, dir, "stash", "push", "-m", message)
