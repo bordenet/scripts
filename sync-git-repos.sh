@@ -2,7 +2,19 @@
 # PURPOSE: Sync all git repos in a directory — parallel Go binary, built on demand
 # USAGE: sync-git-repos.sh [--all] [--recursive] [--what-if] [--no-rebase] [DIRECTORY]
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Resolve the real location of this script, following symlinks.
+# BASH_SOURCE[0] is the symlink path when invoked via symlink, so we must
+# dereference it to find the actual script (and its co-located Go source).
+# macOS lacks readlink -f / realpath, so we use a portable loop.
+_src="${BASH_SOURCE[0]}"
+while [[ -L "$_src" ]]; do
+    _dir="$(cd "$(dirname "$_src")" && pwd)"
+    _src="$(readlink "$_src")"
+    [[ "$_src" = /* ]] || _src="$_dir/$_src"  # handle relative symlinks
+done
+SCRIPT_DIR="$(cd "$(dirname "$_src")" && pwd)"
+unset _src _dir
 BINARY="$SCRIPT_DIR/gitsync"
 HASH_FILE="$SCRIPT_DIR/.gitsync.hash"
 LOCK_FILE="$SCRIPT_DIR/.gitsync.lock"
