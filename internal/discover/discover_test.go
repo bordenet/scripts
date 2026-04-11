@@ -9,7 +9,26 @@ import (
 	"gitsync/internal/discover"
 )
 
+// initRepo creates a git repo with a fake remote so discover treats it as a
+// leaf repo (repos without remotes are treated as organisational containers).
 func initRepo(t *testing.T, dir string) {
+	t.Helper()
+	for _, args := range [][]string{
+		{"git", "init", dir},
+		{"git", "-C", dir, "config", "user.email", "test@test.com"},
+		{"git", "-C", dir, "config", "user.name", "Test"},
+		{"git", "-C", dir, "remote", "add", "origin", "https://example.com/repo.git"},
+	} {
+		if err := exec.Command(args[0], args[1:]...).Run(); err != nil {
+			t.Fatalf("setup %v: %v", args, err)
+		}
+	}
+}
+
+// initContainerRepo creates a git repo with NO remote — simulates a top-level
+// directory that was `git init`-ed but never pushed (e.g. ~/GitHub/CallBox).
+// discover should recurse into it rather than surfacing it as a skipped leaf.
+func initContainerRepo(t *testing.T, dir string) {
 	t.Helper()
 	for _, args := range [][]string{
 		{"git", "init", dir},
@@ -107,5 +126,40 @@ func TestFind_SourceRepoIsIncluded(t *testing.T) {
 	repos := discover.Find(root, false)
 	if len(repos) != 2 {
 		t.Errorf("expected 2 repos (source repo must be included), got %d: %v", len(repos), repos)
+	}
+}
+
+// TestFind_ContainerRepoIsRecursed verifies that a git repo with no remote
+// (e.g. ~/GitHub/CallBox) is treated as an organisational container: discover
+// recurses into it to find the real repos inside rather than surfacing it as a
+// skipped leaf with "no origin remote".
+func TestFind_ContainerRepoIsRecursed(t *testing.T) {
+	root := t.TempDir()
+
+	// container has .git but no remote — simulates ~/GitHub/CallBox
+	container := filepath.Join(root, "CallBox")
+	initContainerRepo(t, container)
+
+	// real repos live inside the container
+	inner1 := filepath.Join(container, "tools", "superpowers-plus")
+	inner2 := filepath.Join(container, "Cari", "acquisition-service")
+	if err := os.MkdirAll(filepath.Dir(inner1), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(inner2), 0755); err != nil {
+		t.Fatal(err)
+	}
+	initRepo(t, inner1)
+	initRepo(t, inner2)
+
+	repos := discover.Find(root, false)
+	if len(repos) != 2 {
+		t.Errorf("expected 2 inner repos, got %d: %v", len(repos), repos)
+	}
+	for _, r := range repos {
+		base := filepath.Base(r)
+		if base != "superpowers-plus" && base != "acquisition-service" {
+			t.Errorf("unexpected repo in results: %s", r)
+		}
 	}
 }
