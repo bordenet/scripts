@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,15 +19,25 @@ import (
 )
 
 func main() {
-	flags, targetDir := parseFlags()
+	flags, targetDirs := parseFlags()
 	if flags.Concurrency < 1 {
 		fmt.Fprintln(os.Stderr, "error: --concurrency must be >= 1")
 		os.Exit(1)
 	}
 
-	repos := discover.Find(targetDir, flags.Recursive)
+	// Scan all target directories, deduplicating by canonical path.
+	seen := map[string]bool{}
+	var repos []string
+	for _, root := range targetDirs {
+		for _, r := range discover.Find(root, flags.Recursive) {
+			if !seen[r] {
+				seen[r] = true
+				repos = append(repos, r)
+			}
+		}
+	}
 	if len(repos) == 0 {
-		fmt.Fprintf(os.Stderr, "No git repositories found in %s\n", targetDir)
+		fmt.Fprintf(os.Stderr, "No git repositories found in %s\n", strings.Join(targetDirs, ", "))
 		os.Exit(0)
 	}
 
@@ -88,7 +99,7 @@ func main() {
 	}()
 
 	// Print header
-	fmt.Printf("\033[1mGit Repository Updates\033[0m: %s\n\n", targetDir)
+	fmt.Printf("\033[1mGit Repository Updates\033[0m: %s\n\n", strings.Join(targetDirs, ", "))
 
 	formatter := output.NewFormatter(flags.Verbose)
 	writer := output.NewProgressWriter(os.Stdout, len(repos))
@@ -155,7 +166,7 @@ loop:
 	output.ShowSummary(allResults, time.Since(start), flags)
 }
 
-func parseFlags() (gosync.Flags, string) {
+func parseFlags() (gosync.Flags, []string) {
 	var (
 		all           = flag.Bool("all", false, "process all repos non-interactively")
 		recursive     = flag.Bool("recursive", false, "search all subdirectories")
@@ -168,21 +179,28 @@ func parseFlags() (gosync.Flags, string) {
 		concurrency   = flag.Int("concurrency", int(math.Min(float64(runtime.NumCPU()), 8)), "max parallel repos")
 		fetchTimeout  = flag.Int("fetch-timeout", 30, "per-repo fetch timeout in seconds")
 		rebaseTimeout = flag.Int("rebase-timeout", 120, "per-repo rebase timeout in seconds")
-		dir           = flag.String("dir", ".", "target directory")
+		dir           = flag.String("dir", ".", "target directory (default: current directory)")
 	)
 	flag.Parse()
 	_ = _merge // --merge is a no-op alias
 
-	targetDir := *dir
+	// Positional args are additional root directories; any positional arg implies --all.
+	var targetDirs []string
 	if flag.NArg() > 0 {
-		targetDir = flag.Arg(0) // positional arg takes precedence
-		*all = true             // positional arg implies --all
-	}
-
-	// Resolve target dir
-	abs, err := filepath.Abs(targetDir)
-	if err == nil {
-		targetDir = abs
+		*all = true
+		for _, arg := range flag.Args() {
+			abs, err := filepath.Abs(arg)
+			if err != nil {
+				abs = arg
+			}
+			targetDirs = append(targetDirs, abs)
+		}
+	} else {
+		abs, err := filepath.Abs(*dir)
+		if err != nil {
+			abs = *dir
+		}
+		targetDirs = []string{abs}
 	}
 
 	f := gosync.Flags{
@@ -197,7 +215,7 @@ func parseFlags() (gosync.Flags, string) {
 		FetchTimeout:  *fetchTimeout,
 		RebaseTimeout: *rebaseTimeout,
 	}
-	return f, targetDir
+	return f, targetDirs
 }
 
 func showMenu(repos []string) []string {
