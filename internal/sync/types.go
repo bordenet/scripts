@@ -43,6 +43,7 @@ const (
 	SkipNoStash            SkipReason = "local changes present and --no-stash set"
 	SkipWhatIf             SkipReason = "dry run (--what-if)"
 	SkipDefaultDiverged    SkipReason = "default branch diverged (manual intervention needed)"
+	SkipRemoteGone         SkipReason = "remote repository no longer exists"
 )
 
 // ActionType is the category of action Decide returns.
@@ -100,6 +101,7 @@ type RepoState struct {
 	FetchErr        error
 	FetchTimeout    bool
 	FetchCancelled  bool // true when fetch was cancelled by parent context (SIGINT), not a timeout
+	RemoteGone      bool // true when fetch fails because the remote repo was deleted or moved
 }
 
 // RepoResult is sent on the results channel after a repo is processed.

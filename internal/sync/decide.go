@@ -39,6 +39,9 @@ func Decide(state RepoState, flags Flags) Action {
 	if state.FetchCancelled {
 		return skip(SkipCancelled)
 	}
+	if state.RemoteGone {
+		return skip(SkipRemoteGone)
+	}
 	if state.FetchErr != nil {
 		return fail(state.FetchErr.Error())
 	}
