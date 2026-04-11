@@ -33,14 +33,6 @@ func Find(targetDir string, recursive bool) []string {
 	seen := map[string]bool{}
 	var results []string
 
-	// If targetDir is itself a git repo, return it directly without descending.
-	if isGitRepo(filepath.Join(targetDir, ".git")) {
-		if !ignore[targetDir] && (selfDir == "" || targetDir != selfDir) {
-			return []string{targetDir}
-		}
-		return []string{}
-	}
-
 	var walk func(dir string, depth int)
 	walk = func(dir string, depth int) {
 		if !recursive && depth > 2 {
@@ -94,6 +86,18 @@ func Find(targetDir string, recursive bool) []string {
 	}
 
 	walk(targetDir, 1)
+
+	// Fallback: if no child repos were found, check whether targetDir itself is a
+	// git repo. This handles the case where the user points gitsync directly at a
+	// single repo rather than a parent directory.
+	//
+	// Self-exclusion is intentionally NOT applied here — when the user explicitly
+	// targets the source directory (e.g. running from inside the scripts repo),
+	// they want to sync it, not get an empty result.
+	if len(results) == 0 && !ignore[targetDir] && isGitRepo(filepath.Join(targetDir, ".git")) {
+		return []string{targetDir}
+	}
+
 	return results
 }
 
