@@ -2,6 +2,7 @@ package discover
 
 import (
 	"bufio"
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,12 +52,21 @@ func Find(targetDir string, recursive bool) []string {
 				if seen[canonical] {
 					continue
 				}
+				seen[canonical] = true
 				if ignore[canonical] {
 					continue
 				}
-				seen[canonical] = true
-				results = append(results, canonical)
-				continue // don't recurse into git repos
+				if hasRemote(gitPath) {
+					// Leaf repo with a remote — add it for syncing; don't recurse.
+					results = append(results, canonical)
+					continue
+				}
+				// No remote: treat as an organisational container (e.g. a top-level
+				// directory that was `git init`-ed but never pushed anywhere).
+				// Reset depth to 1 so the 2-level limit applies relative to the
+				// container itself, not to the original scan root.
+				walk(canonical, 1)
+				continue
 			}
 
 			// Recurse into directories (avoid re-visiting same dir via symlinks)
@@ -92,6 +102,19 @@ func Find(targetDir string, recursive bool) []string {
 func isGitRepo(gitPath string) bool {
 	info, err := os.Stat(gitPath)
 	return err == nil && (info.IsDir() || info.Mode().IsRegular())
+}
+
+// hasRemote returns true if the git directory contains at least one configured remote.
+// It reads the git config file directly to avoid spawning a subprocess.
+func hasRemote(gitPath string) bool {
+	// gitPath is the .git entry; config lives inside it when it's a directory,
+	// or inside the path referenced by the .git file when it's a worktree pointer.
+	configPath := filepath.Join(gitPath, "config")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return false
+	}
+	return bytes.Contains(data, []byte("[remote "))
 }
 
 // loadFetchIgnore reads .fetchignore from dir and returns a set of canonical paths to skip.
