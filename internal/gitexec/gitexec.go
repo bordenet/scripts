@@ -212,11 +212,42 @@ func RebaseAbort(dir string) error {
 	return err
 }
 
+// ForceCleanRebaseState removes stale rebase state files when git rebase --abort
+// refuses to run (e.g. REBASE_HEAD exists but rebase-merge/ is missing).
+// ONLY call this after RebaseAbort has already returned "no rebase in progress"
+// — that confirms the working tree is clean and the files are safe to remove.
+func ForceCleanRebaseState(dir string) error {
+	gd, err := gitDir(context.Background(), dir)
+	if err != nil {
+		return err
+	}
+	for _, f := range []string{"REBASE_HEAD"} {
+		os.Remove(filepath.Join(gd, f)) // best-effort; ignore missing
+	}
+	for _, d := range []string{"rebase-merge", "rebase-apply"} {
+		os.RemoveAll(filepath.Join(gd, d)) // best-effort; ignore missing
+	}
+	return nil
+}
+
 // MergeAbort aborts an in-progress merge. Uses context.Background() — must not
 // be cancelled by the repo's deadline context.
 func MergeAbort(dir string) error {
 	_, err := run(context.Background(), dir, "merge", "--abort")
 	return err
+}
+
+// ForceCleanMergeState removes a stale MERGE_HEAD when git merge --abort
+// refuses to run. ONLY call after MergeAbort returned "no merge in progress".
+func ForceCleanMergeState(dir string) error {
+	gd, err := gitDir(context.Background(), dir)
+	if err != nil {
+		return err
+	}
+	for _, f := range []string{"MERGE_HEAD", "MERGE_MSG", "MERGE_MODE"} {
+		os.Remove(filepath.Join(gd, f)) // best-effort; ignore missing
+	}
+	return nil
 }
 
 // StashPush creates an auto-stash with the given message.

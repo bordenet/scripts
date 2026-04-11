@@ -137,15 +137,21 @@ func TestRun_WhatIf(t *testing.T) {
 	flags := syncp.Flags{WhatIf: true, FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
 	result := syncp.Run(context.Background(), local, flags, registry)
-	// --what-if: status must be Skipped with WhatIf reason, and action described
-	if result.Status != syncp.StatusSkipped || result.SkipReason != syncp.SkipWhatIf {
-		t.Errorf("expected StatusSkipped/SkipWhatIf, got status=%v reason=%q", result.Status, result.SkipReason)
+
+	// --what-if for a fast-forwardable repo: status reflects what WOULD happen
+	// (StatusUpdated) so the summary buckets are meaningful. SkipWhatIf is still
+	// set so the progress-line formatter shows the ○ dry-run format.
+	if result.Status != syncp.StatusUpdated {
+		t.Errorf("expected StatusUpdated for would-ff repo, got status=%v", result.Status)
+	}
+	if result.SkipReason != syncp.SkipWhatIf {
+		t.Errorf("expected SkipWhatIf reason, got %q", result.SkipReason)
 	}
 	if result.WhatIfAction == "" {
 		t.Error("expected WhatIfAction to be non-empty")
 	}
-	// Verify the ff actually didn't happen by re-running without --what-if
-	// and checking status is still Updated (meaning we didn't ff already)
+
+	// Verify the ff actually didn't happen: a real run should still update.
 	flags2 := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	result2 := syncp.Run(context.Background(), local, flags2, registry)
 	if result2.Status != syncp.StatusUpdated {
