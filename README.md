@@ -11,7 +11,7 @@ Utility scripts for macOS and Linux. Bash 3.2+, ShellCheck-clean.
 | Script | Description |
 |---|---|
 | [`enumerate-gh-repos.sh`](./enumerate-gh-repos.sh) | Enumerates repositories within a specified GitHub Enterprise instance and organization. |
-| [`fetch-github-projects.sh`](./fetch-github-projects.sh) | Automates the process of updating all local Git repositories located within a specified directory. [Docs](./docs/fetch-github-projects.md) |
+| [`fetch-github-projects.sh`](./fetch-github-projects.sh) | Parallel git sync across 20+ repos — fast-forward, rebase, auto-stash, feature-branch parent detection. Thin bash wrapper that builds a Go binary on demand. [Docs](./docs/fetch-github-projects.md) |
 | [`integrate-claude-web-branch.sh`](./integrate-claude-web-branch.sh) | Integrates Claude Code web branches into main via complete PR workflow with minimal output. [Docs](./docs/integrate-claude-web-branch.md) |
 | [`purge-stale-claude-code-web-branches.sh`](./purge-stale-claude-code-web-branches.sh) | Interactive tool to safely delete stale Claude Code web branches with human-readable timestamps. [Docs](./docs/purge-stale-claude-code-web-branches.md) |
 | [`get-active-repos.sh`](./get-active-repos.sh) | Identifies and lists active GitHub repositories within a specified organization. |
@@ -21,6 +21,37 @@ Utility scripts for macOS and Linux. Bash 3.2+, ShellCheck-clean.
 | [`scrub-git-history.sh`](./scrub-git-history.sh) | Uses 'git-filter-repo' to rewrite the Git repository history, permanently removing specified files or directories from all commits. |
 | [`squash-commits.sh`](./squash-commits.sh) | Interactively squash a range of commits in a Git repository. |
 | [`squash-last-n.sh`](./squash-last-n.sh) | Squashes the last <N> commits into a single new commit using git reset --soft. |
+
+### gitsync — parallel git sync
+
+`fetch-github-projects.sh` is a thin wrapper around a Go binary that syncs repos in parallel.
+
+```bash
+# Sync all repos in ~/git (non-interactive)
+./fetch-github-projects.sh --all ~/git
+
+# Dry run
+./fetch-github-projects.sh --what-if ~/git
+
+# Flags
+--all              Process all repos without interactive menu
+--recursive        Search all subdirectories
+--what-if          Dry run — describe actions, make no changes
+--no-rebase        Skip diverged branches instead of rebasing
+--no-stash         Skip repos with local changes instead of stashing
+--force-rebase     Rebase pushed branches (solo use only; warns to force-push)
+--concurrency N    Max parallel repos (default: min(CPU count, 8))
+--fetch-timeout N  Per-repo fetch timeout in seconds (default: 30)
+--dir PATH         Target directory (default: current directory)
+```
+
+**How it works:**
+1. Wrapper hashes all `.go` source files + `go.mod` — rebuilds binary only when source changes
+2. SSH ControlMaster is pre-warmed before `exec` to avoid connection storm across goroutines
+3. Each repo runs in a goroutine (semaphore-bounded): guard checks → classify branch → detect parent → stash → fetch → decide (ff/rebase/skip) → execute → pop stash
+4. All output funnels through a single channel to the main goroutine — no interleaved writes
+
+**Performance:** ~1–3s for 10 repos (was ~90s sequential).
 
 ## System & Environment
 
