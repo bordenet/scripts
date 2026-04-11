@@ -105,6 +105,7 @@ type RepoState struct {
 // RepoResult is sent on the results channel after a repo is processed.
 type RepoResult struct {
 	RepoPath      string
+	DisplayName   string   // relative path for output (set by main after discovery)
 	Status        Status
 	SkipReason    SkipReason
 	FailReason    string
