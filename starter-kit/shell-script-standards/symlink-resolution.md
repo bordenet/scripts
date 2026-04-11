@@ -96,7 +96,6 @@ bash test-script.sh --help
 
 - `bu.sh`
 - `mu.sh`
-- `fetch-github-projects.sh`
+- `sync-git-repos.sh`
 - `integrate-claude-web-branch.sh`
 - `scorch-repo.sh`
-

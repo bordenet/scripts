@@ -521,7 +521,7 @@ Before you commit, verify you completed ALL of these:
 | enumerate-gh-repos.sh | Cross-platform | N/A | Uses GitHub CLI (gh) |
 | get-active-repos.sh | Cross-platform | N/A | Uses GitHub CLI (gh) |
 | get-dormant-repos.sh | Cross-platform | N/A | Uses GitHub CLI (gh) |
-| fetch-github-projects.sh | Cross-platform | N/A | Uses GitHub CLI (gh) |
+| sync-git-repos.sh | Cross-platform | N/A | Uses standard git only |
 
 ---
 

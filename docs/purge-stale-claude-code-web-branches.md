@@ -7,7 +7,7 @@ Interactive tool to identify and delete stale Claude Code web branches with safe
 Claude Code web creates many branches over time. This script helps maintain repository hygiene by providing a safe, interactive way to delete branches that are no longer needed.
 
 ## User Experience Pattern
-Follows **fetch-github-projects.sh** UX design:
+Follows **sync-git-repos.sh** UX design:
 - Menu-driven interface (numbered selection)
 - `--all` flag for batch processing
 - Live timer in top-right corner during operations
