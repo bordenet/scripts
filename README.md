@@ -33,15 +33,17 @@ Utility scripts for macOS and Linux. Bash 3.2+, ShellCheck-clean.
 # Dry run
 ./fetch-github-projects.sh --what-if ~/git
 
-# Flags
+# Core flags — see docs/fetch-github-projects.md for full list
 --all              Process all repos without interactive menu
 --recursive        Search all subdirectories
 --what-if          Dry run — describe actions, make no changes
 --no-rebase        Skip diverged branches instead of rebasing
 --no-stash         Skip repos with local changes instead of stashing
 --force-rebase     Rebase pushed branches (solo use only; warns to force-push)
+--verbose          Show per-repo branch and timing detail
 --concurrency N    Max parallel repos (default: min(CPU count, 8))
 --fetch-timeout N  Per-repo fetch timeout in seconds (default: 30)
+--rebase-timeout N Per-repo rebase timeout in seconds (default: 120)
 --dir PATH         Target directory (default: current directory)
 ```
 
@@ -54,11 +56,6 @@ Utility scripts for macOS and Linux. Bash 3.2+, ShellCheck-clean.
 **Performance:** ~1–3s for 10 repos (was ~90s sequential).
 
 ## System & Environment
-
-
-
-
-
 
 | Script | Description |
 |---|---|
@@ -90,6 +87,19 @@ Utility scripts for macOS and Linux. Bash 3.2+, ShellCheck-clean.
 | [`capture-packets/compress-pcap-zstd.sh`](./capture-packets/compress-pcap-zstd.sh) | Compresses .pcap files in a specified directory using zstd. |
 | [`capture-packets/start-pcap-rotate.sh`](./capture-packets/start-pcap-rotate.sh) | Starts a rotating packet capture using tcpdump. |
 | [`capture-packets/stop-pcap-rotate.sh`](./capture-packets/stop-pcap-rotate.sh) | Stops the packet capture rotation process. |
+
+## Repository Maintenance
+
+Tools for keeping the repository compliant, documented, and clean.
+
+| Script | Description |
+|---|---|
+| [`add-help-batch.sh`](./add-help-batch.sh) | Adds `--help` to all scripts missing it — batch remediation for compliance. |
+| [`ci-quality-gates.sh`](./ci-quality-gates.sh) | Runs all quality gates locally (ShellCheck, syntax, cross-references). Mirrors what GitHub Actions runs. |
+| [`detect-readme-slop.sh`](./detect-readme-slop.sh) | Detects AI-generated filler language in README files. Can run as a pre-commit hook. |
+| [`fix-compliance-batch.sh`](./fix-compliance-batch.sh) | Batch-fixes common STYLE_GUIDE.md violations across all scripts. |
+| [`validate-cross-references.sh`](./validate-cross-references.sh) | Validates all Markdown links and script cross-references in the repository. |
+| [`validate-script-compliance.sh`](./validate-script-compliance.sh) | Checks all scripts against STYLE_GUIDE.md requirements (shebang, error handling, help flag, line count). |
 
 ## Xcode
 

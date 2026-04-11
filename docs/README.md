@@ -1,23 +1,16 @@
 # Documentation Index
 
-This directory contains detailed documentation for scripts and tools in this repository.
-
-## Table of Contents
-
-- [Script Documentation](#script-documentation)
-- [Guides & References](#guides--references)
+Detailed documentation for scripts and tools in this repository.
 
 ---
 
 ## Script Documentation
 
-Detailed usage guides for specific scripts:
-
 ### Git & GitHub Tools
 
 | Document | Script | Description |
 |----------|--------|-------------|
-| [fetch-github-projects.md](./fetch-github-projects.md) | [`fetch-github-projects.sh`](../fetch-github-projects.sh) | Automates updating all local Git repositories in a directory |
+| [fetch-github-projects.md](./fetch-github-projects.md) | [`fetch-github-projects.sh`](../fetch-github-projects.sh) | Parallel git sync wrapper — builds Go binary on demand, docs all flags |
 | [integrate-claude-web-branch.md](./integrate-claude-web-branch.md) | [`integrate-claude-web-branch.sh`](../integrate-claude-web-branch.sh) | Integrates Claude Code web branches via complete PR workflow |
 | [purge-stale-claude-code-web-branches.md](./purge-stale-claude-code-web-branches.md) | [`purge-stale-claude-code-web-branches.sh`](../purge-stale-claude-code-web-branches.sh) | Interactive tool to safely delete stale Claude Code web branches |
 
@@ -25,69 +18,49 @@ Detailed usage guides for specific scripts:
 
 | Document | Script | Description |
 |----------|--------|-------------|
-| [purge-identity.md](./purge-identity.md) | [`purge-identity.sh`](../purge-identity.sh) | Comprehensive macOS identity purge tool for removing email traces |
+| [purge-identity.md](./purge-identity.md) | [`purge-identity.sh`](../purge-identity.sh) | Comprehensive macOS identity purge — removes email traces from keychain, browsers, Mail |
+| [tell-vscode-at.md](./tell-vscode-at.md) | [`tell-vscode-at.sh`](../tell-vscode-at.sh) | Send messages to VS Code instances at specified times via AppleScript |
 
 ---
 
 ## Guides & References
 
-Technical guides and reference materials:
+| Document | Purpose |
+|----------|---------|
+| [platform-detection-guide.md](./platform-detection-guide.md) | Detecting OS, architecture, and environment in shell scripts |
 
-| Document | Purpose | Audience |
-|----------|---------|----------|
-| [platform-detection-guide.md](./platform-detection-guide.md) | Comprehensive guide for detecting OS, architecture, and environment in shell scripts | Script developers |
+---
+
+## Subdirectories
+
+### `plans/`
+
+Implementation plans, design documents, and review findings. Dated filenames (`YYYY-MM-DD-topic.md`) provide chronological context.
+
+| Document | Description |
+|----------|-------------|
+| [2026-02-24-safe-merge-feature-branches-design.md](./plans/2026-02-24-safe-merge-feature-branches-design.md) | Design for safe feature-branch merge strategy |
+| [2026-02-24-safe-merge-implementation-plan.md](./plans/2026-02-24-safe-merge-implementation-plan.md) | Implementation plan for safe merges |
+| [2026-04-11-gitsync-review-findings.md](./plans/2026-04-11-gitsync-review-findings.md) | Code-review-battery findings for gitsync (April 2026) |
+
+### `superpowers/`
+
+AI-assisted planning artifacts for the gitsync Go implementation. Not end-user documentation.
+
+| Document | Description |
+|----------|-------------|
+| [superpowers/specs/2026-04-09-gitsync-design.md](./superpowers/specs/2026-04-09-gitsync-design.md) | gitsync architecture spec |
+| [superpowers/plans/2026-04-10-gitsync-implementation.md](./superpowers/plans/2026-04-10-gitsync-implementation.md) | gitsync implementation plan |
 
 ---
 
 ## Related Documentation
 
-For repository-wide standards and guidelines, see:
-
-- **[../README.md](../README.md)** - Repository overview and script catalog
-- **[../STYLE_GUIDE.md](../STYLE_GUIDE.md)** - Shell script coding standards (authoritative)
-- **[../CLAUDE.md](../CLAUDE.md)** - Guidelines for AI assistants working in this repository
-- **[../starter-kit/](../starter-kit/)** - Portable engineering best practices for new projects
+- **[../README.md](../README.md)** — Repository overview and script catalog
+- **[../STYLE_GUIDE.md](../STYLE_GUIDE.md)** — Shell script coding standards (authoritative)
+- **[../AGENTS.md](../AGENTS.md)** — AI assistant guidelines
+- **[../starter-kit/](../starter-kit/)** — Portable engineering best practices for new projects
 
 ---
 
-## Contributing Documentation
-
-When adding new documentation:
-
-1. **Create the document** in the appropriate location:
-   - Script-specific docs: `docs/<script-name>.md`
-   - Planning docs: `docs/plans/<date>-<topic>.md`
-   - Guides: `docs/<topic>-guide.md`
-
-2. **Update this index** with:
-   - Link to the document
-   - Brief description
-   - Related script (if applicable)
-   - Target audience (if a guide)
-
-3. **Cross-reference** from:
-   - Main README.md (if script documentation)
-   - Related scripts (in header comments)
-   - STYLE_GUIDE.md (if relevant to standards)
-
-4. **Follow documentation standards**:
-   - Use clear, concise language
-   - Include table of contents for docs > 100 lines
-   - Provide examples where applicable
-   - Keep language professional and factual
-
----
-
-## Documentation Standards
-
-All documentation in this repository follows these principles:
-
-- **Clarity**: Write for the reader who knows nothing about the topic
-- **Precision**: Use exact, factual language without marketing hype
-- **Completeness**: Cover all important aspects, edge cases, and gotchas
-- **Maintainability**: Keep docs up-to-date when code changes
-- **Cross-referencing**: Link to related docs and code
-
----
-
-**Last Updated**: 2025-11-29
+**Last Updated**: 2026-04-11
