@@ -33,6 +33,14 @@ func Find(targetDir string, recursive bool) []string {
 	seen := map[string]bool{}
 	var results []string
 
+	// If targetDir is itself a git repo, return it directly without descending.
+	if isGitRepo(filepath.Join(targetDir, ".git")) {
+		if !ignore[targetDir] && (selfDir == "" || targetDir != selfDir) {
+			return []string{targetDir}
+		}
+		return []string{}
+	}
+
 	var walk func(dir string, depth int)
 	walk = func(dir string, depth int) {
 		if !recursive && depth > 2 {
