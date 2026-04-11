@@ -22,6 +22,27 @@ func initRepo(t *testing.T, dir string) {
 	}
 }
 
+// TestFind_TargetDirIsRepo covers the case where the user points gitsync directly
+// at a git repo rather than a parent directory containing repos.
+func TestFind_TargetDirIsRepo(t *testing.T) {
+	root := t.TempDir()
+	initRepo(t, root)
+
+	// Resolve symlinks to match what Find() returns internally (macOS: /var -> /private/var).
+	rootCanon, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatalf("EvalSymlinks: %v", err)
+	}
+
+	repos := discover.Find(root, false)
+	if len(repos) != 1 {
+		t.Fatalf("expected 1 repo (targetDir itself), got %d: %v", len(repos), repos)
+	}
+	if repos[0] != rootCanon {
+		t.Errorf("expected %s, got %s", rootCanon, repos[0])
+	}
+}
+
 func TestFind_BasicDiscovery(t *testing.T) {
 	root := t.TempDir()
 	repoA := filepath.Join(root, "repoA")
