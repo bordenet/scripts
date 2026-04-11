@@ -31,9 +31,21 @@ Agents.md.original
 MODULAR-MIGRATION-PROMPT.md
 *.backup
 
+# Go build artifacts
+# Compiled binary (go build ./cmd/gitsync/ drops this in the repo root)
 /gitsync
 /gitsync_new
+# Test binaries produced by: go test -c ./...
+*.test
+# Coverage and profiling output: go test -coverprofile=coverage.out, -cpuprofile, etc.
+*.out
+# Vendor directory (go mod vendor)
+/vendor/
+
+# gitsync runtime files
 .gitsync.hash
 .gitsync.lock
+
+# CI / review gate sentinels (local-only)
 .code-review-cleared
 .agent-gates.tmp
