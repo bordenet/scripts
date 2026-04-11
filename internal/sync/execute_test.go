@@ -14,7 +14,7 @@ import (
 func makeRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	mustRun(t, dir, "git", "init")
+	mustRun(t, dir, "git", "init", "--initial-branch=main")
 	mustRun(t, dir, "git", "config", "user.email", "test@test.com")
 	mustRun(t, dir, "git", "config", "user.name", "Test")
 	mustRun(t, dir, "git", "commit", "--allow-empty", "-m", "init")
@@ -45,6 +45,31 @@ func mustRun(t *testing.T, dir string, args ...string) {
 func addCommit(t *testing.T, dir, msg string) {
 	t.Helper()
 	mustRun(t, dir, "git", "commit", "--allow-empty", "-m", msg)
+}
+
+func writeFile(t *testing.T, dir, name, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// makeRepoWithFile creates a local+remote pair where both have a tracked file.
+func makeRepoWithFile(t *testing.T) (local, remote string) {
+	t.Helper()
+	remote = t.TempDir()
+	mustRun(t, remote, "git", "init", "--initial-branch=main")
+	mustRun(t, remote, "git", "config", "user.email", "test@test.com")
+	mustRun(t, remote, "git", "config", "user.name", "Test")
+	writeFile(t, remote, "tracked.txt", "initial")
+	mustRun(t, remote, "git", "add", "tracked.txt")
+	mustRun(t, remote, "git", "commit", "-m", "init with tracked file")
+	local = t.TempDir()
+	// git clone with absolute paths: cwd is irrelevant; use remote dir for stability.
+	mustRun(t, remote, "git", "clone", remote, local)
+	mustRun(t, local, "git", "config", "user.email", "test@test.com")
+	mustRun(t, local, "git", "config", "user.name", "Test")
+	return
 }
 
 func TestRun_UpToDate(t *testing.T) {
@@ -112,7 +137,10 @@ func TestRun_WhatIf(t *testing.T) {
 	flags := syncp.Flags{WhatIf: true, FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
 	result := syncp.Run(context.Background(), local, flags, registry)
-	// --what-if: no writes, but action described
+	// --what-if: status must be Skipped with WhatIf reason, and action described
+	if result.Status != syncp.StatusSkipped || result.SkipReason != syncp.SkipWhatIf {
+		t.Errorf("expected StatusSkipped/SkipWhatIf, got status=%v reason=%q", result.Status, result.SkipReason)
+	}
 	if result.WhatIfAction == "" {
 		t.Error("expected WhatIfAction to be non-empty")
 	}
@@ -138,17 +166,97 @@ func TestRun_EmptyRepo(t *testing.T) {
 
 func TestRun_FetchTimeout(t *testing.T) {
 	local, _ := makeRepoWithRemote(t)
-	// FetchTimeout=0 forces immediate timeout
+	// FetchTimeout=0 → context.WithTimeout(ctx, 0*time.Second) creates a context whose
+	// deadline is already in the past. Go's context.WithDeadline calls cancel() synchronously
+	// when the deadline has passed, so fetchCtx.Err() == context.DeadlineExceeded immediately.
+	// FetchMultiRef checks ctx.Err() before spawning any subprocess, so this is deterministic.
+	// NOTE: do not lower go.mod below go 1.20 without re-evaluating this test.
 	flags := syncp.Flags{FetchTimeout: 0, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
 	result := syncp.Run(context.Background(), local, flags, registry)
-	// With 0s timeout, fetch should time out
 	if result.Status != syncp.StatusSkipped || result.SkipReason != syncp.SkipFetchTimeout {
-		// This may pass or fail depending on local speed; acceptable if network fetch is fast
-		t.Logf("fetch timeout test: status=%v reason=%v (may be flaky on fast networks)", result.Status, result.SkipReason)
+		t.Errorf("expected SkipFetchTimeout, got status=%v reason=%q", result.Status, result.SkipReason)
 	}
 }
 
-// ensure filepath and os are used
-var _ = filepath.Join
-var _ = os.Getenv
+func TestRun_FastForward_DirtyWorktree(t *testing.T) {
+	local, remote := makeRepoWithFile(t)
+	// Remote adds a new file (no conflict with local dirty state)
+	writeFile(t, remote, "other.txt", "from-remote")
+	mustRun(t, remote, "git", "add", "other.txt")
+	addCommit(t, remote, "remote adds other file")
+	// Dirty the local tracked.txt (unstaged)
+	writeFile(t, local, "tracked.txt", "dirty-local")
+
+	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
+	registry := &syncp.StashRegistry{}
+	result := syncp.Run(context.Background(), local, flags, registry)
+	if result.Status != syncp.StatusUpdated {
+		t.Errorf("expected Updated (FF with stash), got %v (skip=%s fail=%s)", result.Status, result.SkipReason, result.FailReason)
+	}
+	// tracked.txt should be restored to local dirty content after stash pop
+	content, err := os.ReadFile(filepath.Join(local, "tracked.txt"))
+	if err != nil {
+		t.Fatalf("tracked.txt missing after stash pop: %v", err)
+	}
+	if string(content) != "dirty-local" {
+		t.Errorf("tracked.txt = %q after stash pop, want %q", string(content), "dirty-local")
+	}
+	// Registry must be empty — no orphaned stash entries
+	if entries := registry.List(); len(entries) != 0 {
+		t.Errorf("registry has %d orphaned entries after successful FF+stash", len(entries))
+	}
+}
+
+func TestRun_Rebase_DirtyWorktree(t *testing.T) {
+	local, remote := makeRepoWithFile(t)
+	mustRun(t, local, "git", "checkout", "-b", "feature/stash-test")
+	// Diverge: remote and local each add a distinct commit
+	writeFile(t, remote, "remote-change.txt", "from-remote")
+	mustRun(t, remote, "git", "add", "remote-change.txt")
+	addCommit(t, remote, "remote commit")
+	writeFile(t, local, "local-change.txt", "from-local")
+	mustRun(t, local, "git", "add", "local-change.txt")
+	addCommit(t, local, "local commit")
+	// Dirty the local tracked.txt (unstaged)
+	writeFile(t, local, "tracked.txt", "dirty-local")
+
+	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
+	registry := &syncp.StashRegistry{}
+	result := syncp.Run(context.Background(), local, flags, registry)
+	if result.Status != syncp.StatusRebased {
+		t.Errorf("expected Rebased (rebase with stash), got %v (skip=%s fail=%s)", result.Status, result.SkipReason, result.FailReason)
+	}
+	// tracked.txt should be restored to local dirty content after stash pop
+	content, err := os.ReadFile(filepath.Join(local, "tracked.txt"))
+	if err != nil {
+		t.Fatalf("tracked.txt missing after stash pop: %v", err)
+	}
+	if string(content) != "dirty-local" {
+		t.Errorf("tracked.txt = %q after stash pop, want %q", string(content), "dirty-local")
+	}
+	// Registry must be empty
+	if entries := registry.List(); len(entries) != 0 {
+		t.Errorf("registry has %d orphaned entries after successful rebase+stash", len(entries))
+	}
+}
+
+func TestRun_FastForward_StashConflict(t *testing.T) {
+	local, remote := makeRepoWithFile(t)
+	// Remote modifies the SAME file that local has dirty — stash pop will conflict.
+	writeFile(t, remote, "tracked.txt", "from-remote")
+	mustRun(t, remote, "git", "add", "tracked.txt")
+	addCommit(t, remote, "remote modifies tracked.txt")
+	writeFile(t, local, "tracked.txt", "dirty-local")
+
+	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
+	registry := &syncp.StashRegistry{}
+	result := syncp.Run(context.Background(), local, flags, registry)
+	if result.Status != syncp.StatusStashConflict {
+		t.Errorf("expected StatusStashConflict, got %v (skip=%s fail=%s)", result.Status, result.SkipReason, result.FailReason)
+	}
+	// Registry entry MUST remain — stash was not popped, interrupt handler can retry.
+	if entries := registry.List(); len(entries) != 1 {
+		t.Errorf("registry should have 1 orphaned entry after stash conflict, got %d", len(entries))
+	}
+}

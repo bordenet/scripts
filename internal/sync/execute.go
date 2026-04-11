@@ -60,13 +60,20 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 
 	// popStash pops the stash if one was created. Returns true if pop conflicted.
 	// Must be called explicitly — NOT deferred.
+	// Uses context.Background() so cancellation doesn't prevent stash cleanup.
+	// registry.Remove is called AFTER a successful pop so the interrupt handler
+	// can retry on SIGINT if pop fails.
+	// Idempotent: stashed is set to false on first call; subsequent calls return false immediately.
 	popStash := func() bool {
 		if !stashed {
 			return false
 		}
-		registry.Remove(state.RepoPath)
 		stashed = false
-		return gitexec.StashPop(ctx, state.RepoPath) != nil
+		if err := gitexec.StashPop(context.Background(), state.RepoPath); err != nil {
+			return true // conflict — stash still in place, registry entry preserved
+		}
+		registry.Remove(state.RepoPath)
+		return false
 	}
 
 	switch action.Type {
@@ -105,8 +112,13 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 				}
 				return r
 			}
-			// Abort succeeded — safe to pop stash
-			popStash()
+			// Abort succeeded — safe to pop stash.
+			// If stash pop also conflicts, surface that to the user.
+			if popStash() {
+				r := withStatus(base, StatusStashConflict)
+				r.ManualSteps = []string{"cd " + state.RepoPath, "git stash pop  # rebase rolled back; stash pop also conflicted"}
+				return r
+			}
 			r := withStatus(base, StatusRebaseConflict)
 			r.FailReason = "rebase conflict, rolled back"
 			return r

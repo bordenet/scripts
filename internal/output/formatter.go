@@ -18,10 +18,13 @@ const (
 
 // Formatter formats a RepoResult into a terminal-displayable string.
 // It is a pure function — no I/O.
-type Formatter struct{}
+type Formatter struct {
+	verbose bool
+}
 
-// NewFormatter returns a Formatter.
-func NewFormatter() *Formatter { return &Formatter{} }
+// NewFormatter returns a Formatter. When verbose is true, branch names are
+// included in the output for updated/rebased results.
+func NewFormatter(verbose bool) *Formatter { return &Formatter{verbose: verbose} }
 
 // Format returns the single-line display string for a repo result.
 func (f *Formatter) Format(r sync.RepoResult) string {
@@ -30,6 +33,10 @@ func (f *Formatter) Format(r sync.RepoResult) string {
 	if r.ElapsedMs > 0 {
 		elapsed = fmt.Sprintf(", %.1fs", float64(r.ElapsedMs)/1000)
 	}
+	branch := ""
+	if f.verbose && r.CurrentBranch != "" {
+		branch = fmt.Sprintf(" [%s]", r.CurrentBranch)
+	}
 
 	switch {
 	case r.SkipReason == sync.SkipWhatIf:
@@ -37,16 +44,17 @@ func (f *Formatter) Format(r sync.RepoResult) string {
 			colorBlue, colorReset, name, r.WhatIfAction)
 
 	case r.Status == sync.StatusUpdated:
-		return fmt.Sprintf("  %s✓%s %-24s (updated %s%s)",
-			colorGreen, colorReset, name, r.ParentBranch, elapsed)
+		return fmt.Sprintf("  %s✓%s %-24s (updated %s%s%s)",
+			colorGreen, colorReset, name, r.ParentBranch, elapsed, branch)
 
 	case r.Status == sync.StatusRebased && r.ForceRebase:
+		// Verbose branch suffix intentionally omitted: CurrentBranch already appears in the git command.
 		return fmt.Sprintf("  %s⚠%s %-24s (rebased — force-push needed: git push --force-with-lease origin %s)",
 			colorYellow, colorReset, name, r.CurrentBranch)
 
 	case r.Status == sync.StatusRebased:
-		return fmt.Sprintf("  %s✓%s %-24s (rebased onto %s%s)",
-			colorGreen, colorReset, name, r.ParentBranch, elapsed)
+		return fmt.Sprintf("  %s✓%s %-24s (rebased onto %s%s%s)",
+			colorGreen, colorReset, name, r.ParentBranch, elapsed, branch)
 
 	case r.Status == sync.StatusNoOp:
 		return fmt.Sprintf("  %s•%s %-24s (up to date)",

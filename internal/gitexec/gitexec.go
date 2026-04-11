@@ -3,7 +3,6 @@ package gitexec
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,16 +17,20 @@ func run(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
 		"GIT_TERMINAL_PROMPT=0",
-		"GIT_SSH_COMMAND=ssh -oBatchMode=yes -oControlMaster=auto "+
-			"-oControlPath="+os.Getenv("HOME")+"/.ssh/cm-%r@%h:%p -oControlPersist=60s",
+		// Use $HOME (shell-expanded at runtime) rather than os.Getenv("HOME")
+		// so spaces in the home path don't break SSH option parsing.
+		"GIT_SSH_COMMAND=ssh -oBatchMode=yes -oControlMaster=auto -oControlPath=$HOME/.ssh/cm-%r@%h:%p -oControlPersist=60s",
 	)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return "", context.DeadlineExceeded
+		// If context was cancelled or timed out, return the context error directly
+		// so callers can use errors.Is(err, context.DeadlineExceeded) or
+		// errors.Is(err, context.Canceled) to distinguish the cases.
+		if ctx.Err() != nil {
+			return "", ctx.Err()
 		}
 		return "", fmt.Errorf("git %s: %w (stderr: %s)", strings.Join(args, " "), err, stderr.String())
 	}
@@ -83,8 +86,8 @@ func HasUnmerged(ctx context.Context, dir string) bool {
 }
 
 // HasRebaseHead returns true if .git/REBASE_HEAD exists.
-func HasRebaseHead(dir string) bool {
-	gd, err := gitDir(dir)
+func HasRebaseHead(ctx context.Context, dir string) bool {
+	gd, err := gitDir(ctx, dir)
 	if err != nil {
 		return false
 	}
@@ -93,8 +96,8 @@ func HasRebaseHead(dir string) bool {
 }
 
 // HasMergeHead returns true if .git/MERGE_HEAD exists.
-func HasMergeHead(dir string) bool {
-	gd, err := gitDir(dir)
+func HasMergeHead(ctx context.Context, dir string) bool {
+	gd, err := gitDir(ctx, dir)
 	if err != nil {
 		return false
 	}
@@ -235,14 +238,15 @@ func TopStashMessage(ctx context.Context, dir string) string {
 }
 
 // gitDir returns the .git directory path for a repo (handles worktrees where .git is a file).
-func gitDir(dir string) (string, error) {
-	// Fast path: .git as directory
+// ctx is used for the git subprocess in the worktree/submodule case so it can be cancelled.
+func gitDir(ctx context.Context, dir string) (string, error) {
+	// Fast path: .git as directory (no subprocess needed)
 	gitPath := filepath.Join(dir, ".git")
 	if info, err := os.Stat(gitPath); err == nil && info.IsDir() {
 		return gitPath, nil
 	}
 	// Worktree/submodule: .git is a file pointing to real git dir
-	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--git-dir")
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {

@@ -19,6 +19,10 @@ import (
 
 func main() {
 	flags, targetDir := parseFlags()
+	if flags.Concurrency < 1 {
+		fmt.Fprintln(os.Stderr, "error: --concurrency must be >= 1")
+		os.Exit(1)
+	}
 
 	repos := discover.Find(targetDir, flags.Recursive)
 	if len(repos) == 0 {
@@ -50,7 +54,17 @@ func main() {
 	// Launch goroutines
 	for _, repo := range repos {
 		go func(repoPath string) {
-			sem <- struct{}{}
+			// Context-aware semaphore: don't block forever if cancelled.
+			select {
+			case sem <- struct{}{}:
+			case <-rootCtx.Done():
+				results <- gosync.RepoResult{
+					RepoPath:   repoPath,
+					Status:     gosync.StatusSkipped,
+					SkipReason: gosync.SkipCancelled,
+				}
+				return
+			}
 			defer func() { <-sem }()
 			results <- gosync.Run(rootCtx, repoPath, flags, registry)
 		}(repo)
@@ -76,7 +90,7 @@ func main() {
 	// Print header
 	fmt.Printf("\033[1mGit Repository Updates\033[0m: %s\n\n", targetDir)
 
-	formatter := output.NewFormatter()
+	formatter := output.NewFormatter(flags.Verbose)
 	writer := output.NewProgressWriter(os.Stdout, len(repos))
 	start := time.Now()
 	completed := 0
@@ -95,11 +109,10 @@ loop:
 			}
 		case <-tick:
 			writer.UpdateProgress(completed, len(repos), time.Since(start))
-		case <-sigChan:
+		case sig := <-sigChan:
 			cancel()
 			fmt.Fprintln(os.Stdout, "\nInterrupted — waiting for in-flight repos to clean up...")
 			drainCtx, drainCancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer drainCancel()
 			for completed < len(repos) {
 				select {
 				case r := <-results:
@@ -107,15 +120,20 @@ loop:
 					writer.PrintResult(formatter.Format(r))
 					completed++
 				case <-drainCtx.Done():
+					drainCancel()
 					goto afterLoop
 				}
 			}
+			drainCancel()
 		afterLoop:
-			// Attempt safe stash pop for each orphaned stash
+			// Attempt safe stash pop for each orphaned stash.
+			// Use a bounded timeout so a hung git command can't freeze the process indefinitely.
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cleanupCancel()
 			for _, entry := range registry.List() {
-				top := gosync.TopStashMessage(context.Background(), entry.RepoPath)
+				top := gosync.TopStashMessage(cleanupCtx, entry.RepoPath)
 				if top == entry.StashMessage {
-					if err := gosync.PopStash(context.Background(), entry.RepoPath); err != nil {
+					if err := gosync.PopStash(cleanupCtx, entry.RepoPath); err != nil {
 						fmt.Printf("⚠ Stash pop failed in %s — run: git stash pop\n",
 							filepath.Base(entry.RepoPath))
 					} else {
@@ -126,7 +144,11 @@ loop:
 						filepath.Base(entry.RepoPath))
 				}
 			}
-			os.Exit(130)
+			exitCode := 130 // SIGINT
+			if sig == syscall.SIGTERM {
+				exitCode = 143 // SIGTERM (128+15)
+			}
+			os.Exit(exitCode)
 		}
 	}
 

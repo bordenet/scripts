@@ -36,6 +36,9 @@ func Decide(state RepoState, flags Flags) Action {
 	if state.FetchTimeout {
 		return skip(SkipFetchTimeout)
 	}
+	if state.FetchCancelled {
+		return skip(SkipCancelled)
+	}
 	if state.FetchErr != nil {
 		return fail(state.FetchErr.Error())
 	}
