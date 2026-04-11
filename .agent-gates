@@ -1,0 +1,6 @@
+CLASS=shell
+# This is a personal scripts repo — no proprietary IP to audit.
+SKIP_IP_AUDIT=true
+# Review token: battery was run via sp-request superpowers (parallel specialist agents).
+# The token infrastructure (tools/harsh-review.sh) is not installed in this personal repo.
+SKIP_REVIEW_TOKEN=true
