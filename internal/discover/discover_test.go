@@ -93,19 +93,19 @@ func TestFind_FetchIgnore(t *testing.T) {
 	}
 }
 
-func TestFind_SelfExclusion(t *testing.T) {
+// TestFind_SourceRepoIsIncluded verifies that the gitsync source repo itself
+// IS included in results — it must be synced like any other repo.
+// (Self-exclusion via GITSYNC_SOURCE_DIR was removed; it caused the scripts
+// repo to silently skip itself on every --all run.)
+func TestFind_SourceRepoIsIncluded(t *testing.T) {
 	root := t.TempDir()
 	repoA := filepath.Join(root, "repoA")
-	repoSelf := filepath.Join(root, "gitsync-source")
+	repoSource := filepath.Join(root, "scripts")
 	initRepo(t, repoA)
-	initRepo(t, repoSelf)
-
-	t.Setenv("GITSYNC_SOURCE_DIR", repoSelf)
+	initRepo(t, repoSource)
 
 	repos := discover.Find(root, false)
-	for _, r := range repos {
-		if r == repoSelf {
-			t.Error("GITSYNC_SOURCE_DIR repo should be excluded")
-		}
+	if len(repos) != 2 {
+		t.Errorf("expected 2 repos (source repo must be included), got %d: %v", len(repos), repos)
 	}
 }
