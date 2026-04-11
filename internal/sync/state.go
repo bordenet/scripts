@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"gitsync/internal/branch"
@@ -67,6 +68,7 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 				state.FetchCancelled = true
 			} else {
 				state.FetchErr = err
+				state.RemoteGone = isRemoteGoneError(err)
 			}
 			return state
 		}
@@ -101,6 +103,7 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 				state.FetchCancelled = true
 			} else {
 				state.FetchErr = err
+				state.RemoteGone = isRemoteGoneError(err)
 			}
 			return state
 		}
@@ -112,4 +115,21 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 	state.BaseSHA = gitexec.MergeBase(ctx, repoPath, "origin/"+state.ParentBranch)
 
 	return state
+}
+
+// isRemoteGoneError returns true when a fetch error indicates the remote
+// repository has been deleted, archived, or is otherwise permanently gone —
+// as opposed to a transient network failure.
+//
+// Patterns covered:
+//   - Azure DevOps TF401019: "does not exist or you do not have permissions"
+//   - GitHub:                "ERROR: Repository not found"
+//   - Generic git:           "fatal: repository '...' not found"
+func isRemoteGoneError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "does not exist") ||
+		strings.Contains(msg, "repository not found")
 }

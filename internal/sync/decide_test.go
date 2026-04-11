@@ -208,7 +208,7 @@ func TestDecide_AllScenarios(t *testing.T) {
 	}
 }
 
-// TestDecide_FetchError verifies FetchErr → ActionFail
+// TestDecide_FetchError verifies a transient FetchErr → ActionFail
 func TestDecide_FetchError(t *testing.T) {
 	state := syncp.RepoState{
 		HasOrigin:     true,
@@ -217,6 +217,37 @@ func TestDecide_FetchError(t *testing.T) {
 	}
 	action := syncp.Decide(state, defaultFlags())
 	if action.Type != syncp.ActionFail {
-		t.Errorf("expected ActionFail for FetchErr, got %v", action.Type)
+		t.Errorf("expected ActionFail for transient FetchErr, got %v", action.Type)
+	}
+}
+
+// TestDecide_RemoteGone verifies that a "repo no longer exists" fetch error is
+// demoted to ActionSkip(SkipRemoteGone) rather than ActionFail, so it doesn't
+// trigger the failure exit code or show as ✗ in the output.
+func TestDecide_RemoteGone(t *testing.T) {
+	cases := []struct {
+		name string
+		msg  string
+	}{
+		{"ado_tf401019", "exit status 128 (stderr: remote: TF401019: The Git repository with name or identifier cb-logger-js does not exist or you do not have permissions)"},
+		{"github_not_found", "exit status 128 (stderr: ERROR: Repository not found.)"},
+		{"generic_not_found", "exit status 128 (stderr: fatal: repository 'https://example.com/gone.git/' not found)"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			state := syncp.RepoState{
+				HasOrigin:     true,
+				CurrentBranch: "main",
+				FetchErr:      errors.New(tc.msg),
+				RemoteGone:    true,
+			}
+			action := syncp.Decide(state, defaultFlags())
+			if action.Type != syncp.ActionSkip {
+				t.Errorf("expected ActionSkip, got %v", action.Type)
+			}
+			if action.SkipReason != syncp.SkipRemoteGone {
+				t.Errorf("expected SkipRemoteGone, got %q", action.SkipReason)
+			}
+		})
 	}
 }
