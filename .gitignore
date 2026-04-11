@@ -35,3 +35,5 @@ MODULAR-MIGRATION-PROMPT.md
 /gitsync_new
 .gitsync.hash
 .gitsync.lock
+.code-review-cleared
+.agent-gates.tmp

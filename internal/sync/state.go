@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"gitsync/internal/branch"
@@ -34,8 +35,8 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 
 	// 4-6. In-progress guards (cheap filesystem checks)
 	state.HasUnmerged = gitexec.HasUnmerged(ctx, repoPath)
-	state.HasRebaseHead = gitexec.HasRebaseHead(repoPath)
-	state.HasMergeHead = gitexec.HasMergeHead(repoPath)
+	state.HasRebaseHead = gitexec.HasRebaseHead(ctx, repoPath)
+	state.HasMergeHead = gitexec.HasMergeHead(ctx, repoPath)
 
 	// 7-8. Repo properties
 	state.IsShallow = gitexec.IsShallow(ctx, repoPath)
@@ -59,8 +60,11 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 		defer cancel()
 		err := gitexec.FetchMultiRef(fetchCtx, repoPath, parentCandidates)
 		if err != nil {
-			if fetchCtx.Err() != nil {
+			if errors.Is(fetchCtx.Err(), context.DeadlineExceeded) {
 				state.FetchTimeout = true
+			} else if ctx.Err() != nil {
+				// Parent context cancelled (SIGINT) — not a network timeout
+				state.FetchCancelled = true
 			} else {
 				state.FetchErr = err
 			}
@@ -90,8 +94,11 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 		fetchCtx, cancel := context.WithTimeout(ctx, time.Duration(flags.FetchTimeout)*time.Second)
 		defer cancel()
 		if err := gitexec.FetchSingleRef(fetchCtx, repoPath, parent); err != nil {
-			if fetchCtx.Err() != nil {
+			if errors.Is(fetchCtx.Err(), context.DeadlineExceeded) {
 				state.FetchTimeout = true
+			} else if ctx.Err() != nil {
+				// Parent context cancelled (SIGINT) — not a network timeout
+				state.FetchCancelled = true
 			} else {
 				state.FetchErr = err
 			}

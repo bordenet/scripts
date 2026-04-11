@@ -32,6 +32,7 @@ const (
 	SkipRebaseInProgress   SkipReason = "rebase in progress (REBASE_HEAD present)"
 	SkipMergeInProgress    SkipReason = "merge in progress (MERGE_HEAD present)"
 	SkipFetchTimeout       SkipReason = "fetch timed out"
+	SkipCancelled          SkipReason = "cancelled by signal"
 	SkipNoCommonAncestor   SkipReason = "no common ancestor with parent branch"
 	SkipNoRemoteTracking   SkipReason = "remote tracking ref missing after fetch"
 	SkipAmbiguousBranch    SkipReason = "ambiguous branch pattern"
@@ -98,6 +99,7 @@ type RepoState struct {
 	HasOrigin       bool
 	FetchErr        error
 	FetchTimeout    bool
+	FetchCancelled  bool // true when fetch was cancelled by parent context (SIGINT), not a timeout
 }
 
 // RepoResult is sent on the results channel after a repo is processed.
