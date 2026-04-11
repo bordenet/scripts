@@ -130,18 +130,28 @@ func RemoteTrackingRefExists(ctx context.Context, dir, branch string) bool {
 // FetchMultiRef fetches multiple refs from origin, ignoring refs that don't exist.
 // Returns error only if ALL refs fail to fetch (network unavailable).
 func FetchMultiRef(ctx context.Context, dir string, refs []string) error {
-	args := append([]string{"fetch", "origin"}, refs...)
-	_, err := run(ctx, dir, args...)
-	if err != nil {
-		// Check if at least one ref now exists locally
-		for _, ref := range refs {
-			if RemoteTrackingRefExists(ctx, dir, ref) {
-				return nil // at least one succeeded
-			}
+	// Fetch each candidate individually so a missing ref on the remote doesn't
+	// prevent other candidates from being updated.
+	anySucceeded := false
+	var lastErr error
+	for _, ref := range refs {
+		if ctx.Err() != nil {
+			break
 		}
-		return fmt.Errorf("all parent candidate refs unavailable: %w", err)
+		_, err := run(ctx, dir, "fetch", "origin", ref)
+		if err == nil {
+			anySucceeded = true
+		} else {
+			lastErr = err
+		}
 	}
-	return nil
+	if anySucceeded {
+		return nil
+	}
+	if lastErr != nil {
+		return fmt.Errorf("all parent candidate refs unavailable: %w", lastErr)
+	}
+	return fmt.Errorf("no parent candidate refs available")
 }
 
 // FetchSingleRef fetches a single ref from origin.
