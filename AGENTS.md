@@ -136,7 +136,7 @@ grep -r "FILENAME" --include="*.md" --include="*.sh" .
 - **Prevention**: ALWAYS audit completeness when editing documentation
 
 **Failure Case 3: `set -euo pipefail` abort (2025-11-29)**
-- **What happened**: `fetch-github-projects.sh --all` aborted immediately after showing "Updating CallBox..."
+- **What happened**: `sync-git-repos.sh --all` aborted immediately after showing "Updating CallBox..."
 - **Impact**: Script terminated with non-zero exit code, user's workflow broken
 - **Root cause**: The pipeline `git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}'` failed silently when the network command failed. With `pipefail`, the entire script aborted.
 - **Similar issues found in**: 6 scripts with `stop_timer()` functions using bare `kill`/`wait` commands
@@ -158,7 +158,7 @@ grep -r "FILENAME" --include="*.md" --include="*.sh" .
   - This failure was 100% preventable by running `./bu.sh --help` before committing
 
 **Failure Case 5: Widespread STYLE_GUIDE.md non-compliance (2025-11-29)**
-- **What happened**: User discovered fetch-github-projects.sh lacked --verbose flag (STYLE_GUIDE.md requirement)
+- **What happened**: User discovered sync-git-repos.sh lacked --verbose flag (STYLE_GUIDE.md requirement)
 - **Impact**: Audit revealed 24 out of 30 scripts (80%) lacked mandatory --verbose flag
 - **Root cause**:
   - STYLE_GUIDE.md added --verbose requirement but never enforced retroactively

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PURPOSE: Sync all git repos in a directory — parallel Go binary, built on demand
-# USAGE: fetch-github-projects.sh [--all] [--recursive] [--what-if] [--no-rebase] [DIRECTORY]
+# USAGE: sync-git-repos.sh [--all] [--recursive] [--what-if] [--no-rebase] [DIRECTORY]
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BINARY="$SCRIPT_DIR/gitsync"

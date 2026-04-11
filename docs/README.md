@@ -10,7 +10,7 @@ Detailed documentation for scripts and tools in this repository.
 
 | Document | Script | Description |
 |----------|--------|-------------|
-| [fetch-github-projects.md](./fetch-github-projects.md) | [`fetch-github-projects.sh`](../fetch-github-projects.sh) | Parallel git sync wrapper — builds Go binary on demand, docs all flags |
+| [sync-git-repos.md](./sync-git-repos.md) | [`sync-git-repos.sh`](../sync-git-repos.sh) | Parallel git sync wrapper — works with GitHub, GitLab, ADO, and local git; builds Go binary on demand |
 | [integrate-claude-web-branch.md](./integrate-claude-web-branch.md) | [`integrate-claude-web-branch.sh`](../integrate-claude-web-branch.sh) | Integrates Claude Code web branches via complete PR workflow |
 | [purge-stale-claude-code-web-branches.md](./purge-stale-claude-code-web-branches.md) | [`purge-stale-claude-code-web-branches.sh`](../purge-stale-claude-code-web-branches.sh) | Interactive tool to safely delete stale Claude Code web branches |
 

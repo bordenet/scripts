@@ -11,7 +11,7 @@ Utility scripts for macOS and Linux. Bash 3.2+, ShellCheck-clean.
 | Script | Description |
 |---|---|
 | [`enumerate-gh-repos.sh`](./enumerate-gh-repos.sh) | Enumerates repositories within a specified GitHub Enterprise instance and organization. |
-| [`fetch-github-projects.sh`](./fetch-github-projects.sh) | Parallel git sync across 20+ repos — fast-forward, rebase, auto-stash, feature-branch parent detection. Thin bash wrapper that builds a Go binary on demand. [Docs](./docs/fetch-github-projects.md) |
+| [`sync-git-repos.sh`](./sync-git-repos.sh) | Parallel git sync across 20+ repos — fast-forward, rebase, auto-stash, feature-branch parent detection. Works with GitHub, GitLab, ADO, and local-only git. Thin bash wrapper that builds a Go binary on demand. [Docs](./docs/sync-git-repos.md) |
 | [`integrate-claude-web-branch.sh`](./integrate-claude-web-branch.sh) | Integrates Claude Code web branches into main via complete PR workflow with minimal output. [Docs](./docs/integrate-claude-web-branch.md) |
 | [`purge-stale-claude-code-web-branches.sh`](./purge-stale-claude-code-web-branches.sh) | Interactive tool to safely delete stale Claude Code web branches with human-readable timestamps. [Docs](./docs/purge-stale-claude-code-web-branches.md) |
 | [`get-active-repos.sh`](./get-active-repos.sh) | Identifies and lists active GitHub repositories within a specified organization. |
@@ -24,16 +24,16 @@ Utility scripts for macOS and Linux. Bash 3.2+, ShellCheck-clean.
 
 ### gitsync — parallel git sync
 
-`fetch-github-projects.sh` is a thin wrapper around a Go binary that syncs repos in parallel.
+`sync-git-repos.sh` is a thin wrapper around a Go binary that syncs repos in parallel.
 
 ```bash
 # Sync all repos in ~/git (non-interactive)
-./fetch-github-projects.sh --all ~/git
+./sync-git-repos.sh --all ~/git
 
 # Dry run
-./fetch-github-projects.sh --what-if ~/git
+./sync-git-repos.sh --what-if ~/git
 
-# Core flags — see docs/fetch-github-projects.md for full list
+# Core flags — see docs/sync-git-repos.md for full list
 --all              Process all repos without interactive menu
 --recursive        Search all subdirectories
 --what-if          Dry run — describe actions, make no changes

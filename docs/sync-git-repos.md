@@ -1,4 +1,4 @@
-# fetch-github-projects.sh
+# sync-git-repos.sh
 
 Parallel git sync across multiple repositories. Thin bash wrapper that builds a Go binary on demand, then execs it.
 
@@ -19,13 +19,13 @@ Parallel git sync across multiple repositories. Thin bash wrapper that builds a 
 
 ```bash
 # Sync all repos in ~/git (non-interactively)
-./fetch-github-projects.sh --all ~/git
+./sync-git-repos.sh --all ~/git
 
 # Dry run — show what would happen, make no changes
-./fetch-github-projects.sh --all --what-if ~/git
+./sync-git-repos.sh --all --what-if ~/git
 
 # Sync current directory, search subdirectories recursively
-./fetch-github-projects.sh --all --recursive .
+./sync-git-repos.sh --all --recursive .
 ```
 
 ## Options
