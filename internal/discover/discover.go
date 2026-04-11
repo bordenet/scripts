@@ -10,7 +10,7 @@ import (
 // Find returns canonical absolute paths of all git repos under targetDir.
 // If recursive is false, searches up to 2 levels deep.
 // Follows symlinks and deduplicates by canonical path.
-// Respects .fetchignore in targetDir and GITSYNC_SOURCE_DIR self-exclusion.
+// Respects .fetchignore in targetDir.
 func Find(targetDir string, recursive bool) []string {
 	resolved, err := filepath.EvalSymlinks(targetDir)
 	if err != nil {
@@ -19,16 +19,6 @@ func Find(targetDir string, recursive bool) []string {
 	targetDir = resolved
 
 	ignore := loadFetchIgnore(targetDir)
-
-	// Self-exclusion: skip the gitsync source repo
-	selfDir := ""
-	if s := os.Getenv("GITSYNC_SOURCE_DIR"); s != "" {
-		if canon, err := filepath.EvalSymlinks(s); err == nil {
-			selfDir = canon
-		} else {
-			selfDir = s
-		}
-	}
 
 	seen := map[string]bool{}
 	var results []string
@@ -62,9 +52,6 @@ func Find(targetDir string, recursive bool) []string {
 					continue
 				}
 				if ignore[canonical] {
-					continue
-				}
-				if selfDir != "" && canonical == selfDir {
 					continue
 				}
 				seen[canonical] = true

@@ -67,6 +67,5 @@ ssh -o ControlMaster=auto \
     -o ControlPersist=60s \
     git@github.com info 2>/dev/null || true
 
-# 6. Exec binary (replaces this shell process; passes SCRIPT_DIR for self-exclusion)
-export GITSYNC_SOURCE_DIR="$SCRIPT_DIR"
+# 6. Exec binary (replaces this shell process)
 exec "$BINARY" "$@"
