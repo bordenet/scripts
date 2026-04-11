@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PURPOSE: Sync all git repos in a directory — parallel Go binary, built on demand
-# USAGE: sync-git-repos.sh [--all] [--recursive] [--what-if] [--no-rebase] [DIRECTORY]
+# USAGE: sync-git-repos.sh [DIR...] [--interactive] [--what-if] [--no-rebase] [--verbose]
 set -euo pipefail
 
 # Resolve the real location of this script, following symlinks.
