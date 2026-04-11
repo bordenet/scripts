@@ -57,10 +57,17 @@ func ShowSummary(results []sync.RepoResult, elapsed time.Duration, flags sync.Fl
 		}
 	}
 
-	printGroup(colorGreen, "✓", "Updated", updated)
-	printGroup(colorGreen, "✓", "Rebased", rebased)
-	printGroup(colorBlue, "•", "Up to date", noops)
-	printGroup(colorYellow, "⊘", "Skipped", skipped)
+	if flags.WhatIf {
+		printGroup(colorGreen, "○", "Would update", updated)
+		printGroup(colorGreen, "○", "Would rebase", rebased)
+		printGroup(colorBlue, "•", "Up to date", noops)
+		printGroup(colorYellow, "⊘", "Would skip", skipped)
+	} else {
+		printGroup(colorGreen, "✓", "Updated", updated)
+		printGroup(colorGreen, "✓", "Rebased", rebased)
+		printGroup(colorBlue, "•", "Up to date", noops)
+		printGroup(colorYellow, "⊘", "Skipped", skipped)
+	}
 	printGroup(colorYellow, "⚠", "Stash conflicts", stashConflict)
 	printGroup(colorRed, "✗", "Rebase conflicts", rebaseConflict)
 	printGroup(colorRed, "✗", "Failed", failed)

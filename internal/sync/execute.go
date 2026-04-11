@@ -19,16 +19,42 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 		BranchType:    state.BranchType,
 	}
 
-	// --what-if: return description, no writes
+	// --what-if: return description, no writes.
+	// Status reflects what WOULD have happened so the summary buckets are useful:
+	//   ActionNoOp        → StatusNoOp   (SkipWhatIf triggers the ○ formatter path)
+	//   ActionFastForward → StatusUpdated (SkipWhatIf triggers the ○ formatter path)
+	//   ActionRebase      → StatusRebased (SkipWhatIf triggers the ○ formatter path)
+	//   ActionSkip        → StatusSkipped with the REAL SkipReason (shows ⊘ + reason)
+	//   ActionFail        → StatusFailed  with the real FailReason  (shows ✗ + reason)
 	if action.WhatIf {
-		return RepoResult{
+		r := RepoResult{
 			RepoPath:      state.RepoPath,
-			Status:        StatusSkipped,
-			SkipReason:    SkipWhatIf,
 			WhatIfAction:  describeAction(action, state),
 			CurrentBranch: state.CurrentBranch,
 			ParentBranch:  state.ParentBranch,
 		}
+		switch action.Type {
+		case ActionNoOp:
+			r.Status = StatusNoOp
+			r.SkipReason = SkipWhatIf
+		case ActionFastForward:
+			r.Status = StatusUpdated
+			r.SkipReason = SkipWhatIf
+		case ActionRebase:
+			r.Status = StatusRebased
+			r.SkipReason = SkipWhatIf
+			r.ForceRebase = action.ForceRebase
+		case ActionSkip:
+			r.Status = StatusSkipped
+			r.SkipReason = action.SkipReason // real reason — formatter shows ⊘
+		case ActionFail:
+			r.Status = StatusFailed
+			r.FailReason = action.FailReason
+		default:
+			r.Status = StatusSkipped
+			r.SkipReason = SkipWhatIf
+		}
+		return r
 	}
 
 	switch action.Type {
