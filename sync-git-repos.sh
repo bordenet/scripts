@@ -30,7 +30,22 @@ if command -v flock >/dev/null 2>&1; then
     flock -n 9 || { echo "Another gitsync instance is running" >&2; exit 1; }
 fi
 
-# 3. Content-hash cache check
+# 3. Self-update: pull the scripts repo before hash check so a freshly-pushed
+#    Go change is compiled on this run, not the next one.
+#    fetch is non-fatal; ff-merge warns but does not abort.
+git -C "$SCRIPT_DIR" fetch --quiet 2>/dev/null || true
+_upstream=$(git -C "$SCRIPT_DIR" rev-parse '@{u}' 2>/dev/null || true)
+if [[ -n "$_upstream" ]]; then
+    _local=$(git -C "$SCRIPT_DIR" rev-parse HEAD 2>/dev/null || true)
+    if [[ -n "$_local" && "$_local" != "$_upstream" ]]; then
+        echo "Updating scripts repo..." >&2
+        git -C "$SCRIPT_DIR" merge --ff-only "$_upstream" --quiet 2>/dev/null \
+            || echo "  Warning: scripts repo has local divergence; using current version" >&2
+    fi
+fi
+unset _upstream _local
+
+# 4. Content-hash cache check — computed AFTER self-update so the hash reflects the pulled source
 #    Hash = SHA-256 of sorted(find cmd/ internal/ -name "*.go") + go.mod [+ go.sum if present]
 #    Uses shasum -a 256 (macOS BSD — NOT sha256sum which is GNU/Linux only)
 current_hash=$(
@@ -44,7 +59,7 @@ current_hash=$(
 )
 cached_hash=$(cat "$HASH_FILE" 2>/dev/null || echo "")
 
-# 4. Rebuild if hash changed or binary missing
+# 5. Rebuild if hash changed or binary missing
 if [[ "$current_hash" != "$cached_hash" ]] || [[ ! -x "$BINARY" ]]; then
     echo "Building gitsync..." >&2
     rm -f "$SCRIPT_DIR/gitsync_new"
@@ -58,7 +73,7 @@ if [[ "$current_hash" != "$cached_hash" ]] || [[ ! -x "$BINARY" ]]; then
     fi
 fi
 
-# 5. Pre-warm SSH ControlMaster BEFORE exec (runs on every invocation, not just rebuilds)
+# 6. Pre-warm SSH ControlMaster BEFORE exec (runs on every invocation, not just rebuilds)
 #    This ensures all goroutines in the binary find an existing ControlMaster socket,
 #    preventing a connection storm when 8+ goroutines fire simultaneously.
 #    NOTE: ControlPersist=60s leaves the SSH master process alive for 60s after exit.
@@ -67,5 +82,5 @@ ssh -o ControlMaster=auto \
     -o ControlPersist=60s \
     git@github.com info 2>/dev/null || true
 
-# 6. Exec binary (replaces this shell process)
+# 7. Exec binary (replaces this shell process)
 exec "$BINARY" "$@"
