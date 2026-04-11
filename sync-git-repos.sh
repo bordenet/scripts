@@ -48,7 +48,7 @@ cached_hash=$(cat "$HASH_FILE" 2>/dev/null || echo "")
 if [[ "$current_hash" != "$cached_hash" ]] || [[ ! -x "$BINARY" ]]; then
     echo "Building gitsync..." >&2
     rm -f "$SCRIPT_DIR/gitsync_new"
-    if go build -o "$SCRIPT_DIR/gitsync_new" "$SCRIPT_DIR/cmd/gitsync/"; then
+    if (cd "$SCRIPT_DIR" && go build -o "$SCRIPT_DIR/gitsync_new" ./cmd/gitsync/); then
         mv "$SCRIPT_DIR/gitsync_new" "$BINARY"
         echo "$current_hash" > "$HASH_FILE"
     else
