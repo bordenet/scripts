@@ -49,6 +49,22 @@ func main() {
 		}
 	}
 
+	// Build display names: path relative to the common ancestor of all scan roots.
+	// Single root ~/GitHub → "Personal/superpowers-plus"
+	// Multi-root ~/git + ~/GitHub → "git/Personal/superpowers-plus" vs "GitHub/Personal/superpowers-plus"
+	displayRoot := commonAncestor(targetDirs)
+	displayNames := make(map[string]string, len(repos))
+	previewResults := make([]gosync.RepoResult, len(repos))
+	for i, repoPath := range repos {
+		rel, err := filepath.Rel(displayRoot, repoPath)
+		if err != nil {
+			rel = filepath.Base(repoPath)
+		}
+		displayNames[repoPath] = rel
+		previewResults[i] = gosync.RepoResult{RepoPath: repoPath, DisplayName: rel}
+	}
+	maxNameLen := output.ComputeMaxNameLen(previewResults, 20, 48)
+
 	// Root context with cancellation
 	rootCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -70,14 +86,17 @@ func main() {
 			case sem <- struct{}{}:
 			case <-rootCtx.Done():
 				results <- gosync.RepoResult{
-					RepoPath:   repoPath,
-					Status:     gosync.StatusSkipped,
-					SkipReason: gosync.SkipCancelled,
+					RepoPath:    repoPath,
+					DisplayName: displayNames[repoPath],
+					Status:      gosync.StatusSkipped,
+					SkipReason:  gosync.SkipCancelled,
 				}
 				return
 			}
 			defer func() { <-sem }()
-			results <- gosync.Run(rootCtx, repoPath, flags, registry)
+			r := gosync.Run(rootCtx, repoPath, flags, registry)
+			r.DisplayName = displayNames[repoPath]
+			results <- r
 		}(repo)
 	}
 
@@ -101,7 +120,7 @@ func main() {
 	// Print header
 	fmt.Printf("\033[1mGit Repository Updates\033[0m: %s\n\n", strings.Join(targetDirs, ", "))
 
-	formatter := output.NewFormatter(flags.Verbose)
+	formatter := output.NewFormatter(flags.Verbose, maxNameLen)
 	writer := output.NewProgressWriter(os.Stdout, len(repos))
 	start := time.Now()
 	completed := 0
@@ -238,4 +257,36 @@ func showMenu(repos []string) []string {
 		return nil
 	}
 	return repos[n-1 : n]
+}
+
+// commonAncestor returns the longest common directory prefix of dirs.
+// For ["/Users/matt/git", "/Users/matt/GitHub"] → "/Users/matt"
+// For ["/Users/matt/GitHub"] → "/Users/matt/GitHub"
+func commonAncestor(dirs []string) string {
+	if len(dirs) == 0 {
+		return "."
+	}
+	if len(dirs) == 1 {
+		return dirs[0]
+	}
+	split := func(d string) []string {
+		return strings.Split(filepath.Clean(d), string(filepath.Separator))
+	}
+	parts := split(dirs[0])
+	for _, d := range dirs[1:] {
+		dp := split(d)
+		common := 0
+		for common < len(parts) && common < len(dp) && parts[common] == dp[common] {
+			common++
+		}
+		parts = parts[:common]
+	}
+	if len(parts) == 0 {
+		return string(filepath.Separator)
+	}
+	result := strings.Join(parts, string(filepath.Separator))
+	if result == "" {
+		return string(filepath.Separator)
+	}
+	return result
 }

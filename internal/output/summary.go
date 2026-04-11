@@ -47,13 +47,20 @@ func ShowSummary(results []sync.RepoResult, elapsed time.Duration, flags sync.Fl
 
 	fmt.Printf("\n\033[1mSummary\033[0m (%.0fs)\n", elapsed.Seconds())
 
+	displayName := func(r sync.RepoResult) string {
+		if r.DisplayName != "" {
+			return r.DisplayName
+		}
+		return filepath.Base(r.RepoPath)
+	}
+
 	printGroup := func(color, icon, label string, group []sync.RepoResult) {
 		if len(group) == 0 {
 			return
 		}
 		fmt.Printf("%s%s %s (%d):%s\n", color, icon, label, len(group), colorReset)
 		for _, r := range group {
-			fmt.Printf("  • %s\n", filepath.Base(r.RepoPath))
+			fmt.Printf("  • %s\n", displayName(r))
 		}
 	}
 
@@ -77,7 +84,7 @@ func ShowSummary(results []sync.RepoResult, elapsed time.Duration, flags sync.Fl
 		fmt.Printf("%s⚠ Force-push needed:%s\n", colorYellow, colorReset)
 		for _, r := range forcePushNeeded {
 			fmt.Printf("  git push --force-with-lease origin %s  # in %s\n",
-				r.CurrentBranch, filepath.Base(r.RepoPath))
+				r.CurrentBranch, displayName(r))
 		}
 		fmt.Printf("  %s⚠ Solo branches only — force-push overwrites shared branches%s\n",
 			colorYellow, colorReset)
