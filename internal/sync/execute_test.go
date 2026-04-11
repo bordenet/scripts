@@ -241,6 +241,56 @@ func TestRun_Rebase_DirtyWorktree(t *testing.T) {
 	}
 }
 
+// TestRun_RebaseInProgress_AutoAbort verifies that an in-progress rebase (REBASE_HEAD
+// present from a previous interrupted run) is automatically aborted and the repo is
+// then synced normally — rather than being skipped with SkipRebaseInProgress.
+func TestRun_RebaseInProgress_AutoAbort(t *testing.T) {
+	local, remote := makeRepoWithFile(t)
+
+	// Remote gets a new commit (local will be behind — fast-forward candidate).
+	writeFile(t, remote, "tracked.txt", "remote-v2")
+	mustRun(t, remote, "git", "add", "tracked.txt")
+	addCommit(t, remote, "remote update")
+
+	// Simulate an interrupted rebase by creating a conflicting rebase state.
+	// Start a diverging local commit so we can force a real rebase-in-progress.
+	writeFile(t, local, "other.txt", "local-only")
+	mustRun(t, local, "git", "add", "other.txt")
+	addCommit(t, local, "local diverging commit")
+
+	// Fetch so git knows about origin/main, then start a conflicting rebase.
+	mustRun(t, local, "git", "fetch", "origin")
+
+	// Force a rebase conflict: both sides modify tracked.txt differently.
+	writeFile(t, remote, "tracked.txt", "conflict-remote")
+	mustRun(t, remote, "git", "add", "tracked.txt")
+	addCommit(t, remote, "remote conflict commit")
+	mustRun(t, local, "git", "fetch", "origin")
+	writeFile(t, local, "tracked.txt", "conflict-local")
+	mustRun(t, local, "git", "add", "tracked.txt")
+	addCommit(t, local, "local conflict commit")
+
+	// Start a rebase that will conflict — leaves REBASE_HEAD behind.
+	cmd := exec.Command("git", "rebase", "origin/main")
+	cmd.Dir = local
+	_ = cmd.Run() // expected to fail (conflict); we only care that REBASE_HEAD exists
+
+	// Verify the precondition: REBASE_HEAD must exist.
+	gitDir := filepath.Join(local, ".git")
+	if _, err := os.Stat(filepath.Join(gitDir, "REBASE_HEAD")); err != nil {
+		t.Skip("rebase did not leave REBASE_HEAD — git version may handle this differently")
+	}
+
+	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
+	registry := &syncp.StashRegistry{}
+	result := syncp.Run(context.Background(), local, flags, registry)
+
+	// Must NOT be skipped due to rebase-in-progress — the auto-abort should have cleared it.
+	if result.Status == syncp.StatusSkipped && result.SkipReason == syncp.SkipRebaseInProgress {
+		t.Errorf("Run should auto-abort stale rebase; got SkipRebaseInProgress instead")
+	}
+}
+
 func TestRun_FastForward_StashConflict(t *testing.T) {
 	local, remote := makeRepoWithFile(t)
 	// Remote modifies the SAME file that local has dirty — stash pop will conflict.
