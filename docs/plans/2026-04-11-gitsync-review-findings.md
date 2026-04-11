@@ -109,7 +109,7 @@ go func(repoPath string) {
 - [ ] Fix I5 (stash integration tests)
 - [ ] Delete `Nv,f8H811` stray file
 - [ ] Delete `lib/fetch-github-lib.sh` (dead code)
-- [ ] Add `.code-review-cleared` to `.gitignore`
+- [x] Add `.code-review-cleared` to `.gitignore` ✅ done (`.gitignore` line 53)
 - [ ] Re-run code review battery
 - [ ] Write sentinel (`tools/run-battery.sh --verdict PASS`)
 - [ ] Merge to origin/main

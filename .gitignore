@@ -6,6 +6,9 @@ git_reset.log
 captures/*.pcap
 captures/*.log
 captures/*.pid
+# Stray backslash directory — created by tcpdump path bug in start-pcap-rotate.sh
+# Pattern: \\ = escaped literal backslash, trailing / = directories only
+\\/
 
 # AI assistant rules
 .github/instructions/codacy.instructions.md

@@ -1,110 +1,73 @@
 # fetch-github-projects.sh
 
-Updates all Git repositories in a directory with minimal output.
+Parallel git sync across multiple repositories. Thin bash wrapper that builds a Go binary on demand, then execs it.
 
-## Features
+## How It Works
 
-- **Interactive menu** - Select specific repositories to update
-- **Batch mode** - Update all repositories automatically with `--all`
-- **Recursive search** - Use `...` to search all subdirectories
-- **Live timer** - Shows elapsed time in top-right corner
-- **Minimal output** - Clean, inline status updates
-- **Self-update check** - Verifies script is up-to-date before running
+1. Hashes all Go source files (`cmd/`, `internal/`, `go.mod`) — rebuilds the binary only when source changes
+2. Pre-warms SSH ControlMaster before spawning goroutines to avoid a connection storm
+3. Execs the `gitsync` binary, which runs each repo in a bounded goroutine pool
+
+**Performance:** ~1–3s for 10 repos (was ~90s sequential with the old bash implementation).
+
+## Requirements
+
+- Go (build-time only): `brew install go`
+- `flock` (optional, prevents concurrent invocations): `brew install util-linux`
 
 ## Usage
 
-### Interactive Mode (Default)
-
 ```bash
-# Select from menu of repositories in ~/GitHub
-./fetch-github-projects.sh
+# Sync all repos in ~/git (non-interactively)
+./fetch-github-projects.sh --all ~/git
 
-# Select from menu in custom directory
-./fetch-github-projects.sh /path/to/repos
-```
+# Dry run — show what would happen, make no changes
+./fetch-github-projects.sh --all --what-if ~/git
 
-### Batch Mode
-
-```bash
-# Update all repos in ~/GitHub (searches 2 levels deep)
-./fetch-github-projects.sh --all
-
-# Update all repos in custom directory
-./fetch-github-projects.sh --all /path/to/repos
-```
-
-### Recursive Mode
-
-```bash
-# Recursively update all repos in current directory
-./fetch-github-projects.sh ... .
-
-# Recursively update all repos in custom directory
-./fetch-github-projects.sh /path/to/repos ...
+# Sync current directory, search subdirectories recursively
+./fetch-github-projects.sh --all --recursive .
 ```
 
 ## Options
 
-| Option | Description |
-|--------|-------------|
-| `--all` | Skip menu and update all repositories (2 levels deep) |
-| `...` | Recursive mode: search all subdirectories |
-| `-h, --help` | Display help message |
-
-## Arguments
-
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `DIRECTORY` | Target directory containing Git repositories | `~/GitHub` |
-
-## Examples
-
-```bash
-# Interactive menu for ~/GitHub
-./fetch-github-projects.sh
-
-# Update all repos in ~/GitHub (2 levels deep)
-./fetch-github-projects.sh --all
-
-# Update all repos in ~/Projects (2 levels deep)
-./fetch-github-projects.sh --all ~/Projects
-
-# Recursively update everything under ~/Code
-./fetch-github-projects.sh ~/Code ...
-
-# Recursively update current directory
-./fetch-github-projects.sh ... .
-```
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--all` | Process all repos non-interactively | — |
+| `--recursive` | Search all subdirectories | off |
+| `--what-if` | Dry run — describe actions, make no changes | off |
+| `--no-rebase` | Skip diverged branches instead of rebasing | off |
+| `--no-stash` | Skip repos with local changes instead of stashing | off |
+| `--force-rebase` | Rebase pushed branches (solo use only; warns to force-push) | off |
+| `--verbose` | Show per-repo branch and timing detail | off |
+| `--concurrency N` | Max parallel repos | min(CPU, 8) |
+| `--fetch-timeout N` | Per-repo fetch timeout in seconds | 30 |
+| `--rebase-timeout N` | Per-repo rebase timeout in seconds | 120 |
+| `--dir PATH` | Target directory | `.` |
 
 ## Output
 
-The script provides minimal, clean output:
-
 ```
-Checking for script updates...
-✓ Script is up to date
+  ✓  my-app                   (fast-forwarded main ← origin/main)
+  ✓  api-service              (already up to date)
+  ⚠  feature-repo            (rebased — force-push needed: git push --force-with-lease origin my-feature)
+  ○  dirty-repo              (skipped — local changes, use --no-stash to skip or remove changes)
 
-Scanning for repositories...
-Found 15 repositories
-
-▶ Updating repo1                    [✓]
-▶ Updating repo2                    [✓]
-▶ Updating repo3                    [↻ Already up to date]
-
-Summary:
-  Updated: 2
-  Skipped: 1
-  Failed: 0
-
-Total time: 00:15
+Synced 3 repos in 1.4s (4 total, 1 skipped)
 ```
 
-## Platform Support
+## Per-Repo Decision Logic
 
-Cross-platform: macOS, Linux, WSL
+For each repo the binary:
+
+1. Checks for in-progress rebase or merge (skips if found)
+2. Detects the parent branch (e.g. `main`, `dev`) via `git log --first-parent`
+3. Stashes local changes (unless `--no-stash`)
+4. Fetches the parent branch
+5. Decides: fast-forward, rebase, or skip (based on divergence and flags)
+6. Executes the sync, then pops the stash
 
 ## See Also
 
-- [git-pull(1)](https://git-scm.com/docs/git-pull)
+- Source: [`cmd/gitsync/`](../cmd/gitsync/), [`internal/`](../internal/)
 - [git-fetch(1)](https://git-scm.com/docs/git-fetch)
-
+- [git-rebase(1)](https://git-scm.com/docs/git-rebase)
