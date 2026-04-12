@@ -19,9 +19,20 @@ BINARY="$SCRIPT_DIR/gitsync"
 HASH_FILE="$SCRIPT_DIR/.gitsync.hash"
 LOCK_FILE="$SCRIPT_DIR/.gitsync.lock"
 
+# Cross-platform sha256: shasum -a 256 on macOS, sha256sum on Linux/WSL
+if command -v shasum >/dev/null 2>&1; then
+    SHA256_CMD=(shasum -a 256)
+else
+    SHA256_CMD=(sha256sum)
+fi
+
 # 1. Require Go toolchain
 command -v go >/dev/null 2>&1 || {
-    echo "gitsync requires Go. Install: brew install go" >&2; exit 1
+    case "$(uname -s)" in
+        Darwin) echo "gitsync requires Go. Install: brew install go" >&2 ;;
+        *)      echo "gitsync requires Go. See https://go.dev/dl/" >&2 ;;
+    esac
+    exit 1
 }
 
 # 2. Concurrent invocation guard (flock requires util-linux on macOS: brew install util-linux)
@@ -47,15 +58,15 @@ unset _upstream _local
 
 # 4. Content-hash cache check — computed AFTER self-update so the hash reflects the pulled source
 #    Hash = SHA-256 of sorted(find cmd/ internal/ -name "*.go") + go.mod [+ go.sum if present]
-#    Uses shasum -a 256 (macOS BSD — NOT sha256sum which is GNU/Linux only)
+#    Cross-platform: shasum -a 256 (macOS) or sha256sum (Linux/WSL), selected above as SHA256_CMD
 current_hash=$(
     {
-        find "$SCRIPT_DIR/cmd" "$SCRIPT_DIR/internal" -name "*.go" | sort | xargs shasum -a 256
-        shasum -a 256 "$SCRIPT_DIR/go.mod"
+        find "$SCRIPT_DIR/cmd" "$SCRIPT_DIR/internal" -name "*.go" | sort | xargs "${SHA256_CMD[@]}"
+        "${SHA256_CMD[@]}" "$SCRIPT_DIR/go.mod"
         if [[ -f "$SCRIPT_DIR/go.sum" ]]; then
-            shasum -a 256 "$SCRIPT_DIR/go.sum"
+            "${SHA256_CMD[@]}" "$SCRIPT_DIR/go.sum"
         fi
-    } | shasum -a 256 | awk '{print $1}'
+    } | "${SHA256_CMD[@]}" | awk '{print $1}'
 )
 cached_hash=$(cat "$HASH_FILE" 2>/dev/null || echo "")
 
