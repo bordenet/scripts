@@ -74,9 +74,9 @@ node ~/.codex/superpowers-augment/superpowers-augment.js bootstrap
 
 ## Project-Specific Rules
 
-Workspace root at `~/git/`. Contains symlinks to repos in `~/GitHub/`:
-- `CallBox/` → `~/GitHub/CallBox` (work repos, Azure DevOps identity)
-- `Personal/` → `~/GitHub/Personal` (personal repos, GitHub identity)
+Workspace root at `~/git/`. Contains repo directories:
+- `CallBox/` — work repos, Azure DevOps identity
+- `Personal/` — personal repos, GitHub identity
 
 Individual repos have their own AGENTS.md with repo-specific guidance.
 
@@ -94,7 +94,7 @@ Individual repos have their own AGENTS.md with repo-specific guidance.
 
 ### 🔴 superpowers-plus Workflow → `.ai-guidance/superpowers-plus-workflow.md`
 
-Load BEFORE any work on `superpowers-plus`. GitHub-first, GitLab-sync-second. Never skip.
+Load BEFORE any work on `superpowers-plus`. Three-tier branching: dev → staging → main. Branch from `dev`, PR into `dev`, promote through staging to main.
 
 ### 🔴 Push Authorization Gate → `.ai-guidance/push-authorization-gate.md`
 

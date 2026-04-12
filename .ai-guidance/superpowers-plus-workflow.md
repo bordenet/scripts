@@ -39,12 +39,12 @@ git checkout main && git pull origin main && git push gitlab main
 | `~/git/CallBox/superpowers-callbox/` | **Source repo** — private overlay | ✅ YES — edit here |
 | `~/.codex/superpowers-plus/` | **Installed copy** — deployment target | ❌ NEVER |
 | `~/.codex/skills/` | **Installed skills** — deployment target | ❌ NEVER |
-| `~/GitHub/CallBox/tools/superpowers-plus/` | **Installed copy** — CallBox deployment | ❌ NEVER |
+| `~/git/CallBox/tools/superpowers-plus/` | **Installed copy** — CallBox deployment | ❌ NEVER |
 
 **Workflow:** Edit source repo → run `./install.sh --upgrade` → changes propagate to `~/.codex/`.
 
 - ❌ **NEVER** edit files under `~/.codex/` directly
-- ❌ **NEVER** edit `~/GitHub/CallBox/tools/superpowers-plus/` — it is a deployment target, not a working directory
+- ❌ **NEVER** edit `~/git/CallBox/tools/superpowers-plus/` — it is a deployment target, not a working directory
 - ❌ **NEVER** commit anywhere except `~/git/Personal/superpowers-plus/`
 - ✅ To test a local change before opening a PR: edit the source repo, re-run install, verify in `~/.codex/`
 
@@ -75,6 +75,6 @@ git checkout main && git pull origin main && git push gitlab main
 | 2026-03-25 | Bulk wiki update destroyed 5 pages. New invariant: verify every write. |
 | 2026-03-28 | Migrated from two-tier (main + sync) to three-tier (dev → staging → main). |
 | 2026-03-30 | Agent repeatedly edited `~/.codex/superpowers-plus/` directly, creating stray commits with wrong git identity that were never on GitHub. Stale fork + wrong-author commits required force-reset. |
-| 2026-04-03 | Agent operated against `~/GitHub/CallBox/tools/superpowers-plus/` (CallBox deployment target) instead of `~/git/Personal/superpowers-plus/`. Committed and pushed directly to staging from the wrong repo. Required manual sync to fix. |
+| 2026-04-03 | Agent operated against `~/git/CallBox/tools/superpowers-plus/` (CallBox deployment target) instead of `~/git/Personal/superpowers-plus/`. Committed and pushed directly to staging from the wrong repo. Required manual sync to fix. |
 
 > ⚠️ **This workflow is SPECIFIC to `superpowers-plus` only.** Other superpowers repos are private — commit directly to them as normal.
