@@ -24,8 +24,8 @@ func Find(targetDir string) []string {
 	seen := map[string]bool{}
 	var results []string
 
-	var walk func(dir string, depth int)
-	walk = func(dir string, depth int) {
+	var walk func(dir string)
+	walk = func(dir string) {
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			return
@@ -60,9 +60,7 @@ func Find(targetDir string) []string {
 				}
 				// No remote: treat as an organisational container (e.g. a top-level
 				// directory that was `git init`-ed but never pushed anywhere).
-				// Reset depth to 1 so the 2-level limit applies relative to the
-				// container itself, not to the original scan root.
-				walk(canonical, 1)
+				walk(canonical)
 				continue
 			}
 
@@ -75,11 +73,11 @@ func Find(targetDir string) []string {
 				continue
 			}
 			seen[canonical] = true
-			walk(canonical, depth+1)
+			walk(canonical)
 		}
 	}
 
-	walk(targetDir, 1)
+	walk(targetDir)
 
 	// Fallback: if no child repos were found, check whether targetDir itself is a
 	// git repo. This handles the case where the user points gitsync directly at a
