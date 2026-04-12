@@ -44,7 +44,7 @@ func main() {
 	seen := map[string]bool{}
 	var repos []string
 	for _, root := range targetDirs {
-		for _, r := range discover.Find(root, flags.Recursive) {
+		for _, r := range discover.Find(root) {
 			if !seen[r] {
 				seen[r] = true
 				repos = append(repos, r)
@@ -250,7 +250,6 @@ loop:
 func parseFlags() (gosync.Flags, []string) {
 	var (
 		interactive   = flag.Bool("interactive", false, "pick repos from a menu instead of syncing all")
-		recursive     = flag.Bool("recursive", false, "search all subdirectories (default: 2 levels)")
 		verbose       = flag.Bool("verbose", false, "show per-repo detail")
 		whatIf        = flag.Bool("what-if", false, "dry run: show what would happen without changing anything")
 		noRebase      = flag.Bool("no-rebase", false, "skip diverged branches instead of rebasing")
@@ -298,7 +297,6 @@ func parseFlags() (gosync.Flags, []string) {
 
 	f := gosync.Flags{
 		All:           !*interactive, // sync-all is the default; --interactive opts out
-		Recursive:     *recursive,
 		Verbose:       *verbose,
 		WhatIf:        *whatIf,
 		NoRebase:      *noRebase,

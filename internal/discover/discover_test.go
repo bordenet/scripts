@@ -53,7 +53,7 @@ func TestFind_TargetDirIsRepo(t *testing.T) {
 		t.Fatalf("EvalSymlinks: %v", err)
 	}
 
-	repos := discover.Find(root, false)
+	repos := discover.Find(root)
 	if len(repos) != 1 {
 		t.Fatalf("expected 1 repo (targetDir itself), got %d: %v", len(repos), repos)
 	}
@@ -69,7 +69,7 @@ func TestFind_BasicDiscovery(t *testing.T) {
 	initRepo(t, repoA)
 	initRepo(t, repoB)
 
-	repos := discover.Find(root, false)
+	repos := discover.Find(root)
 	if len(repos) != 2 {
 		t.Errorf("expected 2 repos, got %d: %v", len(repos), repos)
 	}
@@ -85,7 +85,7 @@ func TestFind_SymlinkDedup(t *testing.T) {
 		t.Skip("symlinks not supported")
 	}
 
-	repos := discover.Find(root, false)
+	repos := discover.Find(root)
 	if len(repos) != 1 {
 		t.Errorf("expected 1 repo after dedup, got %d: %v", len(repos), repos)
 	}
@@ -103,7 +103,7 @@ func TestFind_FetchIgnore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	repos := discover.Find(root, false)
+	repos := discover.Find(root)
 	if len(repos) != 1 {
 		t.Errorf("expected 1 repo (repoB excluded), got %d: %v", len(repos), repos)
 	}
@@ -123,7 +123,7 @@ func TestFind_SourceRepoIsIncluded(t *testing.T) {
 	initRepo(t, repoA)
 	initRepo(t, repoSource)
 
-	repos := discover.Find(root, false)
+	repos := discover.Find(root)
 	if len(repos) != 2 {
 		t.Errorf("expected 2 repos (source repo must be included), got %d: %v", len(repos), repos)
 	}
@@ -152,7 +152,7 @@ func TestFind_ContainerRepoIsRecursed(t *testing.T) {
 	initRepo(t, inner1)
 	initRepo(t, inner2)
 
-	repos := discover.Find(root, false)
+	repos := discover.Find(root)
 	if len(repos) != 2 {
 		t.Errorf("expected 2 inner repos, got %d: %v", len(repos), repos)
 	}
