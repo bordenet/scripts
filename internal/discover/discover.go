@@ -9,10 +9,10 @@ import (
 )
 
 // Find returns canonical absolute paths of all git repos under targetDir.
-// If recursive is false, searches up to 2 levels deep.
+// Recursively searches all subdirectories.
 // Follows symlinks and deduplicates by canonical path.
 // Respects .fetchignore in targetDir.
-func Find(targetDir string, recursive bool) []string {
+func Find(targetDir string) []string {
 	resolved, err := filepath.EvalSymlinks(targetDir)
 	if err != nil {
 		resolved = targetDir
@@ -26,9 +26,6 @@ func Find(targetDir string, recursive bool) []string {
 
 	var walk func(dir string, depth int)
 	walk = func(dir string, depth int) {
-		if !recursive && depth > 2 {
-			return
-		}
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			return

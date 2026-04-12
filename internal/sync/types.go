@@ -129,7 +129,6 @@ type Flags struct {
 	Concurrency   int
 	FetchTimeout  int // seconds
 	RebaseTimeout int // seconds
-	Recursive     bool
 	Verbose       bool
 	All           bool
 }
