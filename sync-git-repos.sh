@@ -44,17 +44,26 @@ fi
 # 3. Self-update: pull the scripts repo before hash check so a freshly-pushed
 #    Go change is compiled on this run, not the next one.
 #    fetch is non-fatal; ff-merge warns but does not abort.
+#    If HEAD moves, export GITSYNC_SELF_UPDATED so the Go binary can report it
+#    accurately instead of showing a misleading "up to date" for this repo.
+_head_before=$(git -C "$SCRIPT_DIR" rev-parse HEAD 2>/dev/null || true)
 git -C "$SCRIPT_DIR" fetch --quiet 2>/dev/null || true
 _upstream=$(git -C "$SCRIPT_DIR" rev-parse '@{u}' 2>/dev/null || true)
 if [[ -n "$_upstream" ]]; then
     _local=$(git -C "$SCRIPT_DIR" rev-parse HEAD 2>/dev/null || true)
     if [[ -n "$_local" && "$_local" != "$_upstream" ]]; then
-        echo "Updating scripts repo..." >&2
         git -C "$SCRIPT_DIR" merge --ff-only "$_upstream" --quiet 2>/dev/null \
             || echo "  Warning: scripts repo has local divergence; using current version" >&2
     fi
 fi
-unset _upstream _local
+# _head_after captured after merge attempt; if merge failed, HEAD unchanged, so no false positive.
+_head_after=$(git -C "$SCRIPT_DIR" rev-parse HEAD 2>/dev/null || true)
+if [[ -n "$_head_before" && -n "$_head_after" && "$_head_before" != "$_head_after" ]]; then
+    export GITSYNC_SELF_UPDATED="$SCRIPT_DIR"
+    export GITSYNC_SELF_UPDATED_BRANCH
+    GITSYNC_SELF_UPDATED_BRANCH=$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+fi
+unset _upstream _local _head_before _head_after
 
 # 4. Content-hash cache check — computed AFTER self-update so the hash reflects the pulled source
 #    Hash = SHA-256 of sorted(find cmd/ internal/ -name "*.go") + go.mod [+ go.sum if present]

@@ -25,6 +25,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Check if the shell wrapper already updated itself (GITSYNC_SELF_UPDATED).
+	// Resolve to canonical path so we can match against discovered repos.
+	selfUpdatedDir := ""
+	selfUpdatedBranch := "main"
+	if env := os.Getenv("GITSYNC_SELF_UPDATED"); env != "" {
+		if abs, err := filepath.EvalSymlinks(env); err == nil {
+			selfUpdatedDir = abs
+		} else if abs, err := filepath.Abs(env); err == nil {
+			selfUpdatedDir = abs
+		}
+		if b := os.Getenv("GITSYNC_SELF_UPDATED_BRANCH"); b != "" {
+			selfUpdatedBranch = b
+		}
+	}
+
 	// Scan all target directories, deduplicating by canonical path.
 	seen := map[string]bool{}
 	var repos []string
@@ -41,6 +56,27 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Separate out the self-updated repo so it gets a synthetic "Updated" result
+	// instead of a misleading "up to date".
+	var selfUpdatedRepo string
+	if selfUpdatedDir != "" {
+		var filtered []string
+		for _, r := range repos {
+			canon := r
+			if resolved, err := filepath.EvalSymlinks(r); err == nil {
+				canon = resolved
+			}
+			if canon == selfUpdatedDir {
+				selfUpdatedRepo = r
+			} else {
+				filtered = append(filtered, r)
+			}
+		}
+		if selfUpdatedRepo != "" {
+			repos = filtered
+		}
+	}
+
 	// If not --all and no positional arg (interactive), show menu
 	if !flags.All && len(repos) > 1 {
 		repos = showMenu(repos)
@@ -54,8 +90,13 @@ func main() {
 	// Multi-root ~/git + ~/GitHub → "git/Personal/superpowers-plus" vs "GitHub/Personal/superpowers-plus"
 	displayRoot := commonAncestor(targetDirs)
 	displayNames := make(map[string]string, len(repos))
-	previewResults := make([]gosync.RepoResult, len(repos))
-	for i, repoPath := range repos {
+	// Include self-updated repo in previewResults for maxNameLen calculation (non-interactive only).
+	allReposForPreview := repos
+	if selfUpdatedRepo != "" && flags.All {
+		allReposForPreview = append([]string{selfUpdatedRepo}, repos...)
+	}
+	previewResults := make([]gosync.RepoResult, len(allReposForPreview))
+	for i, repoPath := range allReposForPreview {
 		rel, err := filepath.Rel(displayRoot, repoPath)
 		if err != nil {
 			rel = filepath.Base(repoPath)
@@ -64,6 +105,11 @@ func main() {
 		previewResults[i] = gosync.RepoResult{RepoPath: repoPath, DisplayName: rel}
 	}
 	maxNameLen := output.ComputeMaxNameLen(previewResults, 20, 48)
+
+	totalRepos := len(repos)
+	if selfUpdatedRepo != "" && flags.All {
+		totalRepos++ // include self-updated repo in total count (non-interactive only)
+	}
 
 	// Root context with cancellation
 	rootCtx, cancel := context.WithCancel(context.Background())
@@ -121,10 +167,26 @@ func main() {
 	fmt.Printf("\033[1mGit Repository Updates\033[0m: %s\n\n", strings.Join(targetDirs, ", "))
 
 	formatter := output.NewFormatter(flags.Verbose, maxNameLen)
-	writer := output.NewProgressWriter(os.Stdout, len(repos))
+	writer := output.NewProgressWriter(os.Stdout, totalRepos)
 	start := time.Now()
 	completed := 0
 	var allResults []gosync.RepoResult
+
+	// Inject synthetic result for the self-updated repo (shell already pulled it).
+	// Skip in interactive mode — user didn't select this repo explicitly.
+	if selfUpdatedRepo != "" && flags.All {
+		selfResult := gosync.RepoResult{
+			RepoPath:      selfUpdatedRepo,
+			DisplayName:   displayNames[selfUpdatedRepo],
+			Status:        gosync.StatusUpdated,
+			ParentBranch:  selfUpdatedBranch,
+			CurrentBranch: selfUpdatedBranch,
+		}
+		allResults = append(allResults, selfResult)
+		writer.PrintResult(formatter.Format(selfResult))
+		completed++
+		writer.UpdateProgress(completed, totalRepos, time.Since(start))
+	}
 
 loop:
 	for {
@@ -133,17 +195,17 @@ loop:
 			allResults = append(allResults, r)
 			writer.PrintResult(formatter.Format(r))
 			completed++
-			writer.UpdateProgress(completed, len(repos), time.Since(start))
-			if completed == len(repos) {
+			writer.UpdateProgress(completed, totalRepos, time.Since(start))
+			if completed == totalRepos {
 				break loop
 			}
 		case <-tick:
-			writer.UpdateProgress(completed, len(repos), time.Since(start))
+			writer.UpdateProgress(completed, totalRepos, time.Since(start))
 		case sig := <-sigChan:
 			cancel()
 			fmt.Fprintln(os.Stdout, "\nInterrupted — waiting for in-flight repos to clean up...")
 			drainCtx, drainCancel := context.WithTimeout(context.Background(), 10*time.Second)
-			for completed < len(repos) {
+			for completed < totalRepos {
 				select {
 				case r := <-results:
 					allResults = append(allResults, r)
