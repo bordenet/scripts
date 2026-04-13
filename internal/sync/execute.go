@@ -44,6 +44,9 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 			r.Status = StatusRebased
 			r.SkipReason = SkipWhatIf
 			r.ForceRebase = action.ForceRebase
+		case ActionResetHard:
+			r.Status = StatusReset
+			r.SkipReason = SkipWhatIf
 		case ActionSkip:
 			r.Status = StatusSkipped
 			r.SkipReason = action.SkipReason // real reason — formatter shows ⊘
@@ -60,6 +63,16 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 	switch action.Type {
 	case ActionNoOp:
 		return withStatus(base, StatusNoOp)
+	case ActionResetHard:
+		resetCtx, cancel := context.WithTimeout(ctx, time.Duration(flags.FetchTimeout)*time.Second)
+		defer cancel()
+		remoteRef := "origin/" + state.ParentBranch
+		if err := gitexec.ResetHard(resetCtx, state.RepoPath, remoteRef); err != nil {
+			r := withStatus(base, StatusFailed)
+			r.FailReason = "reset --hard failed: " + err.Error()
+			return r
+		}
+		return withStatus(base, StatusReset)
 	case ActionSkip:
 		r := withStatus(base, StatusSkipped)
 		r.SkipReason = action.SkipReason
@@ -179,6 +192,8 @@ func describeAction(action Action, state RepoState) string {
 		return fmt.Sprintf("would fast-forward %s from origin/%s", state.CurrentBranch, state.ParentBranch)
 	case ActionRebase:
 		return fmt.Sprintf("would rebase %s onto origin/%s", state.CurrentBranch, state.ParentBranch)
+	case ActionResetHard:
+		return fmt.Sprintf("would reset --hard %s to origin/%s (unrelated history)", state.CurrentBranch, state.ParentBranch)
 	case ActionSkip:
 		return fmt.Sprintf("would skip: %s", action.SkipReason)
 	case ActionFail:

@@ -11,13 +11,15 @@ import (
 
 // ShowSummary prints the end-of-run summary to stdout.
 func ShowSummary(results []sync.RepoResult, elapsed time.Duration, flags sync.Flags) bool {
-	var updated, rebased, noops, skipped, failed, stashConflict, rebaseConflict, manual []sync.RepoResult
+	var updated, rebased, reset, noops, skipped, failed, stashConflict, rebaseConflict, manual []sync.RepoResult
 	var forcePushNeeded []sync.RepoResult
 
 	for _, r := range results {
 		switch r.Status {
 		case sync.StatusUpdated:
 			updated = append(updated, r)
+		case sync.StatusReset:
+			reset = append(reset, r)
 		case sync.StatusRebased:
 			rebased = append(rebased, r)
 			if r.ForceRebase {
@@ -67,11 +69,13 @@ func ShowSummary(results []sync.RepoResult, elapsed time.Duration, flags sync.Fl
 	if flags.WhatIf {
 		printGroup(colorGreen, "○", "Would update", updated)
 		printGroup(colorGreen, "○", "Would rebase", rebased)
+		printGroup(colorGreen, "○", "Would reset --hard", reset)
 		printGroup(colorBlue, "•", "Up to date", noops)
 		printGroup(colorYellow, "⊘", "Would skip", skipped)
 	} else {
 		printGroup(colorGreen, "✓", "Updated", updated)
 		printGroup(colorGreen, "✓", "Rebased", rebased)
+		printGroup(colorGreen, "✓", "Reset (unrelated history)", reset)
 		printGroup(colorBlue, "•", "Up to date", noops)
 		printGroup(colorYellow, "⊘", "Skipped", skipped)
 	}

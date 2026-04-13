@@ -182,6 +182,39 @@ func TestDecide_AllScenarios(t *testing.T) {
 			wantAction:     syncp.ActionSkip,
 			wantSkipReason: syncp.SkipDefaultDiverged,
 		},
+		{
+			name: "17_no_common_ancestor_default_branch",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "main", DefaultBranch: "main",
+				BranchType: syncp.BranchTypeDefault,
+				LocalSHA:   shaA, RemoteSHA: shaB, BaseSHA: "", // unrelated history
+			},
+			flags:      defaultFlags(),
+			wantAction: syncp.ActionResetHard,
+		},
+		{
+			name: "18_no_common_ancestor_default_branch_dirty",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "main", DefaultBranch: "main",
+				BranchType:      syncp.BranchTypeDefault,
+				LocalSHA:        shaA, RemoteSHA: shaB, BaseSHA: "",
+				HasLocalChanges: true,
+			},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipNoCommonAncestor,
+		},
+		{
+			name: "20_no_common_ancestor_feature_branch",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
+				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA:   shaA, RemoteSHA: shaB, BaseSHA: "", // unrelated history
+			},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipNoCommonAncestor,
+		},
 	}
 
 	for _, tt := range tests {
@@ -199,9 +232,9 @@ func TestDecide_AllScenarios(t *testing.T) {
 				if !action.RequiresCleanWorktree {
 					t.Error("FF and Rebase actions must have RequiresCleanWorktree=true")
 				}
-			case syncp.ActionNoOp, syncp.ActionSkip, syncp.ActionFail:
+			case syncp.ActionNoOp, syncp.ActionSkip, syncp.ActionFail, syncp.ActionResetHard:
 				if action.RequiresCleanWorktree {
-					t.Error("NoOp/Skip/Fail actions must have RequiresCleanWorktree=false")
+					t.Error("NoOp/Skip/Fail/ResetHard actions must have RequiresCleanWorktree=false")
 				}
 			}
 		})

@@ -60,6 +60,10 @@ func (f *Formatter) Format(r sync.RepoResult) string {
 		return fmt.Sprintf("  %s✓%s %s (updated %s%s%s)",
 			colorGreen, colorReset, namePad, r.ParentBranch, elapsed, branch)
 
+	case r.Status == sync.StatusReset:
+		return fmt.Sprintf("  %s✓%s %s (reset --hard to %s%s%s)",
+			colorGreen, colorReset, namePad, r.ParentBranch, elapsed, branch)
+
 	case r.Status == sync.StatusRebased && r.ForceRebase:
 		return fmt.Sprintf("  %s⚠%s %s (rebased — force-push needed: git push --force-with-lease origin %s)",
 			colorYellow, colorReset, namePad, r.CurrentBranch)
