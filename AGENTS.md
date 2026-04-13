@@ -82,13 +82,13 @@ All 80+ scripts are 100% compliant:
 
 ## User Environment
 
-- **All hardware is Apple Silicon** (ARM64 architecture)
-- Homebrew paths: `/opt/homebrew/` (not `/usr/local/`)
-- When suggesting paths, always use Apple Silicon defaults first
-- **macOS uses BSD tools, not GNU** - always test awk/sed/grep syntax
-  - BSD awk does NOT support `match()` with array capture
-  - Use `grep | sed` pipelines instead of complex awk
-  - Test all regex/text processing commands before committing
+- **Hardware: Apple Silicon (macOS ARM64), Linux x86-64, and Windows/WSL-Ubuntu ARM64** — architecture does not affect shell script portability; BSD/GNU tool differences do
+- macOS Homebrew paths: `/opt/homebrew/` (not `/usr/local/`)
+- When suggesting paths, use Apple Silicon defaults for macOS; rely on `$PATH` for Linux/WSL rather than hardcoding paths
+- **macOS uses BSD tools; Linux and WSL-Ubuntu use GNU tools** - always account for both when writing scripts
+  - BSD awk (macOS) does NOT support `match()` with array capture
+  - On macOS, use `grep | sed` pipelines instead of complex awk
+  - Test all regex/text processing commands on all target platforms before committing
   - See [STYLE_GUIDE.md § Platform Compatibility](./STYLE_GUIDE.md#platform-compatibility) for details
 
 ## Pre-Commit Checklist
