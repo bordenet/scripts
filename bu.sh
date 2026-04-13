@@ -154,6 +154,7 @@ if [ "$VERBOSE" = true ]; then
             log_success "No missing dependencies"
         else
             log_info "Missing dependencies found (informational):"
+            # shellcheck disable=SC2001  # no clean bash substitute for multiline indent
             echo "$output" | sed 's/^/  /'
         fi
         SUCCEEDED_TASKS+=("Check missing dependencies")
@@ -200,6 +201,18 @@ else
     fi
 fi
 
+# --- VS Code & Cursor Updates ---
+if [ "$VERBOSE" = true ]; then
+    echo
+    echo "========================================================================"
+    echo "  VS Code & Cursor Updates"
+    echo "========================================================================"
+fi
+
+# --update-extensions is supported by both 'code' and 'cursor' on macOS and Linux.
+update_vscode_extensions
+update_cursor_extensions
+
 # --- Mac App Store Updates (mas) ---
 if [ "$VERBOSE" = true ]; then
     echo
@@ -233,6 +246,7 @@ if command_exists mas; then
         else
             if [ "$VERBOSE" = true ]; then
                 log_info "Outdated apps:"
+                # shellcheck disable=SC2001  # no clean bash substitute for multiline indent
                 echo "$outdated" | sed 's/^/  /'
             fi
 

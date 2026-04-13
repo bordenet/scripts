@@ -30,6 +30,7 @@ ensure_dependencies() {
     # If timeout doesn't exist but gtimeout does, create alias function
     if ! command -v timeout &>/dev/null && command -v gtimeout &>/dev/null; then
         # Export function so subshells can use it
+        # shellcheck disable=SC2329  # invoked indirectly via 'timeout' in calling script
         timeout() { gtimeout "$@"; }
         export -f timeout
     fi
@@ -70,6 +71,8 @@ DEPENDENCIES
     • npm - Node.js package manager
     • mas - Mac App Store CLI
     • pip - Python package manager
+    • code (optional) - VS Code CLI for extension updates
+    • cursor (optional) - Cursor CLI for extension updates
 
 EXAMPLES
     # Run with minimal output (default)
@@ -193,12 +196,12 @@ retry_command() {
 
     log_info "Starting: $task_name"
 
-    while [ $attempt -le $max_attempts ]; do
-        if [ $attempt -gt 1 ]; then
+    while [ "$attempt" -le "$max_attempts" ]; do
+        if [ "$attempt" -gt 1 ]; then
             # shellcheck disable=SC2154  # YELLOW, NC, RETRY_DELAY are set in calling script
             update_status "${YELLOW}↻${NC} $spinner_text (retry $attempt/$max_attempts)..."
             log_warning "Retry attempt $attempt of $max_attempts for: $task_name"
-            sleep $RETRY_DELAY
+            sleep "$RETRY_DELAY"
         else
             update_status "  $spinner_text..."
         fi
@@ -250,7 +253,7 @@ retry_command() {
             # Parse output to show final summary
             if [ $exit_code -eq 0 ]; then
                 local upgrade_count
-                upgrade_count=$(echo "$output" | grep -E "^==> (Upgrading|Installing)" | wc -l | tr -d ' ')
+                upgrade_count=$(echo "$output" | grep -cE "^==> (Upgrading|Installing)" || true)
                 if [ "$upgrade_count" -gt 0 ]; then
                     # shellcheck disable=SC2154
                     complete_status "${GREEN}✓${NC} $spinner_text ($upgrade_count packages)"
@@ -280,12 +283,13 @@ retry_command() {
 
         log_warning "$task_name failed (attempt $attempt/$max_attempts, exit code: $exit_code)"
 
-        if [ $attempt -eq $max_attempts ]; then
+        if [ "$attempt" -eq "$max_attempts" ]; then
             # shellcheck disable=SC2154  # RED, NC, FAILED_TASKS are set in calling script
             complete_status "${RED}✗${NC} $spinner_text"
             log_error "$task_name failed after $max_attempts attempts"
             if [ "$VERBOSE" = true ]; then
                 log_error "Last error output:"
+                # shellcheck disable=SC2001  # no clean bash substitute for multiline indent
                 echo "$output" | sed 's/^/  /' >&2
             fi
             FAILED_TASKS+=("$task_name")
@@ -295,6 +299,48 @@ retry_command() {
         ((attempt++))
     done
 }
+
+# Shared helper: update extensions for any VS Code-compatible editor.
+# Cross-platform: works on macOS and Linux wherever the CLI is in PATH.
+# Usage: _update_editor_extensions "VS Code" "code"
+_update_editor_extensions() {
+    local display_name=$1
+    local cli=$2
+    local task_name="${display_name} extension updates"
+
+    if ! command_exists "$cli"; then
+        log_warning "${display_name} CLI (${cli}) not found, skipping extension updates"
+        SKIPPED_TASKS+=("$task_name")
+        return 0
+    fi
+
+    log_info "Updating ${display_name} extensions..."
+    update_status "  Updating ${display_name} extensions..."
+
+    local output
+    if output=$("$cli" --update-extensions 2>&1); then
+        # shellcheck disable=SC2154  # GREEN, NC, SUCCEEDED_TASKS are set in calling script
+        complete_status "${GREEN}✓${NC} Updating ${display_name} extensions"
+        log_success "${display_name} extensions updated"
+        SUCCEEDED_TASKS+=("$task_name")
+        return 0
+    else
+        local exit_code=$?
+        # shellcheck disable=SC2154  # RED, NC, FAILED_TASKS are set in calling script
+        complete_status "${RED}✗${NC} Updating ${display_name} extensions"
+        log_error "${display_name} extension update failed (exit code: $exit_code)"
+        if [ "$VERBOSE" = true ] && [ -n "$output" ]; then
+            log_error "Error output:"
+            # shellcheck disable=SC2001  # no clean bash substitute for multiline indent
+            echo "$output" | sed 's/^/  /' >&2
+        fi
+        FAILED_TASKS+=("$task_name")
+        return 1
+    fi
+}
+
+update_vscode_extensions()  { _update_editor_extensions "VS Code" "code";   }
+update_cursor_extensions()  { _update_editor_extensions "Cursor"  "cursor";  }
 
 # Execute command without retries but with error handling
 safe_command() {
@@ -319,10 +365,10 @@ safe_command() {
         log_error "$task_name failed (exit code: $exit_code)"
         if [ "$VERBOSE" = true ]; then
             log_error "Error output:"
+            # shellcheck disable=SC2001  # no clean bash substitute for multiline indent
             echo "$output" | sed 's/^/  /' >&2
         fi
         FAILED_TASKS+=("$task_name")
         return 1
     fi
 }
-
