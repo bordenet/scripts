@@ -284,3 +284,52 @@ func TestDecide_RemoteGone(t *testing.T) {
 		})
 	}
 }
+
+func TestIsNoteworthyResult(t *testing.T) {
+	tests := []struct {
+		desc string
+		r    syncp.RepoResult
+		want bool
+	}{
+		// Clean real outcomes → suppress in compact mode.
+		{"updated real", syncp.RepoResult{Status: syncp.StatusUpdated}, false},
+		{"noop real", syncp.RepoResult{Status: syncp.StatusNoOp}, false},
+		{"reset real", syncp.RepoResult{Status: syncp.StatusReset}, false},
+		{"rebased clean", syncp.RepoResult{Status: syncp.StatusRebased}, false},
+
+		// WhatIf outcomes (WhatIfAction set by execute.go) → always show dry-run preview.
+		// Uses WhatIfAction field, not SkipReason, to avoid overloading skip semantics.
+		{"whatif updated", syncp.RepoResult{Status: syncp.StatusUpdated, WhatIfAction: "would fast-forward"}, true},
+		{"whatif noop", syncp.RepoResult{Status: syncp.StatusNoOp, WhatIfAction: "already up to date"}, true},
+		{"whatif reset", syncp.RepoResult{Status: syncp.StatusReset, WhatIfAction: "would reset --hard"}, true},
+		{"whatif rebased", syncp.RepoResult{Status: syncp.StatusRebased, WhatIfAction: "would rebase"}, true},
+
+		// ForceRebase → show the ⚠ force-push warning.
+		{"rebased force-push needed", syncp.RepoResult{Status: syncp.StatusRebased, ForceRebase: true}, true},
+		// WhatIf + ForceRebase → noteworthy via WhatIfAction alone (both signals agree).
+		{"whatif rebased force-push", syncp.RepoResult{Status: syncp.StatusRebased, ForceRebase: true, WhatIfAction: "would rebase"}, true},
+
+		// Actionable skips → show.
+		{"skipped no-stash", syncp.RepoResult{Status: syncp.StatusSkipped, SkipReason: syncp.SkipNoStash}, true},
+		{"skipped detached head", syncp.RepoResult{Status: syncp.StatusSkipped, SkipReason: syncp.SkipDetachedHEAD}, true},
+		{"skipped fetch timeout", syncp.RepoResult{Status: syncp.StatusSkipped, SkipReason: syncp.SkipFetchTimeout}, true},
+
+		// SkipCancelled → suppress inline (SIGINT flood prevention); still in summary.
+		{"skipped cancelled", syncp.RepoResult{Status: syncp.StatusSkipped, SkipReason: syncp.SkipCancelled}, false},
+
+		// Failures and conflicts → always show.
+		{"failed", syncp.RepoResult{Status: syncp.StatusFailed}, true},
+		{"rebase conflict", syncp.RepoResult{Status: syncp.StatusRebaseConflict}, true},
+		{"stash conflict", syncp.RepoResult{Status: syncp.StatusStashConflict}, true},
+		{"manual intervention", syncp.RepoResult{Status: syncp.StatusManualInterventionRequired}, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			got := syncp.IsNoteworthyResult(tc.r)
+			if got != tc.want {
+				t.Errorf("IsNoteworthyResult(status=%v, ForceRebase=%v, WhatIfAction=%q, SkipReason=%q) = %v, want %v",
+					tc.r.Status, tc.r.ForceRebase, tc.r.WhatIfAction, tc.r.SkipReason, got, tc.want)
+			}
+		})
+	}
+}

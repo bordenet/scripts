@@ -13,6 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
 	"gitsync/internal/discover"
 	"gitsync/internal/output"
 	gosync "gitsync/internal/sync"
@@ -121,7 +124,6 @@ func main() {
 
 	registry := &gosync.StashRegistry{}
 	results := make(chan gosync.RepoResult, int(math.Max(float64(len(repos)), 1)))
-	tick := make(chan struct{}, 1)
 	sem := make(chan struct{}, flags.Concurrency)
 
 	// Launch goroutines
@@ -146,105 +148,115 @@ func main() {
 		}(repo)
 	}
 
-	// Ticker goroutine
+	// Print header
+	fmt.Printf("%s: %s\n\n",
+		lipgloss.NewStyle().Bold(true).Render("Git Repository Updates"),
+		strings.Join(targetDirs, ", "))
+
+	formatter := output.NewFormatter(flags.Verbose, maxNameLen)
+	start := time.Now()
+	var allResults []gosync.RepoResult // written by drain goroutine, read after p.Run()
+	var interruptExitCode int          // non-zero on SIGINT/SIGTERM
+
+	prog := tea.NewProgram(
+		output.NewProgressModel(totalRepos, flags.Verbose),
+		tea.WithOutput(os.Stdout),
+		tea.WithInput(nil), // headless runner — disable keyboard to prevent accidental q/ctrl-c races
+	)
+
+	// Drain goroutine: collects results and drives the TUI via p.Send.
+	// Writes to allResults and interruptExitCode before sending MsgDone,
+	// establishing the happens-before boundary that makes the post-Run reads safe.
 	go func() {
-		ticker := time.NewTicker(250 * time.Millisecond)
-		defer ticker.Stop()
-		for {
+		send := func(r gosync.RepoResult) {
+			formatted := ""
+			if flags.Verbose || gosync.IsNoteworthyResult(r) {
+				formatted = formatter.Format(r)
+			}
+			prog.Send(output.MsgResult{Result: r, Formatted: formatted})
+		}
+
+		// Inject synthetic result for the self-updated repo (shell already pulled it).
+		// Synthetic results have no WhatIfAction; gate on flags.WhatIf explicitly.
+		if selfUpdatedRepo != "" && flags.All {
+			selfResult := gosync.RepoResult{
+				RepoPath:      selfUpdatedRepo,
+				DisplayName:   displayNames[selfUpdatedRepo],
+				Status:        gosync.StatusUpdated,
+				ParentBranch:  selfUpdatedBranch,
+				CurrentBranch: selfUpdatedBranch,
+			}
+			allResults = append(allResults, selfResult)
+			formatted := ""
+			if flags.Verbose || flags.WhatIf || gosync.IsNoteworthyResult(selfResult) {
+				formatted = formatter.Format(selfResult)
+			}
+			prog.Send(output.MsgResult{Result: selfResult, Formatted: formatted})
+		}
+
+		remaining := len(repos)
+		for remaining > 0 {
 			select {
-			case <-ticker.C:
-				select {
-				case tick <- struct{}{}:
-				default:
+			case r := <-results:
+				allResults = append(allResults, r)
+				send(r)
+				remaining--
+			case sig := <-sigChan:
+				cancel()
+				prog.Send(output.MsgPrint{Line: "\nInterrupted — waiting for in-flight repos to clean up..."})
+				drainCtx, drainCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			drainLoop:
+				for remaining > 0 {
+					select {
+					case r := <-results:
+						allResults = append(allResults, r)
+						send(r)
+						remaining--
+					case <-drainCtx.Done():
+						break drainLoop
+					}
 				}
-			case <-rootCtx.Done():
+				drainCancel()
+				// Safe stash pop for orphaned stashes.
+				cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				for _, entry := range registry.List() {
+					top := gosync.TopStashMessage(cleanupCtx, entry.RepoPath)
+					if top == entry.StashMessage {
+						if err := gosync.PopStash(cleanupCtx, entry.RepoPath); err != nil {
+							prog.Send(output.MsgPrint{Line: fmt.Sprintf("⚠ Stash pop failed in %s — run: git stash pop",
+								filepath.Base(entry.RepoPath))})
+						} else {
+							registry.Remove(entry.RepoPath)
+						}
+					} else {
+						prog.Send(output.MsgPrint{Line: fmt.Sprintf("⚠ Could not safely pop stash in %s — run: git stash list",
+							filepath.Base(entry.RepoPath))})
+					}
+				}
+				cleanupCancel()
+				interruptExitCode = 130 // SIGINT
+				if sig == syscall.SIGTERM {
+					interruptExitCode = 143 // SIGTERM (128+15)
+				}
+				prog.Send(output.MsgDone{})
 				return
 			}
 		}
+		prog.Send(output.MsgDone{})
 	}()
 
-	// Print header
-	fmt.Printf("\033[1mGit Repository Updates\033[0m: %s\n\n", strings.Join(targetDirs, ", "))
-
-	formatter := output.NewFormatter(flags.Verbose, maxNameLen)
-	writer := output.NewProgressWriter(os.Stdout, totalRepos)
-	start := time.Now()
-	completed := 0
-	var allResults []gosync.RepoResult
-
-	// Inject synthetic result for the self-updated repo (shell already pulled it).
-	// Skip in interactive mode — user didn't select this repo explicitly.
-	if selfUpdatedRepo != "" && flags.All {
-		selfResult := gosync.RepoResult{
-			RepoPath:      selfUpdatedRepo,
-			DisplayName:   displayNames[selfUpdatedRepo],
-			Status:        gosync.StatusUpdated,
-			ParentBranch:  selfUpdatedBranch,
-			CurrentBranch: selfUpdatedBranch,
-		}
-		allResults = append(allResults, selfResult)
-		writer.PrintResult(formatter.Format(selfResult))
-		completed++
-		writer.UpdateProgress(completed, totalRepos, time.Since(start))
+	if _, err := prog.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
 	}
 
-loop:
-	for {
-		select {
-		case r := <-results:
-			allResults = append(allResults, r)
-			writer.PrintResult(formatter.Format(r))
-			completed++
-			writer.UpdateProgress(completed, totalRepos, time.Since(start))
-			if completed == totalRepos {
-				break loop
-			}
-		case <-tick:
-			writer.UpdateProgress(completed, totalRepos, time.Since(start))
-		case sig := <-sigChan:
-			cancel()
-			fmt.Fprintln(os.Stdout, "\nInterrupted — waiting for in-flight repos to clean up...")
-			drainCtx, drainCancel := context.WithTimeout(context.Background(), 10*time.Second)
-			for completed < totalRepos {
-				select {
-				case r := <-results:
-					allResults = append(allResults, r)
-					writer.PrintResult(formatter.Format(r))
-					completed++
-				case <-drainCtx.Done():
-					drainCancel()
-					goto afterLoop
-				}
-			}
-			drainCancel()
-		afterLoop:
-			// Attempt safe stash pop for each orphaned stash.
-			// Use a bounded timeout so a hung git command can't freeze the process indefinitely.
-			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cleanupCancel()
-			for _, entry := range registry.List() {
-				top := gosync.TopStashMessage(cleanupCtx, entry.RepoPath)
-				if top == entry.StashMessage {
-					if err := gosync.PopStash(cleanupCtx, entry.RepoPath); err != nil {
-						fmt.Printf("⚠ Stash pop failed in %s — run: git stash pop\n",
-							filepath.Base(entry.RepoPath))
-					} else {
-						registry.Remove(entry.RepoPath)
-					}
-				} else {
-					fmt.Printf("⚠ Could not safely pop stash in %s — stash order changed; run: git stash list\n",
-						filepath.Base(entry.RepoPath))
-				}
-			}
-			exitCode := 130 // SIGINT
-			if sig == syscall.SIGTERM {
-				exitCode = 143 // SIGTERM (128+15)
-			}
-			os.Exit(exitCode)
-		}
+	if interruptExitCode != 0 {
+		output.ShowSummary(os.Stdout, allResults, time.Since(start), flags)
+		os.Exit(interruptExitCode)
 	}
-
-	output.ShowSummary(allResults, time.Since(start), flags)
+	if !output.ShowSummary(os.Stdout, allResults, time.Since(start), flags) {
+		os.Exit(1)
+	}
 }
 
 func parseFlags() (gosync.Flags, []string) {

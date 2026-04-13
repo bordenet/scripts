@@ -46,13 +46,31 @@ Parallel git sync across multiple repositories. Thin bash wrapper that builds a 
 
 ## Output
 
-```
-  ✓  my-app                   (fast-forwarded main ← origin/main)
-  ✓  api-service              (already up to date)
-  ⚠  feature-repo            (rebased — force-push needed: git push --force-with-lease origin my-feature)
-  ○  dirty-repo              (skipped — local changes, use --no-stash to skip or remove changes)
+**Default (compact mode)** — a single rolling progress line updates in-place while syncing. Only repos that need attention are printed:
 
-Synced 3 repos in 1.4s (4 total, 1 skipped)
+```
+⟳  my-feature-branch                             [12/20]  00:08
+
+Summary (14s)
+✓ 18 synced, 1 already current
+⊘ Skipped (1):
+  • dirty-repo
+⚠ Force-push needed:
+  git push --force-with-lease origin my-feature  # in feature-repo
+```
+
+**`--verbose` mode** — per-repo result lines printed as each completes, plus the full summary breakdown:
+
+```
+  ✓  my-app                   (updated main, 1.2s [main])
+  ✓  api-service              (up to date)
+  ⚠  feature-repo            (rebased — force-push needed: git push --force-with-lease origin my-feature)
+  ⊘  dirty-repo              (local changes present and --no-stash set)
+
+Summary (14s)
+✓ Updated (1): my-app
+• Up to date (1): api-service
+⊘ Skipped (1): dirty-repo
 ```
 
 ## Per-Repo Decision Logic

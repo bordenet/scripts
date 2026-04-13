@@ -135,6 +135,43 @@ type Flags struct {
 	All           bool
 }
 
+// IsNoteworthyResult reports whether r should be surfaced inline during a compact
+// (non-verbose) run. It is used by the run-loop in main.go; ShowSummary has its
+// own independent branching.
+//
+// Rules:
+//   - WhatIf results (r.WhatIfAction != "") are always shown — the dry-run preview
+//     is the whole point of --what-if. Note: synthetic results injected outside the
+//     normal execute path (e.g. the self-update result in main.go) do not carry
+//     WhatIfAction; callers must gate on flags.WhatIf separately for those.
+//   - Clean real outcomes (Updated, Rebased without force-push, Reset, NoOp)
+//     are suppressed; the rolling progress line and summary count them.
+//   - ForceRebase rebases surface the actionable ⚠ force-push warning.
+//   - SkipCancelled skips are suppressed inline (SIGINT flood prevention);
+//     they still appear in the summary's Skipped group.
+//   - Everything else (other Skipped reasons, Failed, conflicts) is shown.
+func IsNoteworthyResult(r RepoResult) bool {
+	// WhatIf dry-run results must always be shown so the user can see the preview.
+	// We check WhatIfAction (set by execute.go for every WhatIf result) rather than
+	// SkipReason so that non-Skipped statuses (Updated, Rebased, …) are handled
+	// without overloading the skip-reason field with mode semantics.
+	if r.WhatIfAction != "" {
+		return true
+	}
+	switch r.Status {
+	case StatusUpdated, StatusReset, StatusNoOp:
+		// Clean outcomes: suppress in compact mode.
+		return false
+	case StatusRebased:
+		// Clean rebase is silent; force-push warning must surface.
+		return r.ForceRebase
+	case StatusSkipped:
+		// Cancellation skips are informational — not surfaced inline.
+		return r.SkipReason != SkipCancelled
+	}
+	return true
+}
+
 // StashEntry records a single active auto-stash.
 type StashEntry struct {
 	RepoPath     string

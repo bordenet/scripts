@@ -21,9 +21,9 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 
 	// --what-if: return description, no writes.
 	// Status reflects what WOULD have happened so the summary buckets are useful:
-	//   ActionNoOp        → StatusNoOp   (SkipWhatIf triggers the ○ formatter path)
-	//   ActionFastForward → StatusUpdated (SkipWhatIf triggers the ○ formatter path)
-	//   ActionRebase      → StatusRebased (SkipWhatIf triggers the ○ formatter path)
+	//   ActionNoOp        → StatusNoOp   (WhatIfAction set; formatter routes via WhatIfAction != "")
+	//   ActionFastForward → StatusUpdated (WhatIfAction set; SkipWhatIf kept for backward compat)
+	//   ActionRebase      → StatusRebased (WhatIfAction set; SkipWhatIf kept for backward compat)
 	//   ActionSkip        → StatusSkipped with the REAL SkipReason (shows ⊘ + reason)
 	//   ActionFail        → StatusFailed  with the real FailReason  (shows ✗ + reason)
 	if action.WhatIf {

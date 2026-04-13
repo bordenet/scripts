@@ -139,8 +139,8 @@ func TestRun_WhatIf(t *testing.T) {
 	result := syncp.Run(context.Background(), local, flags, registry)
 
 	// --what-if for a fast-forwardable repo: status reflects what WOULD happen
-	// (StatusUpdated) so the summary buckets are meaningful. SkipWhatIf is still
-	// set so the progress-line formatter shows the ○ dry-run format.
+	// (StatusUpdated) so the summary buckets are meaningful. SkipWhatIf is kept
+	// as a backward-compat side-effect; the formatter now routes via WhatIfAction != "".
 	if result.Status != syncp.StatusUpdated {
 		t.Errorf("expected StatusUpdated for would-ff repo, got status=%v", result.Status)
 	}
