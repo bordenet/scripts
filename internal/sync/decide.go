@@ -52,6 +52,15 @@ func Decide(state RepoState, flags Flags) Action {
 		return skip(SkipNoRemoteTracking)
 	}
 	if state.BaseSHA == "" {
+		// Default branch with unrelated history: reset hard to origin is safe and expected.
+		// Feature branches: skip — unrelated history on a feature branch is unusual enough
+		// to warrant manual inspection.
+		if state.BranchType == BranchTypeDefault {
+			if state.HasLocalChanges {
+				return skip(SkipNoCommonAncestor)
+			}
+			return Action{Type: ActionResetHard}
+		}
 		return skip(SkipNoCommonAncestor)
 	}
 

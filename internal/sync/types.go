@@ -13,6 +13,7 @@ type Status int
 const (
 	StatusUpdated              Status = iota // fast-forward succeeded
 	StatusRebased                            // rebase succeeded
+	StatusReset                              // git reset --hard to origin (unrelated history)
 	StatusNoOp                               // already up to date or local ahead
 	StatusSkipped                            // deliberate skip (see SkipReason)
 	StatusFailed                             // unrecoverable error
@@ -53,6 +54,7 @@ const (
 	ActionNoOp        ActionType = iota
 	ActionFastForward
 	ActionRebase
+	ActionResetHard // git reset --hard origin/<parent> for unrelated-history default branches
 	ActionSkip
 	ActionFail
 )

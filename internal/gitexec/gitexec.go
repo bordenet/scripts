@@ -193,6 +193,12 @@ func CommitsBehind(ctx context.Context, dir, remoteRef string) int {
 	return n
 }
 
+// ResetHard resets the current branch to ref, discarding all local changes.
+func ResetHard(ctx context.Context, dir, ref string) error {
+	_, err := run(ctx, dir, "reset", "--hard", ref)
+	return err
+}
+
 // PullFFOnly runs git pull --ff-only for the given branch.
 func PullFFOnly(ctx context.Context, dir, branch string) error {
 	_, err := run(ctx, dir, "pull", "--ff-only", "origin", branch)
