@@ -149,7 +149,7 @@ func main() {
 	}
 
 	// Print header
-	fmt.Printf("%s: %s\n\n",
+	fmt.Printf("%s: %s\n",
 		lipgloss.NewStyle().Bold(true).Render("Git Repository Updates"),
 		strings.Join(targetDirs, ", "))
 

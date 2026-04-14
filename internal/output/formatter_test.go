@@ -117,6 +117,16 @@ func TestShowSummary_StashConflict_ExitsNonZero(t *testing.T) {
 	if ok {
 		t.Errorf("ShowSummary with StashConflict must return false (exit 1), got true.\nOutput:\n%s", buf.String())
 	}
+	got := buf.String()
+	if !strings.Contains(got, "had issues") {
+		t.Errorf("issues path must emit warning text, got:\n%s", got)
+	}
+	// Verdict must not be preceded by a blank line when groups fire — the
+	// needsSeparator logic emits exactly one blank line via fmt.Fprintln(w, "").
+	// Two consecutive newlines (\n\n) would indicate a re-introduced leading \n.
+	if strings.Contains(got, "\n\n\n") {
+		t.Errorf("issues path must not produce double blank lines, got:\n%q", got)
+	}
 }
 
 func TestShowSummary_WhatIf_ForceRebase_AdvisoryOnly(t *testing.T) {
@@ -139,6 +149,10 @@ func TestShowSummary_WhatIf_ForceRebase_AdvisoryOnly(t *testing.T) {
 	if !strings.Contains(got, "git push --force-with-lease origin feature") {
 		t.Errorf("WhatIf summary must still show the push command for reference, got:\n%s", got)
 	}
+	// DRY RUN banner must always be emitted in WhatIf mode.
+	if !strings.Contains(got, "DRY RUN") {
+		t.Errorf("WhatIf summary must contain DRY RUN banner, got:\n%s", got)
+	}
 }
 
 func TestShowSummary_CompactMode_SuccessOneLiner(t *testing.T) {
@@ -157,5 +171,62 @@ func TestShowSummary_CompactMode_SuccessOneLiner(t *testing.T) {
 	}
 	if !strings.Contains(got, "already current") {
 		t.Errorf("compact summary should contain 'already current': %q", got)
+	}
+	// Compact all-clean mode must not produce blank lines — no per-repo groups fire,
+	// so needsSeparator=false and no \n\n should appear anywhere.
+	if strings.Contains(got, "\n\n") {
+		t.Errorf("compact all-clean summary must not contain blank lines, got:\n%q", got)
+	}
+	// Final verdict must be present.
+	if !strings.Contains(got, "All repositories processed successfully") {
+		t.Errorf("compact summary must contain success verdict, got:\n%s", got)
+	}
+}
+
+func TestShowSummary_Verbose_GroupsListed(t *testing.T) {
+	var buf bytes.Buffer
+	results := []sync.RepoResult{
+		{RepoPath: "/repos/a", DisplayName: "a", Status: sync.StatusUpdated, CurrentBranch: "main", ParentBranch: "main"},
+		{RepoPath: "/repos/b", DisplayName: "b", Status: sync.StatusNoOp},
+	}
+	ok := output.ShowSummary(&buf, results, time.Second, sync.Flags{Verbose: true})
+	if !ok {
+		t.Errorf("verbose all-clean must return true")
+	}
+	got := buf.String()
+	if !strings.Contains(got, "Updated") {
+		t.Errorf("verbose summary must contain 'Updated' group header: %q", got)
+	}
+	if !strings.Contains(got, "Up to date") {
+		t.Errorf("verbose summary must contain 'Up to date' group: %q", got)
+	}
+	// In verbose mode a blank separator must appear before the verdict to visually
+	// distinguish the per-repo list from the overall conclusion line.
+	if !strings.Contains(got, "\n\n") {
+		t.Errorf("verbose summary must have blank line before verdict: %q", got)
+	}
+	if !strings.Contains(got, "All repositories processed successfully") {
+		t.Errorf("verbose summary must contain success verdict: %q", got)
+	}
+}
+
+func TestShowSummary_WithSkipped_SeparatorBeforeVerdict(t *testing.T) {
+	var buf bytes.Buffer
+	results := []sync.RepoResult{
+		{RepoPath: "/repos/a", DisplayName: "a", Status: sync.StatusUpdated},
+		{RepoPath: "/repos/b", DisplayName: "b", Status: sync.StatusSkipped, SkipReason: sync.SkipEmptyRepo},
+	}
+	ok := output.ShowSummary(&buf, results, time.Second, sync.Flags{})
+	if !ok {
+		t.Errorf("run with skipped repos must return true (skipped is not a failure)")
+	}
+	got := buf.String()
+	// When skipped repos are listed (per-repo bullet lines), a blank line must
+	// separate the list from the verdict to prevent visual ambiguity.
+	if !strings.Contains(got, "\n\n") {
+		t.Errorf("summary with skipped repos must have blank line before verdict: %q", got)
+	}
+	if !strings.Contains(got, "All repositories processed successfully") {
+		t.Errorf("summary with skipped repos must contain success verdict: %q", got)
 	}
 }
