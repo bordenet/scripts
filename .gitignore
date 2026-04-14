@@ -9,3 +9,7 @@ ADOPT-PROMPT.md
 *.original
 
 MODULAR-MIGRATION-PROMPT.md
+
+
+#Ignore cursor AI rules
+.cursor/rules/codacy.mdc
