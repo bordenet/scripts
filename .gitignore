@@ -13,3 +13,5 @@ MODULAR-MIGRATION-PROMPT.md
 
 #Ignore cursor AI rules
 .cursor/rules/codacy.mdc
+.DS_Store
+wiki/
