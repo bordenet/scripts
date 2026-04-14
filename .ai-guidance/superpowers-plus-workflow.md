@@ -76,5 +76,7 @@ git checkout main && git pull origin main && git push gitlab main
 | 2026-03-28 | Migrated from two-tier (main + sync) to three-tier (dev → staging → main). |
 | 2026-03-30 | Agent repeatedly edited `~/.codex/superpowers-plus/` directly, creating stray commits with wrong git identity that were never on GitHub. Stale fork + wrong-author commits required force-reset. |
 | 2026-04-03 | Agent operated against `~/git/CallBox/tools/superpowers-plus/` (CallBox deployment target) instead of `~/git/Personal/superpowers-plus/`. Committed and pushed directly to staging from the wrong repo. Required manual sync to fix. |
+| 2026-04-14 | Agent pushed `dev` and `staging` branches to `gitlab` remote (only `main` is permitted). Root cause: `superpowers.always.md` rule file was deleted from OneDrive and replaced with a pull-only module, removing auto-injected GitLab restrictions from context. |
+| 2026-04-14 | Agent included CallBox-internal details in commit messages pushed to public `github.com/bordenet/superpowers-plus`. IP leakage. Root cause: same dangling-symlink event dropped the IP boundary rule from context. |
 
 > ⚠️ **This workflow is SPECIFIC to `superpowers-plus` only.** Other superpowers repos are private — commit directly to them as normal.
