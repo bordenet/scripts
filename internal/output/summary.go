@@ -46,9 +46,9 @@ func ShowSummary(w io.Writer, results []sync.RepoResult, elapsed time.Duration, 
 	}
 
 	if flags.WhatIf {
-		fmt.Fprintln(w, "\n"+styleYellow.Render("DRY RUN — no changes were made"))
+		fmt.Fprintln(w, styleYellow.Render("DRY RUN — no changes were made"))
 	}
-	fmt.Fprintf(w, "\n%s (%.0fs)\n", styleYellow.Render("Summary"), elapsed.Seconds())
+	fmt.Fprintf(w, "%s (%.0fs)\n", styleYellow.Render("Summary"), elapsed.Seconds())
 
 	displayName := func(r sync.RepoResult) string {
 		if r.DisplayName != "" {
@@ -106,11 +106,25 @@ func ShowSummary(w io.Writer, results []sync.RepoResult, elapsed time.Duration, 
 	// Stash conflicts require manual user action (git stash pop + resolve), so
 	// they count as issues that should produce a non-zero exit code.
 	hasIssues := len(failed)+len(rebaseConflict)+len(manual)+len(stashConflict) > 0
+
+	// Add a blank line before the verdict when per-repo group lines were printed
+	// above it — verbose mode and any run with skipped/failed/conflict/force-push
+	// repos all emit indented bullet lines whose visual level matches the verdict
+	// icon, so the separator is needed to distinguish list content from conclusion.
+	// In compact all-clean mode no groups fire, so no separator is added.
+	needsSeparator := flags.Verbose ||
+		len(skipped) > 0 || len(stashConflict) > 0 ||
+		len(rebaseConflict) > 0 || len(failed) > 0 ||
+		len(manual) > 0 || len(forcePushNeeded) > 0
+	if needsSeparator {
+		fmt.Fprintln(w, "")
+	}
+
 	if hasIssues {
-		fmt.Fprintf(w, "\n%s Some repositories had issues. Review above.\n", styleYellow.Render("⚠"))
+		fmt.Fprintf(w, "%s Some repositories had issues. Review above.\n", styleYellow.Render("⚠"))
 		return false
 	}
-	fmt.Fprintf(w, "\n%s All repositories processed successfully!\n", styleGreen.Render("✓"))
+	fmt.Fprintf(w, "%s All repositories processed successfully!\n", styleGreen.Render("✓"))
 	return true
 }
 
