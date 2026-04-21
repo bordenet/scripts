@@ -125,6 +125,7 @@ func main() {
 	registry := &gosync.StashRegistry{}
 	results := make(chan gosync.RepoResult, int(math.Max(float64(len(repos)), 1)))
 	sem := make(chan struct{}, flags.Concurrency)
+	drainDone := make(chan struct{}) // closed by drain goroutine after MsgDone is sent
 
 	// Launch goroutines
 	for _, repo := range repos {
@@ -161,13 +162,17 @@ func main() {
 	prog := tea.NewProgram(
 		output.NewProgressModel(totalRepos, flags.Verbose),
 		tea.WithOutput(os.Stdout),
-		tea.WithInput(nil), // headless runner — disable keyboard to prevent accidental q/ctrl-c races
+		tea.WithInput(nil),              // headless runner — disable keyboard to prevent accidental q/ctrl-c races
+		tea.WithoutSignalHandler(),      // we own SIGINT/SIGTERM via sigChan; suppress bubbletea's competing handler
 	)
 
 	// Drain goroutine: collects results and drives the TUI via p.Send.
-	// Writes to allResults and interruptExitCode before sending MsgDone,
+	// Writes to allResults and interruptExitCode before closing drainDone,
 	// establishing the happens-before boundary that makes the post-Run reads safe.
+	// The drain goroutine's own internal timeouts (10 s result drain + 5 s stash
+	// cleanup) bound its lifetime, so main can wait on drainDone unconditionally.
 	go func() {
+		defer signal.Stop(sigChan) // release sigChan once we're done handling signals
 		send := func(r gosync.RepoResult) {
 			formatted := ""
 			if flags.Verbose || gosync.IsNoteworthyResult(r) {
@@ -239,14 +244,24 @@ func main() {
 					interruptExitCode = 143 // SIGTERM (128+15)
 				}
 				prog.Send(output.MsgDone{})
+				close(drainDone)
 				return
 			}
 		}
 		prog.Send(output.MsgDone{})
+		close(drainDone)
 	}()
 
-	if _, err := prog.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+	_, progErr := prog.Run()
+
+	// Wait for the drain goroutine to finish writing allResults and interruptExitCode
+	// before reading them. The drain goroutine's internal timeouts guarantee it
+	// terminates, so this is safe to wait on unconditionally.
+	<-drainDone
+
+	if progErr != nil && interruptExitCode == 0 {
+		// Genuine renderer/tea error — not a signal we handled ourselves.
+		fmt.Fprintf(os.Stderr, "error: %v\n", progErr)
 		os.Exit(1)
 	}
 
