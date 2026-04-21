@@ -142,7 +142,7 @@ func main() {
 				return
 			}
 			defer func() { <-sem }()
-			r := gosync.Run(rootCtx, repoPath, flags, registry)
+			r := gosync.Run(rootCtx, repoPath, flags, registry, gosync.DefaultSyncer{})
 			r.DisplayName = displayNames[repoPath]
 			results <- r
 		}(repo)

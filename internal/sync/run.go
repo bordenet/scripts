@@ -8,7 +8,7 @@ import (
 )
 
 // Run processes a single repo: collect state → decide → execute.
-func Run(ctx context.Context, repoPath string, flags Flags, registry *StashRegistry) RepoResult {
+func Run(ctx context.Context, repoPath string, flags Flags, registry *StashRegistry, syncer RepoSyncer) RepoResult {
 	start := time.Now()
 	state := CollectState(ctx, repoPath, flags)
 
@@ -22,7 +22,7 @@ func Run(ctx context.Context, repoPath string, flags Flags, registry *StashRegis
 	// force-remove the residual state files — git already confirmed the working
 	// tree is clean, so removal is safe.
 	if state.HasRebaseHead {
-		if err := gitexec.RebaseAbort(repoPath); err != nil {
+		if err := syncer.RebaseAbort(state); err != nil {
 			// Abort failed — likely a ghost REBASE_HEAD. Force-clean the stale files.
 			_ = gitexec.ForceCleanRebaseState(repoPath)
 		}
@@ -40,7 +40,7 @@ func Run(ctx context.Context, repoPath string, flags Flags, registry *StashRegis
 	if flags.WhatIf {
 		action.WhatIf = true
 	}
-	result := Execute(ctx, state, action, flags, registry)
+	result := Execute(ctx, state, action, flags, registry, syncer)
 	result.ElapsedMs = time.Since(start).Milliseconds()
 	return result
 }

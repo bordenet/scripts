@@ -2,6 +2,7 @@ package sync_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -76,7 +77,7 @@ func TestRun_UpToDate(t *testing.T) {
 	local, _ := makeRepoWithRemote(t)
 	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
-	result := syncp.Run(context.Background(), local, flags, registry)
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
 	if result.Status != syncp.StatusNoOp {
 		t.Errorf("expected NoOp, got %v (skip: %s, fail: %s)", result.Status, result.SkipReason, result.FailReason)
 	}
@@ -88,7 +89,7 @@ func TestRun_FastForward(t *testing.T) {
 	addCommit(t, remote, "remote commit")
 	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
-	result := syncp.Run(context.Background(), local, flags, registry)
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
 	if result.Status != syncp.StatusUpdated {
 		t.Errorf("expected Updated, got %v (skip: %s, fail: %s)", result.Status, result.SkipReason, result.FailReason)
 	}
@@ -99,7 +100,7 @@ func TestRun_LocalAhead(t *testing.T) {
 	addCommit(t, local, "local only commit")
 	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
-	result := syncp.Run(context.Background(), local, flags, registry)
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
 	if result.Status != syncp.StatusNoOp {
 		t.Errorf("expected NoOp (local ahead), got %v", result.Status)
 	}
@@ -113,7 +114,7 @@ func TestRun_Diverged_Rebase(t *testing.T) {
 	addCommit(t, local, "local commit")
 	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
-	result := syncp.Run(context.Background(), local, flags, registry)
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
 	if result.Status != syncp.StatusRebased {
 		t.Errorf("expected Rebased, got %v (skip: %s, fail: %s)", result.Status, result.SkipReason, result.FailReason)
 	}
@@ -125,7 +126,7 @@ func TestRun_NoRebase_Diverged(t *testing.T) {
 	addCommit(t, local, "local commit")
 	flags := syncp.Flags{NoRebase: true, FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
-	result := syncp.Run(context.Background(), local, flags, registry)
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
 	if result.Status != syncp.StatusSkipped {
 		t.Errorf("expected Skipped, got %v", result.Status)
 	}
@@ -136,7 +137,7 @@ func TestRun_WhatIf(t *testing.T) {
 	addCommit(t, remote, "remote commit")
 	flags := syncp.Flags{WhatIf: true, FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
-	result := syncp.Run(context.Background(), local, flags, registry)
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
 
 	// --what-if for a fast-forwardable repo: status reflects what WOULD happen
 	// (StatusUpdated) so the summary buckets are meaningful. SkipWhatIf is kept
@@ -153,7 +154,7 @@ func TestRun_WhatIf(t *testing.T) {
 
 	// Verify the ff actually didn't happen: a real run should still update.
 	flags2 := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
-	result2 := syncp.Run(context.Background(), local, flags2, registry)
+	result2 := syncp.Run(context.Background(), local, flags2, registry, syncp.DefaultSyncer{})
 	if result2.Status != syncp.StatusUpdated {
 		t.Errorf("after --what-if, real run should still update; got %v", result2.Status)
 	}
@@ -164,7 +165,7 @@ func TestRun_EmptyRepo(t *testing.T) {
 	mustRun(t, dir, "git", "init")
 	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
-	result := syncp.Run(context.Background(), dir, flags, registry)
+	result := syncp.Run(context.Background(), dir, flags, registry, syncp.DefaultSyncer{})
 	if result.Status != syncp.StatusSkipped || result.SkipReason != syncp.SkipEmptyRepo {
 		t.Errorf("expected SkipEmptyRepo, got %v / %v", result.Status, result.SkipReason)
 	}
@@ -179,7 +180,7 @@ func TestRun_FetchTimeout(t *testing.T) {
 	// NOTE: do not lower go.mod below go 1.20 without re-evaluating this test.
 	flags := syncp.Flags{FetchTimeout: 0, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
-	result := syncp.Run(context.Background(), local, flags, registry)
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
 	if result.Status != syncp.StatusSkipped || result.SkipReason != syncp.SkipFetchTimeout {
 		t.Errorf("expected SkipFetchTimeout, got status=%v reason=%q", result.Status, result.SkipReason)
 	}
@@ -196,7 +197,7 @@ func TestRun_FastForward_DirtyWorktree(t *testing.T) {
 
 	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
-	result := syncp.Run(context.Background(), local, flags, registry)
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
 	if result.Status != syncp.StatusUpdated {
 		t.Errorf("expected Updated (FF with stash), got %v (skip=%s fail=%s)", result.Status, result.SkipReason, result.FailReason)
 	}
@@ -229,7 +230,7 @@ func TestRun_Rebase_DirtyWorktree(t *testing.T) {
 
 	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
-	result := syncp.Run(context.Background(), local, flags, registry)
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
 	if result.Status != syncp.StatusRebased {
 		t.Errorf("expected Rebased (rebase with stash), got %v (skip=%s fail=%s)", result.Status, result.SkipReason, result.FailReason)
 	}
@@ -289,7 +290,7 @@ func TestRun_RebaseInProgress_AutoAbort(t *testing.T) {
 
 	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
-	result := syncp.Run(context.Background(), local, flags, registry)
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
 
 	// Must NOT be skipped due to rebase-in-progress — the auto-abort should have cleared it.
 	if result.Status == syncp.StatusSkipped && result.SkipReason == syncp.SkipRebaseInProgress {
@@ -307,7 +308,7 @@ func TestRun_FastForward_StashConflict(t *testing.T) {
 
 	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
 	registry := &syncp.StashRegistry{}
-	result := syncp.Run(context.Background(), local, flags, registry)
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
 	if result.Status != syncp.StatusStashConflict {
 		t.Errorf("expected StatusStashConflict, got %v (skip=%s fail=%s)", result.Status, result.SkipReason, result.FailReason)
 	}
@@ -315,4 +316,88 @@ func TestRun_FastForward_StashConflict(t *testing.T) {
 	if entries := registry.List(); len(entries) != 1 {
 		t.Errorf("registry should have 1 orphaned entry after stash conflict, got %d", len(entries))
 	}
+}
+
+
+// ---------------------------------------------------------------------------
+// Spy syncer — verifies that Execute routes through the RepoSyncer interface
+// ---------------------------------------------------------------------------
+
+// spySyncer wraps DefaultSyncer, records every call, and lets tests inject
+// controlled errors for the Rebase and RebaseAbort paths.
+type spySyncer struct {
+	syncp.DefaultSyncer
+	rebaseErr error
+	abortErr  error
+	calls     []string
+}
+
+func (s *spySyncer) Rebase(ctx context.Context, state syncp.RepoState, flags syncp.Flags) error {
+	s.calls = append(s.calls, "Rebase")
+	if s.rebaseErr != nil {
+		return s.rebaseErr
+	}
+	return s.DefaultSyncer.Rebase(ctx, state, flags)
+}
+
+func (s *spySyncer) RebaseAbort(state syncp.RepoState) error {
+	s.calls = append(s.calls, "RebaseAbort")
+	// Don't delegate to DefaultSyncer.RebaseAbort when abortErr is nil: no
+	// real git rebase was started by the spy, so git rebase --abort would fail.
+	return s.abortErr
+}
+
+// TestExecute_RebaseConflict verifies that when Rebase returns an error and
+// RebaseAbort succeeds, Execute reports StatusRebaseConflict.
+func TestExecute_RebaseConflict(t *testing.T) {
+	local, remote := makeRepoWithRemote(t)
+	// Feature branch so Decide permits rebase (diverged default branch is always skipped).
+	mustRun(t, local, "git", "checkout", "-b", "feature/spy-rebase")
+	addCommit(t, remote, "remote commit")
+	addCommit(t, local, "local commit")
+
+	spy := &spySyncer{rebaseErr: fmt.Errorf("simulated rebase conflict")}
+	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
+	registry := &syncp.StashRegistry{}
+	result := syncp.Run(context.Background(), local, flags, registry, spy)
+
+	if result.Status != syncp.StatusRebaseConflict {
+		t.Errorf("expected StatusRebaseConflict, got %v (skip=%s fail=%s)", result.Status, result.SkipReason, result.FailReason)
+	}
+	if !containsCall(spy.calls, "Rebase") {
+		t.Errorf("expected Rebase to be called; calls=%v", spy.calls)
+	}
+	if !containsCall(spy.calls, "RebaseAbort") {
+		t.Errorf("expected RebaseAbort to be called after rebase failure; calls=%v", spy.calls)
+	}
+}
+
+// TestExecute_ManualIntervention verifies that when both Rebase and
+// RebaseAbort fail, Execute reports StatusManualInterventionRequired.
+func TestExecute_ManualIntervention(t *testing.T) {
+	local, remote := makeRepoWithRemote(t)
+	mustRun(t, local, "git", "checkout", "-b", "feature/spy-manual")
+	addCommit(t, remote, "remote commit")
+	addCommit(t, local, "local commit")
+
+	spy := &spySyncer{
+		rebaseErr: fmt.Errorf("simulated rebase conflict"),
+		abortErr:  fmt.Errorf("simulated abort failure"),
+	}
+	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
+	registry := &syncp.StashRegistry{}
+	result := syncp.Run(context.Background(), local, flags, registry, spy)
+
+	if result.Status != syncp.StatusManualInterventionRequired {
+		t.Errorf("expected StatusManualInterventionRequired, got %v (skip=%s fail=%s)", result.Status, result.SkipReason, result.FailReason)
+	}
+}
+
+func containsCall(calls []string, target string) bool {
+	for _, c := range calls {
+		if c == target {
+			return true
+		}
+	}
+	return false
 }
