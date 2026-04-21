@@ -11,7 +11,7 @@ import (
 // Execute carries out the Action for a repo. It manages stash lifecycle explicitly
 // (NOT via defer — stash pop is suppressed when rebase fails to avoid popping on
 // a half-rebased repo).
-func Execute(ctx context.Context, state RepoState, action Action, flags Flags, registry *StashRegistry) RepoResult {
+func Execute(ctx context.Context, state RepoState, action Action, flags Flags, registry *StashRegistry, syncer RepoSyncer) RepoResult {
 	base := RepoResult{
 		RepoPath:      state.RepoPath,
 		CurrentBranch: state.CurrentBranch,
@@ -64,10 +64,7 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 	case ActionNoOp:
 		return withStatus(base, StatusNoOp)
 	case ActionResetHard:
-		resetCtx, cancel := context.WithTimeout(ctx, time.Duration(flags.FetchTimeout)*time.Second)
-		defer cancel()
-		remoteRef := "origin/" + state.ParentBranch
-		if err := gitexec.ResetHard(resetCtx, state.RepoPath, remoteRef); err != nil {
+		if err := syncer.ResetHard(ctx, state, flags); err != nil {
 			r := withStatus(base, StatusFailed)
 			r.FailReason = "reset --hard failed: " + err.Error()
 			return r
@@ -117,9 +114,7 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 
 	switch action.Type {
 	case ActionFastForward:
-		ffCtx, cancel := context.WithTimeout(ctx, time.Duration(flags.FetchTimeout)*time.Second)
-		defer cancel()
-		if err := gitexec.PullFFOnly(ffCtx, state.RepoPath, state.ParentBranch); err != nil {
+		if err := syncer.FastForward(ctx, state, flags); err != nil {
 			popStash() // safe: no rebase in flight
 			r := withStatus(base, StatusFailed)
 			r.FailReason = "pull --ff-only failed: " + err.Error()
@@ -133,12 +128,9 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 		return withStatus(base, StatusUpdated)
 
 	case ActionRebase:
-		rebaseCtx, cancel := context.WithTimeout(ctx, time.Duration(flags.RebaseTimeout)*time.Second)
-		defer cancel()
-		remoteRef := "origin/" + state.ParentBranch
-		if err := gitexec.Rebase(rebaseCtx, state.RepoPath, remoteRef); err != nil {
-			// Rebase failed — attempt abort. Use Background ctx (rebaseCtx may be cancelled).
-			abortErr := gitexec.RebaseAbort(state.RepoPath)
+		if err := syncer.Rebase(ctx, state, flags); err != nil {
+			// Rebase failed — attempt abort. Use Background ctx (parent ctx may be cancelled).
+			abortErr := syncer.RebaseAbort(state)
 			if abortErr != nil {
 				// Both rebase and abort failed — repo may be corrupt
 				// Do NOT pop stash (repo state unknown)
