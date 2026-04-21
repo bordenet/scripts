@@ -207,6 +207,7 @@ func main() {
 				send(r)
 				remaining--
 			case sig := <-sigChan:
+				signal.Reset(os.Interrupt, syscall.SIGTERM) // restore OS default so second Ctrl-C kills immediately
 				cancel()
 				prog.Send(output.MsgPrint{Line: "\nInterrupted — waiting for in-flight repos to clean up..."})
 				drainCtx, drainCancel := context.WithTimeout(context.Background(), 10*time.Second)
