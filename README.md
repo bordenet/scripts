@@ -1,0 +1,187 @@
+# Scripts
+
+Utility scripts for macOS and Linux. Bash 3.2+, ShellCheck-clean.
+
+[![Quality Gates](https://github.com/bordenet/scripts/actions/workflows/quality-gates.yml/badge.svg)](https://github.com/bordenet/scripts/actions/workflows/quality-gates.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![ShellCheck](https://img.shields.io/badge/ShellCheck-passing-success.svg)](https://www.shellcheck.net/)
+
+## Git & GitHub
+
+| Script | Description |
+|---|---|
+| [`enumerate-gh-repos.sh`](./enumerate-gh-repos.sh) | Enumerates repositories within a specified GitHub Enterprise instance and organization. |
+| [`sync-git-repos.sh`](./sync-git-repos.sh) | Parallel git sync across 20+ repos — fast-forward, rebase, auto-stash, feature-branch parent detection. Works with GitHub, GitLab, ADO, and local-only git. Thin bash wrapper that builds a Go binary on demand. [Docs](./docs/sync-git-repos.md) |
+| [`integrate-claude-web-branch.sh`](./integrate-claude-web-branch.sh) | Integrates Claude Code web branches into main via complete PR workflow with minimal output. [Docs](./docs/integrate-claude-web-branch.md) |
+| [`purge-stale-claude-code-web-branches.sh`](./purge-stale-claude-code-web-branches.sh) | Interactive tool to safely delete stale Claude Code web branches with human-readable timestamps. [Docs](./docs/purge-stale-claude-code-web-branches.md) |
+| [`get-active-repos.sh`](./get-active-repos.sh) | Identifies and lists active GitHub repositories within a specified organization. |
+| [`list-dormant-repos.sh`](./list-dormant-repos.sh) | Identifies and lists dormant GitHub repositories within a specified organization. |
+| [`reset-all-repos.sh`](./reset-all-repos.sh) | Automates the process of resetting multiple Git repositories to match their remote main/master branch. |
+| [`scorch-repo.sh`](./scorch-repo.sh) | Removes build cruft by deleting files matching .gitignore patterns while protecting .env* files. Supports recursive processing, interactive mode, and what-if previews. |
+| [`scrub-git-history.sh`](./scrub-git-history.sh) | Uses 'git-filter-repo' to rewrite the Git repository history, permanently removing specified files or directories from all commits. |
+| [`squash-commits.sh`](./squash-commits.sh) | Interactively squash a range of commits in a Git repository. |
+| [`squash-last-n.sh`](./squash-last-n.sh) | Squashes the last <N> commits into a single new commit using git reset --soft. |
+
+### gitsync — parallel git sync
+
+`sync-git-repos.sh` is a thin wrapper around a Go binary that syncs repos in parallel.
+
+```bash
+# Sync all repos in ~/git (non-interactive)
+./sync-git-repos.sh --all ~/git
+
+# Dry run
+./sync-git-repos.sh --what-if ~/git
+
+# Core flags — see docs/sync-git-repos.md for full list
+--all              Process all repos without interactive menu
+--recursive        Search all subdirectories
+--what-if          Dry run — describe actions, make no changes
+--no-rebase        Skip diverged branches instead of rebasing
+--no-stash         Skip repos with local changes instead of stashing
+--force-rebase     Rebase pushed branches (solo use only; warns to force-push)
+--verbose          Show per-repo branch and timing detail
+--concurrency N    Max parallel repos (default: min(CPU count, 8))
+--fetch-timeout N  Per-repo fetch timeout in seconds (default: 30)
+--rebase-timeout N Per-repo rebase timeout in seconds (default: 120)
+--dir PATH         Target directory (default: current directory)
+```
+
+**How it works:**
+1. Wrapper hashes all `.go` source files + `go.mod` — rebuilds binary only when source changes
+2. SSH ControlMaster is pre-warmed before `exec` to avoid connection storm across goroutines
+3. Each repo runs in a goroutine (semaphore-bounded): guard checks → classify branch → detect parent → stash → fetch → decide (ff/rebase/skip) → execute → pop stash
+4. All output funnels through a single channel to the main goroutine — no interleaved writes
+
+**Performance:** ~1–3s for 10 repos (was ~90s sequential).
+
+## System & Environment
+
+| Script | Description |
+|---|---|
+| [`backup-wsl-config.sh`](./backup-wsl-config.sh) | Backs up WSL configuration files and settings into a timestamped archive with interactive restore script. |
+| [`bu.sh`](./bu.sh) | Performs a comprehensive system update and cleanup for a macOS environment. |
+| [`clone-brew.sh`](./clone-brew.sh) | Homebrew environment cloner - export and import brew packages and casks for macOS. |
+| [`cleanup-npm-global.sh`](./cleanup-npm-global.sh) | Helps manage and clean up globally installed npm packages. |
+| [`flush-dns-cache.sh`](./flush-dns-cache.sh) | Flushes the DNS cache on macOS. |
+| [`mu.sh`](./mu.sh) | Matt's Update - Comprehensive system update script for WSL + Windows environments. |
+| [`purge-identity.sh`](./purge-identity.sh) | Comprehensive macOS identity purge tool that discovers and permanently removes all traces of specified email identities from the system (keychain, browsers, Mail.app, SSH keys, cloud storage). |
+| [`setup-podman-for-terraform.sh`](./setup-podman-for-terraform.sh) | Automates the setup and configuration of Podman to be used as a Docker-compatible environment for Terraform. |
+| [`start-ollama.sh`](./start-ollama.sh) | Ollama LAN server bootstrap - auto-detects LAN IP and starts Ollama bound to that address. |
+
+## Security & Analysis
+
+| Script | Description |
+|---|---|
+| [`analyze-malware-sandbox/check-alpine-version.sh`](./analyze-malware-sandbox/check-alpine-version.sh) | Checks if the Alpine Linux version specified in the sandbox setup script is the latest stable version. |
+| [`analyze-malware-sandbox/create-vm-alternate.sh`](./analyze-malware-sandbox/create-vm-alternate.sh) | Provides an alternate method for creating the inspection sandbox VM. |
+| [`analyze-malware-sandbox/create-vm.sh`](./analyze-malware-sandbox/create-vm.sh) | Provides detailed manual instructions for creating the malware inspection sandbox VM using UTM. |
+| [`analyze-malware-sandbox/inspect.sh`](./analyze-malware-sandbox/inspect.sh) | A wrapper for inspecting a suspicious file within the isolated malware analysis sandbox. |
+| [`analyze-malware-sandbox/provision-vm.sh`](./analyze-malware-sandbox/provision-vm.sh) | Helps automate the final provisioning steps for the inspection sandbox VM after Alpine Linux has been installed. |
+| [`analyze-malware-sandbox/setup-alpine.sh`](./analyze-malware-sandbox/setup-alpine.sh) | Executed INSIDE the Alpine Linux VM to perform an unattended installation. |
+| [`analyze-malware-sandbox/setup-sandbox.sh`](./analyze-malware-sandbox/setup-sandbox.sh) | Sets up a secure sandbox environment for inspecting potentially malicious files. |
+| [`analyze-malware-sandbox/status.sh`](./analyze-malware-sandbox/status.sh) | Performs a comprehensive health check of the malware inspection sandbox environment. |
+| [`analyze-malware-sandbox/shared/analyze.sh`](./analyze-malware-sandbox/shared/analyze.sh) | Runs inside the Alpine Linux VM to analyze potentially malicious files. |
+| [`capture-packets/capture.sh`](./capture-packets/capture.sh) | Starts a packet capture using tcpdump. |
+| [`capture-packets/compress-pcap-gzip.sh`](./capture-packets/compress-pcap-gzip.sh) | Compresses .pcap files in a specified directory using gzip. |
+| [`capture-packets/compress-pcap-zstd.sh`](./capture-packets/compress-pcap-zstd.sh) | Compresses .pcap files in a specified directory using zstd. |
+| [`capture-packets/start-pcap-rotate.sh`](./capture-packets/start-pcap-rotate.sh) | Starts a rotating packet capture using tcpdump. |
+| [`capture-packets/stop-pcap-rotate.sh`](./capture-packets/stop-pcap-rotate.sh) | Stops the packet capture rotation process. |
+
+## Repository Maintenance
+
+Tools for keeping the repository compliant, documented, and clean.
+
+| Script | Description |
+|---|---|
+| [`add-help-batch.sh`](./add-help-batch.sh) | Adds `--help` to all scripts missing it — batch remediation for compliance. |
+| [`ci-quality-gates.sh`](./ci-quality-gates.sh) | Runs all quality gates locally (ShellCheck, syntax, cross-references). Mirrors what GitHub Actions runs. |
+| [`detect-readme-slop.sh`](./detect-readme-slop.sh) | Detects AI-generated filler language in README files. Can run as a pre-commit hook. |
+| [`fix-compliance-batch.sh`](./fix-compliance-batch.sh) | Batch-fixes common STYLE_GUIDE.md violations across all scripts. |
+| [`validate-cross-references.sh`](./validate-cross-references.sh) | Validates all Markdown links and script cross-references in the repository. |
+| [`validate-script-compliance.sh`](./validate-script-compliance.sh) | Checks all scripts against STYLE_GUIDE.md requirements (shebang, error handling, help flag, line count). |
+
+## Xcode
+
+| Script | Description |
+|---|---|
+| [`xcode/inspect-xcode.sh`](./xcode/inspect-xcode.sh) | Analyzes an Xcode project for common issues. |
+
+## AI Assistant
+
+| Script | Description |
+|---|---|
+| [`resume-claude.sh`](./resume-claude.sh) | Automates the process of resuming an AI assistant session with "Claude" within VS Code. |
+| [`schedule-claude.sh`](./schedule-claude.sh) | Schedules the execution of the 'resume-claude.sh' script after a specified delay. |
+| [`tell-vscode-at.sh`](./tell-vscode-at.sh) | Send messages to VS Code instances at specified times using AppleScript. [Docs](./docs/tell-vscode-at.md) |
+
+## Experimental
+
+Scripts in development or testing. May not meet full compliance standards yet.
+
+| Script | Description |
+|---|---|
+| [`experimental/install-augment-superpowers.sh`](./experimental/install-augment-superpowers.sh) | Installs the superpowers skill system for Augment Code. Self-contained installer (requires only git + node) works via curl pipe on macOS, Linux, and WSL. |
+| [`experimental/app-nuke.sh`](./experimental/app-nuke.sh) | Application removal utility (experimental). |
+| [`experimental/daily-trim.sh`](./experimental/daily-trim.sh) | Daily cleanup utility (experimental). |
+| [`experimental/disk-master.sh`](./experimental/disk-master.sh) | Disk management utility (experimental). |
+
+## Engineering Starter Kit
+
+Portable collection of engineering best practices for new projects.
+
+See **[`starter-kit/`](./starter-kit/README.md)** for:
+- Pre-commit hooks, validation systems, dependency management
+- AI development protocols for Claude Code
+- Cross-language style guides (Go, JS/TS, Dart, Kotlin, Swift)
+- Reusable shell script library (common.sh)
+- Project setup checklist
+
+```bash
+# Copy to your project
+cp -r starter-kit/ your-project/docs/
+```
+
+---
+
+## macOS Development Environment Setup
+
+Modular, component-based architecture for macOS setup scripts.
+
+See **[`macos-setup/`](./macos-setup/README.md)** for reusable template system with:
+- Component-based architecture (reduces complexity ~65%)
+- Selective component reuse
+- Consistent UI (verbose/compact modes)
+- AI-assisted customization guide
+
+```bash
+# Copy to your project
+cp -r macos-setup/lib your-project/scripts/
+cp -r macos-setup/setup-components your-project/scripts/
+cp macos-setup/setup-macos-template.sh your-project/scripts/setup-macos.sh
+```
+
+---
+
+## Standards
+
+All scripts follow [STYLE_GUIDE.md](./STYLE_GUIDE.md):
+
+- `#!/usr/bin/env bash` shebang
+- `set -euo pipefail` error handling
+- `-h/--help` with man-page style output
+- `--what-if` for destructive operations
+- Under 400 lines
+- ShellCheck clean (`shellcheck -S warning`)
+
+Pre-commit hooks and CI enforce these automatically.
+
+## Documentation
+
+- [STYLE_GUIDE.md](./STYLE_GUIDE.md) — Coding standards
+- [CLAUDE.md](./CLAUDE.md) — AI assistant guidelines
+- [docs/](./docs/) — Script-specific docs
+
+## License
+
+MIT — see [LICENSE](./LICENSE)

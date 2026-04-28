@@ -1,0 +1,195 @@
+package sync
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"gitsync/internal/gitexec"
+)
+
+// Execute carries out the Action for a repo. It manages stash lifecycle explicitly
+// (NOT via defer — stash pop is suppressed when rebase fails to avoid popping on
+// a half-rebased repo).
+func Execute(ctx context.Context, state RepoState, action Action, flags Flags, registry *StashRegistry, syncer RepoSyncer) RepoResult {
+	base := RepoResult{
+		RepoPath:      state.RepoPath,
+		CurrentBranch: state.CurrentBranch,
+		ParentBranch:  state.ParentBranch,
+		BranchType:    state.BranchType,
+	}
+
+	// --what-if: return description, no writes.
+	// Status reflects what WOULD have happened so the summary buckets are useful:
+	//   ActionNoOp        → StatusNoOp   (WhatIfAction set; formatter routes via WhatIfAction != "")
+	//   ActionFastForward → StatusUpdated (WhatIfAction set; SkipWhatIf kept for backward compat)
+	//   ActionRebase      → StatusRebased (WhatIfAction set; SkipWhatIf kept for backward compat)
+	//   ActionSkip        → StatusSkipped with the REAL SkipReason (shows ⊘ + reason)
+	//   ActionFail        → StatusFailed  with the real FailReason  (shows ✗ + reason)
+	if action.WhatIf {
+		r := RepoResult{
+			RepoPath:      state.RepoPath,
+			WhatIfAction:  describeAction(action, state),
+			CurrentBranch: state.CurrentBranch,
+			ParentBranch:  state.ParentBranch,
+		}
+		switch action.Type {
+		case ActionNoOp:
+			r.Status = StatusNoOp
+			r.SkipReason = SkipWhatIf
+		case ActionFastForward:
+			r.Status = StatusUpdated
+			r.SkipReason = SkipWhatIf
+		case ActionRebase:
+			r.Status = StatusRebased
+			r.SkipReason = SkipWhatIf
+			r.ForceRebase = action.ForceRebase
+		case ActionResetHard:
+			r.Status = StatusReset
+			r.SkipReason = SkipWhatIf
+		case ActionSkip:
+			r.Status = StatusSkipped
+			r.SkipReason = action.SkipReason // real reason — formatter shows ⊘
+		case ActionFail:
+			r.Status = StatusFailed
+			r.FailReason = action.FailReason
+		default:
+			r.Status = StatusSkipped
+			r.SkipReason = SkipWhatIf
+		}
+		return r
+	}
+
+	switch action.Type {
+	case ActionNoOp:
+		return withStatus(base, StatusNoOp)
+	case ActionResetHard:
+		if err := syncer.ResetHard(ctx, state, flags); err != nil {
+			r := withStatus(base, StatusFailed)
+			r.FailReason = "reset --hard failed: " + err.Error()
+			return r
+		}
+		return withStatus(base, StatusReset)
+	case ActionSkip:
+		r := withStatus(base, StatusSkipped)
+		r.SkipReason = action.SkipReason
+		return r
+	case ActionFail:
+		r := withStatus(base, StatusFailed)
+		r.FailReason = action.FailReason
+		return r
+	}
+
+	// FastForward or Rebase — may need stash
+	stashMsg := fmt.Sprintf("gitsync auto-stash %s", time.Now().UTC().Format(time.RFC3339))
+	stashed := false
+
+	if action.RequiresCleanWorktree && state.HasLocalChanges {
+		if err := gitexec.StashPush(ctx, state.RepoPath, stashMsg); err != nil {
+			r := withStatus(base, StatusFailed)
+			r.FailReason = "stash push failed: " + err.Error()
+			return r
+		}
+		stashed = true
+		registry.Add(StashEntry{RepoPath: state.RepoPath, StashMessage: stashMsg})
+	}
+
+	// popStash pops the stash if one was created. Returns true if pop conflicted.
+	// Must be called explicitly — NOT deferred.
+	// Uses context.Background() so cancellation doesn't prevent stash cleanup.
+	// registry.Remove is called AFTER a successful pop so the interrupt handler
+	// can retry on SIGINT if pop fails.
+	// Idempotent: stashed is set to false on first call; subsequent calls return false immediately.
+	popStash := func() bool {
+		if !stashed {
+			return false
+		}
+		stashed = false
+		if err := gitexec.StashPop(context.Background(), state.RepoPath); err != nil {
+			return true // conflict — stash still in place, registry entry preserved
+		}
+		registry.Remove(state.RepoPath)
+		return false
+	}
+
+	switch action.Type {
+	case ActionFastForward:
+		if err := syncer.FastForward(ctx, state, flags); err != nil {
+			popStash() // safe: no rebase in flight
+			r := withStatus(base, StatusFailed)
+			r.FailReason = "pull --ff-only failed: " + err.Error()
+			return r
+		}
+		if popStash() {
+			r := withStatus(base, StatusStashConflict)
+			r.ManualSteps = []string{"cd " + state.RepoPath, "git stash pop  # resolve conflicts manually"}
+			return r
+		}
+		return withStatus(base, StatusUpdated)
+
+	case ActionRebase:
+		if err := syncer.Rebase(ctx, state, flags); err != nil {
+			// Rebase failed — attempt abort. Use Background ctx (parent ctx may be cancelled).
+			abortErr := syncer.RebaseAbort(state)
+			if abortErr != nil {
+				// Both rebase and abort failed — repo may be corrupt
+				// Do NOT pop stash (repo state unknown)
+				r := withStatus(base, StatusManualInterventionRequired)
+				r.FailReason = "rebase and abort both failed"
+				r.ManualSteps = []string{
+					"cd " + state.RepoPath,
+					"git rebase --abort  # or: git reset --hard HEAD",
+					"git stash list     # check for orphaned stash",
+				}
+				return r
+			}
+			// Abort succeeded — safe to pop stash.
+			// If stash pop also conflicts, surface that to the user.
+			if popStash() {
+				r := withStatus(base, StatusStashConflict)
+				r.ManualSteps = []string{"cd " + state.RepoPath, "git stash pop  # rebase rolled back; stash pop also conflicted"}
+				return r
+			}
+			r := withStatus(base, StatusRebaseConflict)
+			r.FailReason = "rebase conflict, rolled back"
+			return r
+		}
+		// Rebase succeeded — pop stash
+		if popStash() {
+			r := withStatus(base, StatusStashConflict)
+			r.ManualSteps = []string{"cd " + state.RepoPath, "git stash pop  # resolve conflicts manually"}
+			return r
+		}
+		r := withStatus(base, StatusRebased)
+		r.ForceRebase = action.ForceRebase
+		return r
+	}
+
+	// Unreachable
+	r := withStatus(base, StatusFailed)
+	r.FailReason = "unexpected action type"
+	return r
+}
+
+func withStatus(base RepoResult, s Status) RepoResult {
+	base.Status = s
+	return base
+}
+
+func describeAction(action Action, state RepoState) string {
+	switch action.Type {
+	case ActionNoOp:
+		return "already up to date"
+	case ActionFastForward:
+		return fmt.Sprintf("would fast-forward %s from origin/%s", state.CurrentBranch, state.ParentBranch)
+	case ActionRebase:
+		return fmt.Sprintf("would rebase %s onto origin/%s", state.CurrentBranch, state.ParentBranch)
+	case ActionResetHard:
+		return fmt.Sprintf("would reset --hard %s to origin/%s (unrelated history)", state.CurrentBranch, state.ParentBranch)
+	case ActionSkip:
+		return fmt.Sprintf("would skip: %s", action.SkipReason)
+	case ActionFail:
+		return fmt.Sprintf("would fail: %s", action.FailReason)
+	}
+	return "unknown"
+}

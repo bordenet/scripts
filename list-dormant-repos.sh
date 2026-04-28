@@ -1,0 +1,243 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+#
+# Script Name: list-dormant-repos.sh
+#
+# Description: This script identifies and lists dormant GitHub repositories
+#              within a specified organization. A repository is considered
+#              dormant if it has NOT had a push within the last year. For each
+#              dormant repository, it reports its name, the last push
+#              timestamp, and the total lines of code.
+#
+# Platform: Cross-platform
+#
+# Usage: ./list-dormant-repos.sh
+#
+# Configuration:
+#   Set these environment variables before running:
+#   - GITHUB_ORG:     GitHub organization name
+#   - GITHUB_API_URL: GitHub API URL (for GitHub Enterprise)
+#   - GITHUB_TOKEN:   Personal access token with repo read permissions
+#
+# Dependencies: curl, jq, git, date
+#
+# Author: Matt J Bordenet
+#
+# Last Updated: 2025-10-08
+#
+# -----------------------------------------------------------------------------
+
+# Exit immediately if a command exits with a non-zero status.
+
+set -euo pipefail
+
+# --- Argument Defaults ---
+VERBOSE=false
+
+# --- Help Function ---
+show_help() {
+    cat << EOF
+NAME
+    list-dormant-repos.sh - Identify and list dormant GitHub repositories
+
+SYNOPSIS
+    list-dormant-repos.sh [OPTIONS]
+
+DESCRIPTION
+    Identifies and lists dormant GitHub repositories within a specified organization.
+    A repository is considered dormant if it has NOT had a push within the last year.
+    For each dormant repository, reports its name, last push timestamp, and total
+    lines of code.
+
+OPTIONS
+    -h, --help
+        Display this help message and exit.
+
+    -v, --verbose
+        Enable verbose output showing detailed progress information.
+
+PLATFORM
+    Cross-platform (macOS, Linux, WSL)
+
+CONFIGURATION
+    Set these environment variables before running:
+    • GITHUB_ORG - GitHub organization name
+    • GITHUB_API_URL - GitHub API URL (for GitHub Enterprise)
+    • GITHUB_TOKEN - Personal access token with repository read permissions
+
+DEPENDENCIES
+    • curl - For API requests
+    • jq - For JSON parsing
+    • git - For cloning repositories
+    • date - For date calculations
+
+EXAMPLES
+    # List all dormant repositories
+    ./list-dormant-repos.sh
+
+OUTPUT FORMAT
+    Repo    Last-Pushed    Lines-of-Code
+
+NOTES
+    This script clones each dormant repository to count lines of code, which may
+    take considerable time for organizations with many repositories. Consider using
+    this script to identify candidates for archiving or cleanup.
+
+AUTHOR
+    Matt J Bordenet
+
+SEE ALSO
+    get-active-repos.sh, enumerate-gh-repos.sh
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        -*)
+            echo "Error: Unknown option: $1"
+            echo "Try '$0 --help' for more information"
+            exit 1
+            ;;
+        *)
+            echo "Error: Unexpected argument: $1"
+            echo "Try '$0 --help' for more information"
+            exit 1
+            ;;
+    esac
+done
+
+# --- Configuration ---
+# Set these via environment variables or pass as arguments
+GITHUB_ORG="${GITHUB_ORG:-}"
+GITHUB_API_URL="${GITHUB_API_URL:-}"
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+
+if [[ -z "$GITHUB_ORG" || -z "$GITHUB_API_URL" || -z "$GITHUB_TOKEN" ]]; then
+    echo "Error: Required environment variables not set." >&2
+    echo "  export GITHUB_ORG='your-org'" >&2
+    echo "  export GITHUB_API_URL='https://github.example.com/api/v3'" >&2
+    echo "  export GITHUB_TOKEN='ghp_...'" >&2
+    exit 1
+fi
+
+# --- Script Setup ---
+start_time=$(date +%s)
+TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
+
+# --- Functions ---
+
+# Function to log verbose messages
+log_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo "INFO: $*"
+    fi
+}
+
+# Calculate the date one year ago (macOS and GNU compatible).
+if date -u -v-1y +'%Y' >/dev/null 2>&1; then
+    ONE_YEAR_AGO=$(date -u -v-1y +'%Y-%m-%dT%H:%M:%SZ')
+else
+    ONE_YEAR_AGO=$(date -u -d '1 year ago' +'%Y-%m-%dT%H:%M:%SZ')
+fi
+
+log_verbose "Verbose mode enabled"
+log_verbose "Configuration: GITHUB_ORG=$GITHUB_ORG, GITHUB_API_URL=$GITHUB_API_URL"
+echo "Finding dormant repositories in '$GITHUB_ORG' (no pushes since $ONE_YEAR_AGO)..."
+
+# Function to fetch all repositories for the organization, handling pagination.
+fetch_all_repos() {
+    local page=1
+    local all_repos=()
+    local repos_url="$GITHUB_API_URL/orgs/$GITHUB_ORG/repos"
+
+    echo "Fetching all repositories for organization: $GITHUB_ORG"
+    log_verbose "API URL: $repos_url"
+    while :; do
+        log_verbose "Fetching page $page"
+        response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$repos_url?per_page=100&page=$page")
+        repo_names=$(echo "$response" | jq -r '.[].name')
+
+        if [ -z "$repo_names" ]; then
+            break
+        fi
+        while IFS= read -r repo; do
+            all_repos+=("$repo")
+        done <<< "$repo_names"
+        ((page++))
+    done
+    printf '%s\n' "${all_repos[@]}"
+}
+
+# Function to count lines of code in a repository.
+count_loc() {
+    local repo_name=$1
+    # Extract hostname from API URL for clone URL
+    local github_host
+    github_host=$(echo "$GITHUB_API_URL" | sed 's|https\?://||; s|/api/v3||')
+    local repo_url="https://x-access-token:$GITHUB_TOKEN@$github_host/$GITHUB_ORG/$repo_name.git"
+    local clone_dir="$TEMP_DIR/$repo_name"
+
+    echo "Cloning $repo_name to count lines of code..."
+    log_verbose "Clone destination: $clone_dir"
+    git clone --quiet "$repo_url" "$clone_dir"
+
+    log_verbose "Counting lines using git ls-files"
+    # Using git ls-files to respect .gitignore, then counting lines.
+    lines_of_code=$(cd "$clone_dir" && git ls-files -z | xargs -0 wc -l | tail -n 1 | awk '{print $1}')
+    
+    echo "$lines_of_code"
+}
+
+# --- Main Script ---
+
+# Get all repositories.
+all_repos=()
+while IFS= read -r repo; do
+    [[ -n "$repo" ]] && all_repos+=("$repo")
+done < <(fetch_all_repos)
+
+if [ "${#all_repos[@]}" -eq 0 ]; then
+    echo "Error: No repositories found for organization '$GITHUB_ORG'. Check configuration and token permissions."
+    exit 1
+fi
+
+echo "Found ${#all_repos[@]} repositories. Checking for inactivity..."
+echo -e "\nRepo\tLast-Pushed\tLines-of-Code"
+
+# Check each repository for activity.
+for repo in "${all_repos[@]}"; do
+    echo "Checking activity for: $repo"
+    response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$GITHUB_API_URL/repos/$GITHUB_ORG/$repo")
+    last_pushed=$(echo "$response" | jq -r '.pushed_at')
+
+    if [[ "$last_pushed" == "null" || -z "$last_pushed" ]]; then
+        echo "  -> No push data available (empty repo?)"
+        continue
+    fi
+
+    if [[ "$last_pushed" < "$ONE_YEAR_AGO" ]]; then
+        echo "  -> Dormant. Last push: $last_pushed"
+        lines_of_code=$(count_loc "$repo")
+        echo -e "$repo\t$last_pushed\t$lines_of_code"
+    else
+        echo "  -> Active. Last push: $last_pushed"
+    fi
+done
+
+echo -e "\nDone!"
+
+# --- Completion ---
+end_time=$(date +%s)
+execution_time=$((end_time - start_time))
+echo "Total execution time: ${execution_time} seconds"
