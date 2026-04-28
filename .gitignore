@@ -1,20 +1,58 @@
-# Symlinked repos (managed independently)
+# System files
+.DS_Store
+git_reset.log
+
+# Packet capture artifacts
+captures/*.pcap
+captures/*.log
+captures/*.pid
+# Stray backslash directory — created by tcpdump path bug in start-pcap-rotate.sh
+\\/
+
+# AI assistant rules
+.github/instructions/codacy.instructions.md
+.cursor/rules/codacy.mdc
+
+# Temporary/personal scripts
+resume-at-0801.sh
+delete-time-machine-snapshots.sh
+
+# Malware sandbox - security sensitive files
+analyze-malware-sandbox/id_rsa
+analyze-malware-sandbox/id_rsa.pub
+analyze-malware-sandbox/*.iso
+analyze-malware-sandbox/shared/*
+analyze-malware-sandbox/vm/*
+analyze-malware-sandbox/.env
+
+# Purge identity - runtime data
+purge-identity/cache/*
+purge-identity/logs/*
+ADOPT-PROMPT.md
+Agents.md.original
+MODULAR-MIGRATION-PROMPT.md
+*.backup
+
+# Go build artifacts
+/gitsync
+/gitsync_new
+*.test
+*.out
+/vendor/
+
+# gitsync runtime files
+.gitsync.hash
+.gitsync.lock
+
+# CI / review gate sentinels (local-only)
+.code-review-cleared
+.agent-gates.tmp
+
+# Symlinked workspace repos (managed independently)
 CallBox/
 Personal/
 Private/
 Public/
-
-# golden-agents artifacts
-ADOPT-PROMPT.md
-*.original
-
-MODULAR-MIGRATION-PROMPT.md
-
-
-#Ignore cursor AI rules
-.cursor/rules/codacy.mdc
-.DS_Store
-wiki/
 
 # OneDrive / cloud sync artifacts
 *,*
@@ -29,3 +67,6 @@ wiki/
 # Claude Code session artifacts
 SONNET_CONTEXT_HANDOFF.md
 *_CONTEXT_HANDOFF.md
+
+# wiki subdir
+wiki/

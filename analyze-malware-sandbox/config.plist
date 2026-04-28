@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Backend</key>
+	<string>Apple</string>
+	<key>System</key>
+	<dict>
+		<key>Architecture</key>
+		<string>x86_64</string>
+		<key>CPUCount</key>
+		<integer>2</integer>
+		<key>MemorySize</key>
+		<integer>2048</integer>
+	</dict>
+	<key>Boot</key>
+	<dict>
+		<key>OperatingSystem</key>
+		<string>Linux</string>
+		<key>LinuxKernelPath</key>
+		<string>vmlinuz-lts</string>
+		<key>LinuxInitrdPath</key>
+		<string>initramfs-lts</string>
+		<key>LinuxCommandLine</key>
+		<string>ip=dhcp alpine_repo=http://dl-cdn.alpinelinux.org/alpine/v3.19/main/ apkovl=http://192.168.64.1:8000/setup_alpine.sh</string>
+	</dict>
+	<key>Drives</key>
+	<array>
+		<dict>
+			<key>Identifier</key>
+			<string>disk0</string>
+			<key>Size</key>
+			<integer>10240</integer>
+			<key>Removable</key>
+			<false/>
+			<key>IsExternal</key>
+			<false/>
+		</dict>
+	</array>
+	<key>Network</key>
+	<dict>
+		<key>NetworkMode</key>
+		<string>Isolated</string>
+		<key>PortForward</key>
+		<array>
+			<dict>
+				<key>Protocol</key>
+				<string>tcp</string>
+				<key>HostPort</key>
+				<integer>2222</integer>
+				<key>GuestPort</key>
+				<integer>22</integer>
+			</dict>
+		</array>
+	</dict>
+	<key>Sharing</key>
+	<dict>
+		<key>DirectoryShareMode</key>
+		<string>ReadOnly</string>
+		<key>DirectorySharePath</key>
+		<string>__SHARED_DIR__</string>
+	</dict>
+</dict>
+</plist>

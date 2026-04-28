@@ -1,0 +1,335 @@
+package sync_test
+
+import (
+	"errors"
+	"testing"
+
+	syncp "gitsync/internal/sync"
+)
+
+// sha values used in tests — just need to be distinct
+const (
+	shaA = "aaaa"
+	shaB = "bbbb"
+	shaC = "cccc"
+)
+
+func defaultFlags() syncp.Flags {
+	return syncp.Flags{FetchTimeout: 30, RebaseTimeout: 120, Concurrency: 8}
+}
+
+func TestDecide_AllScenarios(t *testing.T) {
+	tests := []struct {
+		name           string
+		state          syncp.RepoState
+		flags          syncp.Flags
+		wantAction     syncp.ActionType
+		wantSkipReason syncp.SkipReason
+	}{
+		{
+			name:           "1_empty_repo",
+			state:          syncp.RepoState{IsEmpty: true},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipEmptyRepo,
+		},
+		{
+			name:           "2_no_remote",
+			state:          syncp.RepoState{HasOrigin: false},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipNoRemote,
+		},
+		{
+			name:           "3_detached_head",
+			state:          syncp.RepoState{HasOrigin: true, CurrentBranch: ""},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipDetachedHEAD,
+		},
+		{
+			name:           "4_conflict_in_progress",
+			state:          syncp.RepoState{HasOrigin: true, CurrentBranch: "main", HasUnmerged: true},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipUnresolvedConflict,
+		},
+		{
+			name:           "5_rebase_in_progress",
+			state:          syncp.RepoState{HasOrigin: true, CurrentBranch: "main", HasRebaseHead: true},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipRebaseInProgress,
+		},
+		{
+			name: "6_up_to_date",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "main", DefaultBranch: "main",
+				BranchType: syncp.BranchTypeDefault,
+				LocalSHA:   shaA, RemoteSHA: shaA, BaseSHA: shaA,
+			},
+			flags:      defaultFlags(),
+			wantAction: syncp.ActionNoOp,
+		},
+		{
+			name: "7_ff_available",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "main", DefaultBranch: "main",
+				BranchType: syncp.BranchTypeDefault,
+				LocalSHA:   shaA, RemoteSHA: shaB, BaseSHA: shaA, // local==base → ff available
+			},
+			flags:      defaultFlags(),
+			wantAction: syncp.ActionFastForward,
+		},
+		{
+			name: "8_local_ahead",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "main", DefaultBranch: "main",
+				BranchType: syncp.BranchTypeDefault,
+				LocalSHA:   shaB, RemoteSHA: shaA, BaseSHA: shaA, // remote==base → local ahead
+			},
+			flags:      defaultFlags(),
+			wantAction: syncp.ActionNoOp,
+		},
+		{
+			name: "9_diverged_no_rebase",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
+				BranchType:   syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA:     shaB, RemoteSHA: shaC, BaseSHA: shaA, // all different → diverged
+			},
+			flags:          syncp.Flags{NoRebase: true, FetchTimeout: 30, RebaseTimeout: 120},
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipDivergedNoRebase,
+		},
+		{
+			name: "10_diverged_rebase_not_pushed",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
+				BranchType:   syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA:     shaB, RemoteSHA: shaC, BaseSHA: shaA,
+				IsPushed:     false,
+			},
+			flags:      defaultFlags(),
+			wantAction: syncp.ActionRebase,
+		},
+		{
+			name: "11_diverged_pushed_no_force",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
+				BranchType:   syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA:     shaB, RemoteSHA: shaC, BaseSHA: shaA,
+				IsPushed:     true,
+			},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipPushedNeedForce,
+		},
+		{
+			name: "12_diverged_force_rebase",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
+				BranchType:   syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA:     shaB, RemoteSHA: shaC, BaseSHA: shaA,
+				IsPushed:     true,
+			},
+			flags:      syncp.Flags{ForceRebase: true, FetchTimeout: 30, RebaseTimeout: 120},
+			wantAction: syncp.ActionRebase,
+		},
+		{
+			name: "13_shallow_diverged",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
+				BranchType:   syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA:     shaB, RemoteSHA: shaC, BaseSHA: shaA,
+				IsShallow:    true,
+			},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipShallowClone,
+		},
+		{
+			name: "14_submodules_diverged",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
+				BranchType:    syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA:      shaB, RemoteSHA: shaC, BaseSHA: shaA,
+				HasSubmodules: true,
+			},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipHasSubmodules,
+		},
+		{
+			name: "15_fetch_timeout",
+			state: syncp.RepoState{
+				HasOrigin:    true,
+				CurrentBranch: "main",
+				FetchTimeout: true,
+			},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipFetchTimeout,
+		},
+		{
+			name: "16_diverged_default_branch",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "main", DefaultBranch: "main",
+				BranchType: syncp.BranchTypeDefault,
+				LocalSHA:   shaB, RemoteSHA: shaC, BaseSHA: shaA, // diverged
+			},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipDefaultDiverged,
+		},
+		{
+			name: "17_no_common_ancestor_default_branch",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "main", DefaultBranch: "main",
+				BranchType: syncp.BranchTypeDefault,
+				LocalSHA:   shaA, RemoteSHA: shaB, BaseSHA: "", // unrelated history
+			},
+			flags:      defaultFlags(),
+			wantAction: syncp.ActionResetHard,
+		},
+		{
+			name: "18_no_common_ancestor_default_branch_dirty",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "main", DefaultBranch: "main",
+				BranchType:      syncp.BranchTypeDefault,
+				LocalSHA:        shaA, RemoteSHA: shaB, BaseSHA: "",
+				HasLocalChanges: true,
+			},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipNoCommonAncestor,
+		},
+		{
+			name: "20_no_common_ancestor_feature_branch",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
+				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA:   shaA, RemoteSHA: shaB, BaseSHA: "", // unrelated history
+			},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipNoCommonAncestor,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			action := syncp.Decide(tt.state, tt.flags)
+			if action.Type != tt.wantAction {
+				t.Errorf("Decide() action = %v, want %v", action.Type, tt.wantAction)
+			}
+			if tt.wantSkipReason != "" && action.SkipReason != tt.wantSkipReason {
+				t.Errorf("Decide() skipReason = %q, want %q", action.SkipReason, tt.wantSkipReason)
+			}
+			// Verify RequiresCleanWorktree truth table
+			switch action.Type {
+			case syncp.ActionFastForward, syncp.ActionRebase:
+				if !action.RequiresCleanWorktree {
+					t.Error("FF and Rebase actions must have RequiresCleanWorktree=true")
+				}
+			case syncp.ActionNoOp, syncp.ActionSkip, syncp.ActionFail, syncp.ActionResetHard:
+				if action.RequiresCleanWorktree {
+					t.Error("NoOp/Skip/Fail/ResetHard actions must have RequiresCleanWorktree=false")
+				}
+			}
+		})
+	}
+}
+
+// TestDecide_FetchError verifies a transient FetchErr → ActionFail
+func TestDecide_FetchError(t *testing.T) {
+	state := syncp.RepoState{
+		HasOrigin:     true,
+		CurrentBranch: "main",
+		FetchErr:      errors.New("connection refused"),
+	}
+	action := syncp.Decide(state, defaultFlags())
+	if action.Type != syncp.ActionFail {
+		t.Errorf("expected ActionFail for transient FetchErr, got %v", action.Type)
+	}
+}
+
+// TestDecide_RemoteGone verifies that a "repo no longer exists" fetch error is
+// demoted to ActionSkip(SkipRemoteGone) rather than ActionFail, so it doesn't
+// trigger the failure exit code or show as ✗ in the output.
+func TestDecide_RemoteGone(t *testing.T) {
+	cases := []struct {
+		name string
+		msg  string
+	}{
+		{"ado_tf401019", "exit status 128 (stderr: remote: TF401019: The Git repository with name or identifier cb-logger-js does not exist or you do not have permissions)"},
+		{"github_not_found", "exit status 128 (stderr: ERROR: Repository not found.)"},
+		{"generic_not_found", "exit status 128 (stderr: fatal: repository 'https://example.com/gone.git/' not found)"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			state := syncp.RepoState{
+				HasOrigin:     true,
+				CurrentBranch: "main",
+				FetchErr:      errors.New(tc.msg),
+				RemoteGone:    true,
+			}
+			action := syncp.Decide(state, defaultFlags())
+			if action.Type != syncp.ActionSkip {
+				t.Errorf("expected ActionSkip, got %v", action.Type)
+			}
+			if action.SkipReason != syncp.SkipRemoteGone {
+				t.Errorf("expected SkipRemoteGone, got %q", action.SkipReason)
+			}
+		})
+	}
+}
+
+func TestIsNoteworthyResult(t *testing.T) {
+	tests := []struct {
+		desc string
+		r    syncp.RepoResult
+		want bool
+	}{
+		// Clean real outcomes → suppress in compact mode.
+		{"updated real", syncp.RepoResult{Status: syncp.StatusUpdated}, false},
+		{"noop real", syncp.RepoResult{Status: syncp.StatusNoOp}, false},
+		{"reset real", syncp.RepoResult{Status: syncp.StatusReset}, false},
+		{"rebased clean", syncp.RepoResult{Status: syncp.StatusRebased}, false},
+
+		// WhatIf outcomes (WhatIfAction set by execute.go) → always show dry-run preview.
+		// Uses WhatIfAction field, not SkipReason, to avoid overloading skip semantics.
+		{"whatif updated", syncp.RepoResult{Status: syncp.StatusUpdated, WhatIfAction: "would fast-forward"}, true},
+		{"whatif noop", syncp.RepoResult{Status: syncp.StatusNoOp, WhatIfAction: "already up to date"}, true},
+		{"whatif reset", syncp.RepoResult{Status: syncp.StatusReset, WhatIfAction: "would reset --hard"}, true},
+		{"whatif rebased", syncp.RepoResult{Status: syncp.StatusRebased, WhatIfAction: "would rebase"}, true},
+
+		// ForceRebase → show the ⚠ force-push warning.
+		{"rebased force-push needed", syncp.RepoResult{Status: syncp.StatusRebased, ForceRebase: true}, true},
+		// WhatIf + ForceRebase → noteworthy via WhatIfAction alone (both signals agree).
+		{"whatif rebased force-push", syncp.RepoResult{Status: syncp.StatusRebased, ForceRebase: true, WhatIfAction: "would rebase"}, true},
+
+		// Actionable skips → show.
+		{"skipped no-stash", syncp.RepoResult{Status: syncp.StatusSkipped, SkipReason: syncp.SkipNoStash}, true},
+		{"skipped detached head", syncp.RepoResult{Status: syncp.StatusSkipped, SkipReason: syncp.SkipDetachedHEAD}, true},
+		{"skipped fetch timeout", syncp.RepoResult{Status: syncp.StatusSkipped, SkipReason: syncp.SkipFetchTimeout}, true},
+
+		// SkipCancelled → suppress inline (SIGINT flood prevention); still in summary.
+		{"skipped cancelled", syncp.RepoResult{Status: syncp.StatusSkipped, SkipReason: syncp.SkipCancelled}, false},
+
+		// Failures and conflicts → always show.
+		{"failed", syncp.RepoResult{Status: syncp.StatusFailed}, true},
+		{"rebase conflict", syncp.RepoResult{Status: syncp.StatusRebaseConflict}, true},
+		{"stash conflict", syncp.RepoResult{Status: syncp.StatusStashConflict}, true},
+		{"manual intervention", syncp.RepoResult{Status: syncp.StatusManualInterventionRequired}, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			got := syncp.IsNoteworthyResult(tc.r)
+			if got != tc.want {
+				t.Errorf("IsNoteworthyResult(status=%v, ForceRebase=%v, WhatIfAction=%q, SkipReason=%q) = %v, want %v",
+					tc.r.Status, tc.r.ForceRebase, tc.r.WhatIfAction, tc.r.SkipReason, got, tc.want)
+			}
+		})
+	}
+}

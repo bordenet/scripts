@@ -1,0 +1,247 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+#
+# Script Name: enumerate-gh-repos.sh
+#
+# Description: This script enumerates repositories within a specified GitHub
+#              Enterprise instance and organization. For each repository, it
+#              clones the repository, counts the lines of code, and retrieves
+#              the last push timestamp. The results are logged to a file.
+#
+# Platform: Cross-platform
+#
+# Usage: ./enumerate-gh-repos.sh [OPTIONS]
+#
+# Configuration:
+#   Set these environment variables before running:
+#   - GITHUB_URL:   GitHub Enterprise URL
+#   - GITHUB_ORG:   GitHub organization name
+#   - GITHUB_TOKEN: Personal access token with repo read permissions
+#
+# Dependencies: curl, jq, git, mktemp
+#
+# Author: Matt J Bordenet
+#
+# Last Updated: 2025-10-08
+#
+# -----------------------------------------------------------------------------
+
+# Exit immediately if a command exits with a non-zero status.
+
+set -euo pipefail
+
+# --- Argument Defaults ---
+VERBOSE=false
+
+# --- Help Function ---
+show_help() {
+    cat << EOF
+NAME
+    enumerate-gh-repos.sh - Enumerate and analyze GitHub repositories
+
+SYNOPSIS
+    enumerate-gh-repos.sh [OPTIONS]
+
+DESCRIPTION
+    Enumerates repositories within a specified GitHub Enterprise instance and
+    organization. For each repository, clones it, counts the lines of code, and
+    retrieves the last push timestamp. Results are logged to a file.
+
+OPTIONS
+    -h, --help
+        Display this help message and exit.
+
+    -v, --verbose
+        Enable verbose output showing detailed progress information.
+
+PLATFORM
+    Cross-platform (macOS, Linux, WSL)
+
+CONFIGURATION
+    Set these environment variables before running:
+    • GITHUB_URL  - GitHub Enterprise URL (e.g., https://github.example.com)
+    • GITHUB_ORG  - GitHub organization name
+    • GITHUB_TOKEN - Personal access token with repo read permissions
+
+DEPENDENCIES
+    • curl - For API requests
+    • jq - For JSON parsing
+    • git - For cloning repositories
+    • mktemp - For temporary directory creation
+
+OUTPUT
+    Results are written to: github_enum.log
+    Format: repo    lines-of-code    last-push
+
+EXAMPLES
+    # Set required environment variables
+    export GITHUB_URL='https://github.example.com'
+    export GITHUB_ORG='my-org'
+    export GITHUB_TOKEN='ghp_...'
+
+    # Enumerate all repositories
+    ./enumerate-gh-repos.sh
+
+    # Display help
+    ./enumerate-gh-repos.sh --help
+
+NOTES
+    This script clones each repository to count lines of code, which may take
+    considerable time for organizations with many repositories. A temporary
+    directory is created and cleaned up automatically on exit.
+
+AUTHOR
+    Matt J Bordenet
+
+SEE ALSO
+    get-active-repos.sh, list-dormant-repos.sh
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        -*)
+            echo "Error: Unknown option: $1"
+            echo "Try '$0 --help' for more information"
+            exit 1
+            ;;
+        *)
+            # This is the API token
+            break
+            ;;
+    esac
+done
+
+# --- Configuration ---
+# Set these via environment variables
+GITHUB_URL="${GITHUB_URL:-}"
+GITHUB_ORG="${GITHUB_ORG:-}"
+LOG_FILE="${LOG_FILE:-github_enum.log}"
+
+# Accept token from environment variable (preferred) or positional argument (legacy)
+GITHUB_TOKEN="${GITHUB_TOKEN:-${1:-}}"
+if [[ -n "${1:-}" ]]; then
+    echo "Warning: Passing tokens as arguments is insecure (visible in ps/history)." >&2
+    echo "  Prefer: export GITHUB_TOKEN='ghp_...' && $0" >&2
+    shift
+    if [[ $# -gt 0 ]]; then
+        echo "Error: Unexpected arguments: $*" >&2
+        exit 1
+    fi
+fi
+
+if [[ -z "$GITHUB_URL" || -z "$GITHUB_ORG" || -z "$GITHUB_TOKEN" ]]; then
+    echo "Error: Required configuration not set." >&2
+    echo "  export GITHUB_URL='https://github.example.com'" >&2
+    echo "  export GITHUB_ORG='your-org'" >&2
+    echo "  export GITHUB_TOKEN='ghp_...'" >&2
+    exit 1
+fi
+
+# --- Functions ---
+
+# Function to clean up the temporary directory on script exit.
+cleanup() {
+    echo "Cleaning up temporary directory: $TEMP_DIR"
+    rm -rf "$TEMP_DIR"
+}
+
+# Function to log messages to both the console and the log file.
+log() {
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S')\t$1" | tee -a "$LOG_FILE"
+}
+
+# Function to log verbose messages
+log_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo "INFO: $*"
+    fi
+}
+
+# Function to handle errors and exit the script.
+error_exit() {
+    log "ERROR: $1"
+    exit 1
+}
+
+# Function to retrieve the list of repository clone URLs for the organization.
+get_repos() {
+    log "Fetching repository list for organization: $GITHUB_ORG"
+    log_verbose "Calling GitHub API: $GITHUB_URL/api/v3/orgs/$GITHUB_ORG/repos"
+    curl -s -H "Authorization: token $GITHUB_TOKEN" "$GITHUB_URL/api/v3/orgs/$GITHUB_ORG/repos" | jq -r '.[].clone_url' || true
+}
+
+# Function to get the timestamp of the last push for a given repository.
+get_latest_push() {
+    local repo_url=$1
+    local repo_name; repo_name=$(basename "$repo_url" .git)
+    log "Getting last push time for: $repo_name"
+    curl -s -H "Authorization: token $GITHUB_TOKEN" "$GITHUB_URL/api/v3/repos/$GITHUB_ORG/$repo_name" | jq -r '.pushed_at' || true
+}
+
+# Function to clone a repository and count its lines of code.
+count_loc() {
+    local repo_url=$1
+    local repo_name; repo_name=$(basename "$repo_url" .git)
+    local clone_dir="$TEMP_DIR/$repo_name"
+    log "Cloning $repo_name to $clone_dir"
+    log_verbose "Clone destination: $clone_dir"
+    git clone "$repo_url" "$clone_dir" --quiet || error_exit "Failed to clone $repo_url"
+    log "Counting lines of code for: $repo_name"
+    log_verbose "Using find to count all non-hidden files"
+    # This command finds all files, excludes dotfiles/dot-directories, and counts their lines.
+    find "$clone_dir" -type f ! -path "*/\.*" -exec wc -l {} + | tail -n 1 | awk '{print $1}'
+}
+
+# --- Main Script ---
+
+# Start timer
+start_time=$(date +%s)
+
+# Check for API token argument.
+log_verbose "Verbose mode enabled"
+log_verbose "Configuration: GITHUB_URL=$GITHUB_URL, GITHUB_ORG=$GITHUB_ORG"
+
+# Create a temporary directory for cloning repositories.
+TEMP_DIR=$(mktemp -d)
+# Ensure the cleanup function is called on script exit.
+trap cleanup EXIT
+
+log "--- Starting GitHub Repository Enumeration ---"
+
+# Get the list of repositories.
+repos=$(get_repos) || error_exit "Failed to get repositories. Check URL, org, and token."
+
+if [ -z "$repos" ]; then
+    error_exit "No repositories found. Check organization name and permissions."
+fi
+
+# Log the header for the output data.
+log "repo\tlines-of-code\tlast-push"
+
+# Loop through each repository, gather data, and log it.
+for repo in $repos; do
+    loc=$(count_loc "$repo")
+    latest_push=$(get_latest_push "$repo")
+    log "$repo\t$loc\t$latest_push"
+done
+
+log "--- GitHub enumeration script completed ---"
+
+# End timer
+end_time=$(date +%s)
+
+# Calculate and display execution time
+execution_time=$((end_time - start_time))
+log "Total execution time: ${execution_time} seconds"
+echo "Process complete. Results are in ${LOG_FILE}"

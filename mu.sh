@@ -1,0 +1,399 @@
+#!/usr/bin/env bash
+################################################################################
+# Script Name: mu.sh (Matt's Update)
+################################################################################
+# PURPOSE: Comprehensive system update script for WSL + Windows environments
+# USAGE: ./mu.sh [--skip-windows-update]
+# PLATFORM: WSL/Linux + Windows
+# DEPENDENCIES: apt, npm, pip, winget, PowerShell
+################################################################################
+set -o pipefail
+
+# --- Configuration ---
+LOG_DIR="/tmp"
+ERRORS=()
+SKIP_WINDOWS_UPDATE=false
+VERBOSE=false
+
+# Show help
+show_help() {
+    cat << 'EOF'
+NAME
+    mu.sh - Matt's Update - System update script for WSL + Windows
+
+SYNOPSIS
+    mu.sh [OPTIONS]
+
+DESCRIPTION
+    Performs system updates for WSL/Linux environment and optionally Windows.
+    Updates package managers (apt, npm, pip), Windows packages (winget), and
+    optionally triggers Windows Update.
+
+    Designed for daily manual execution. Provides detailed progress reporting
+    and comprehensive error summary at completion.
+
+OPTIONS
+    --skip-windows-update
+        Skip Windows Update (only update packages via winget)
+
+    -v, --verbose
+        Enable verbose output showing detailed update operations
+
+    -h, --help
+        Display this help message and exit
+
+EXAMPLES
+    # Full system update (Linux + Windows packages + Windows Update)
+    ./mu.sh
+
+    # Update packages only (skip Windows Update)
+    ./mu.sh --skip-windows-update
+
+DEPENDENCIES
+    - apt (Linux package manager)
+    - npm (Node.js package manager)
+    - pip (Python package manager)
+    - winget (Windows package manager)
+    - PowerShell (for Windows Update)
+
+PLATFORM
+    WSL/Linux + Windows
+
+LOGS
+    Logs are stored in /tmp with 24-hour retention
+
+SEE ALSO
+    bu.sh - macOS system update script
+
+EOF
+}
+
+# Logging function for verbose output
+log_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo "[VERBOSE] $*" >&2
+    fi
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --skip-windows-update) SKIP_WINDOWS_UPDATE=true; shift ;;
+        -v|--verbose) VERBOSE=true; shift ;;
+        -h|--help) show_help; exit 0 ;;
+        *) echo "Unknown option: $1"; echo "Use --help for usage information"; exit 1 ;;
+    esac
+done
+
+# Source helper library
+# Get the directory where this script is located (portable across macOS/Linux)
+# This resolves the actual script location even when called via relative path or symlink
+get_script_dir() {
+    local source="${BASH_SOURCE[0]}"
+    # Resolve symlinks
+    while [ -h "$source" ]; do
+        local dir
+        dir="$(cd -P "$(dirname "$source")" && pwd)"
+        source="$(readlink "$source")"
+        [[ $source != /* ]] && source="$dir/$source"
+    done
+    cd -P "$(dirname "$source")" && pwd
+}
+
+SCRIPT_DIR="$(get_script_dir)"
+
+# Verify helper library exists before sourcing
+HELPER_LIB="$SCRIPT_DIR/lib/mu-helpers.sh"
+if [[ ! -f "$HELPER_LIB" ]]; then
+    echo "ERROR: Cannot find helper library at: $HELPER_LIB" >&2
+    echo "SCRIPT_DIR resolved to: $SCRIPT_DIR" >&2
+    echo "Please run this script from the repository root or ensure lib/mu-helpers.sh exists" >&2
+    exit 1
+fi
+
+# shellcheck source=lib/mu-helpers.sh
+source "$HELPER_LIB"
+
+# --- Main Script ---
+echo "=================================================="
+echo "mu.sh - Matt's Update Script"
+echo "=================================================="
+log_verbose "Starting system update process"
+
+start_time=$(date +%s)
+
+# Request sudo upfront
+echo "Requesting sudo privileges..."
+if sudo -v; then
+    echo "✓ Sudo privileges granted"
+    (while true; do sudo -n true; sleep 50; kill -0 $$ 2>/dev/null || exit; done 2>/dev/null) &
+    SUDO_KEEPER_PID=$!
+else
+    echo "⚠ Sudo authentication failed"
+fi
+
+cleanup_old_logs
+log_verbose "Cleaned up old log files (>24 hours)"
+
+log_verbose "Starting APT package updates"
+run_phase "apt upgrade" "$LOG_DIR/mu_apt_upgrade.log" \
+    sudo apt upgrade -y || true
+
+run_phase "apt autoremove" "$LOG_DIR/mu_apt_autoremove.log" \
+    sudo apt autoremove -y || true
+
+run_phase "apt autoclean" "$LOG_DIR/mu_apt_autoclean.log" \
+    sudo apt autoclean || true
+
+# Homebrew updates
+if command -v brew &> /dev/null; then
+    # Warn on ARM64 about limited support
+    if [ "$(uname -m)" = "aarch64" ]; then
+        echo "⚠ Homebrew on ARM64 Linux - limited package support"
+        echo "  Consider using nvm, rbenv, rustup for language runtimes"
+    fi
+
+    run_phase "brew update" "$LOG_DIR/mu_brew_update.log" \
+        brew update || true
+
+    run_phase "brew upgrade" "$LOG_DIR/mu_brew_upgrade.log" \
+        brew upgrade || true
+
+    run_phase "brew cleanup" "$LOG_DIR/mu_brew_cleanup.log" \
+        brew cleanup || true
+
+    # brew doctor - capture warnings but don't fail
+    printf "%-30s" "brew doctor..."
+    if brew doctor > "$LOG_DIR/mu_brew_doctor.log" 2>&1; then
+        echo "✓"
+    else
+        echo "⚠"
+        ERRORS+=("brew doctor warnings - see $LOG_DIR/mu_brew_doctor.log")
+    fi
+else
+    echo "⊘ Homebrew not installed - skipping"
+fi
+
+# nvm (Node Version Manager) updates
+if [ -d "$HOME/.nvm" ]; then
+    printf "%-30s" "nvm update..."
+    (
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+        # Update nvm itself
+        cd "$NVM_DIR" && git fetch --tags origin && git checkout "$(git describe --abbrev=0 --tags --match "v[0-9]*" "$(git rev-list --tags --max-count=1)")" && \. "$NVM_DIR/nvm.sh"
+    ) > "$LOG_DIR/mu_nvm.log" 2>&1 &
+    pid=$!
+    spinner $pid 600
+    spinner_exit=$?
+
+    if [ $spinner_exit -eq 124 ]; then
+        echo "⏱ TIMEOUT"
+        ERRORS+=("nvm update timed out after 600s - see $LOG_DIR/mu_nvm.log")
+    else
+        wait $pid 2>/dev/null
+        if [ $? -eq 0 ]; then
+            echo "✓"
+        else
+            echo "✗"
+            ERRORS+=("nvm update failed - see $LOG_DIR/mu_nvm.log")
+        fi
+    fi
+else
+    echo "⊘ nvm not installed - skipping"
+fi
+
+# rbenv (Ruby Version Manager) updates
+if command -v rbenv &> /dev/null; then
+    run_phase "rbenv update" "$LOG_DIR/mu_rbenv.log" \
+        bash -c "cd ~/.rbenv && git pull" || true
+
+    # Update ruby-build plugin
+    if [ -d "$HOME/.rbenv/plugins/ruby-build" ]; then
+        run_phase "ruby-build update" "$LOG_DIR/mu_ruby_build.log" \
+            bash -c "cd ~/.rbenv/plugins/ruby-build && git pull" || true
+    fi
+else
+    echo "⊘ rbenv not installed - skipping"
+fi
+
+# rustup updates
+if command -v rustup &> /dev/null; then
+    run_phase "rustup update" "$LOG_DIR/mu_rustup.log" \
+        rustup update || true
+else
+    echo "⊘ rustup not installed - skipping"
+fi
+
+# npm updates (global packages)
+if command -v npm &> /dev/null; then
+    run_phase "npm update -g" "$LOG_DIR/mu_npm_update.log" \
+        npm update -g || true
+
+    run_phase "npm install -g npm" "$LOG_DIR/mu_npm_self.log" \
+        npm install -g npm || true
+else
+    echo "⊘ npm not installed - skipping"
+fi
+
+# pip3 updates - skip on externally-managed environments
+if command -v pip3 &> /dev/null; then
+    # Check if this is an externally-managed environment
+    # 1. Check for Linux EXTERNALLY-MANAGED marker file
+    # 2. Check if pip3 install fails with externally-managed error (Homebrew on macOS)
+    is_externally_managed=false
+
+    if [ -f "/usr/lib/python$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')/EXTERNALLY-MANAGED" ]; then
+        is_externally_managed=true
+    elif python3 -m pip install --help 2>&1 | grep -q "externally-managed-environment" 2>/dev/null; then
+        # Quick check without actually attempting an install
+        is_externally_managed=true
+    elif ! python3 -m pip install --dry-run --upgrade pip >/dev/null 2>&1; then
+        # Last resort: test if pip upgrade would fail
+        if python3 -m pip install --dry-run --upgrade pip 2>&1 | grep -q "externally-managed"; then
+            is_externally_managed=true
+        fi
+    fi
+
+    if [ "$is_externally_managed" = true ]; then
+        echo "⊘ pip3 externally-managed - use apt/pipx/brew instead"
+    else
+        run_phase "pip3 upgrade" "$LOG_DIR/mu_pip3_upgrade.log" \
+            python3 -m pip install --upgrade pip || true
+
+        # Update all installed pip3 packages
+        printf "%-30s" "pip3 update packages..."
+        (
+            set +o pipefail  # Disable pipefail for this section
+            outdated=$(pip3 list --outdated 2>/dev/null | tail -n +3 | awk '{print $1}')
+            if [ -n "$outdated" ]; then
+                echo "$outdated" | xargs -n1 pip3 install --upgrade
+            fi
+        ) > "$LOG_DIR/mu_pip3_packages.log" 2>&1 &
+        pid=$!
+        spinner $pid 600
+        spinner_exit=$?
+
+        if [ $spinner_exit -eq 124 ]; then
+            echo "⏱ TIMEOUT"
+            ERRORS+=("pip3 package updates timed out after 600s - see $LOG_DIR/mu_pip3_packages.log")
+        else
+            wait $pid 2>/dev/null
+            if [ $? -eq 0 ]; then
+                echo "✓"
+            else
+                echo "✗"
+                ERRORS+=("pip3 package updates failed - see $LOG_DIR/mu_pip3_packages.log")
+            fi
+        fi
+    fi
+else
+    echo "⊘ pip3 not installed - skipping"
+fi
+
+# pipx updates (for externally-managed Python environments)
+if command -v pipx &> /dev/null; then
+    run_phase "pipx upgrade-all" "$LOG_DIR/mu_pipx_upgrade.log" \
+        pipx upgrade-all || true
+else
+    echo "⊘ pipx not installed - skipping"
+fi
+
+# pip (Python 2) updates if present
+if command -v pip &> /dev/null && [[ $(pip --version) == *"python 2"* ]]; then
+    run_phase "pip upgrade" "$LOG_DIR/mu_pip_upgrade.log" \
+        python -m pip install --upgrade pip || true
+
+    printf "%-30s" "pip update packages..."
+    (
+        set +o pipefail  # Disable pipefail for this section
+        outdated=$(pip list --outdated 2>/dev/null | tail -n +3 | awk '{print $1}')
+        if [ -n "$outdated" ]; then
+            echo "$outdated" | xargs -n1 pip install --upgrade
+        fi
+    ) > "$LOG_DIR/mu_pip_packages.log" 2>&1 &
+    pid=$!
+    spinner $pid 600
+    spinner_exit=$?
+
+    if [ $spinner_exit -eq 124 ]; then
+        echo "⏱ TIMEOUT"
+        ERRORS+=("pip package updates timed out after 600s - see $LOG_DIR/mu_pip_packages.log")
+    else
+        wait $pid 2>/dev/null
+        if [ $? -eq 0 ]; then
+            echo "✓"
+        else
+            echo "✗"
+            ERRORS+=("pip package updates failed - see $LOG_DIR/mu_pip_packages.log")
+        fi
+    fi
+fi
+
+log_verbose "Completed Linux package updates"
+
+# --- Phase 2: Windows Updates (via PowerShell) ---
+log_verbose "Starting Windows updates phase"
+echo "PHASE 2: Windows Updates"
+echo "--------------------------------------------------"
+
+# Check if we're in WSL
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    log_verbose "Running in WSL environment, proceeding with Windows updates"
+    # winget updates
+    printf "%-30s" "winget upgrade..."
+
+    # Ensure log file is writable
+    touch "$LOG_DIR/mu_winget.log" 2>/dev/null || sudo touch "$LOG_DIR/mu_winget.log" 2>/dev/null
+    [ -f "$LOG_DIR/mu_winget.log" ] && chmod 644 "$LOG_DIR/mu_winget.log" 2>/dev/null || true
+
+    # Note: winget may require UAC elevation for package installs
+    # Use --accept-package-agreements, --accept-source-agreements, and --disable-interactivity
+    # to minimize prompts, but UAC may still block automation
+    powershell.exe -Command "winget upgrade --all --accept-package-agreements --accept-source-agreements --disable-interactivity 2>&1 | Out-String" > "$LOG_DIR/mu_winget.log" 2>&1 &
+    pid=$!
+    spinner $pid 600
+    spinner_exit=$?
+
+    if [ $spinner_exit -eq 124 ]; then
+        echo "⏱ TIMEOUT"
+        ERRORS+=("winget upgrade timed out after 600s - likely waiting for UAC prompt - see $LOG_DIR/mu_winget.log")
+    else
+        wait $pid 2>/dev/null
+        winget_exit=$?
+        if [ $winget_exit -eq 0 ]; then
+            echo "✓"
+        else
+            echo "⚠"
+            # Don't treat as hard error - may need manual UAC approval
+            ERRORS+=("winget upgrade incomplete (exit: $winget_exit) - may need UAC approval - see $LOG_DIR/mu_winget.log")
+        fi
+    fi
+
+    # Windows Update (requires elevation)
+    if [ "$SKIP_WINDOWS_UPDATE" = true ]; then
+        echo "⊘ Windows Update skipped (--skip-windows-update)"
+    else
+        run_windows_update
+    fi
+else
+    echo "⊘ Not running in WSL - skipping Windows updates"
+fi
+
+# --- Summary ---
+# Kill sudo keeper process if it exists
+if [ -n "$SUDO_KEEPER_PID" ]; then
+    kill $SUDO_KEEPER_PID 2>/dev/null || true
+fi
+
+# Calculate execution time
+end_time=$(date +%s)
+execution_time=$((end_time - start_time))
+log_verbose "Total execution time: ${execution_time}s"
+
+# Print error report
+print_error_report $execution_time
+
+log_verbose "System update completed"
+exit 0
