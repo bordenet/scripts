@@ -1,0 +1,1 @@
+[COMPANY]/Tools-GitLab/gitsync/sync-git-repos.sh

@@ -46,7 +46,12 @@
       "Bash(.venv/bin/python3 -c \"from cryptography.hazmat.primitives.ciphers.aead import AESGCM; print\\('cryptography ok'\\)\")",
       "Bash(.venv/bin/python3 -c \"import hashlib; hashlib.scrypt\\(b'test', salt=b'a'*16, n=32768, r=8, p=1, dklen=32\\); print\\('scrypt ok'\\)\")",
       "Bash(chmod +x ~/git/tools/run-battery.sh)",
-      "Bash(bash tools/run-battery.sh --verdict PASS --min-score 7.0)"
+      "Bash(bash tools/run-battery.sh --verdict PASS --min-score 7.0)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); servers=d.get\\('mcpServers',{}\\); [print\\(k, list\\(v.get\\('env',{}\\).keys\\(\\)\\)\\) for k,v in servers.items\\(\\)]\")",
+      "Bash(claude mcp *)",
+      "Bash(git -C ~/git fetch origin)",
+      "Bash(git -C ~/git log --oneline origin/main..HEAD)",
+      "Bash(git *)"
     ],
     "deny": [],
     "ask": []
