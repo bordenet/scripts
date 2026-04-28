@@ -15,3 +15,17 @@ MODULAR-MIGRATION-PROMPT.md
 .cursor/rules/codacy.mdc
 .DS_Store
 wiki/
+
+# OneDrive / cloud sync artifacts
+*,*
+*#*#
+~$*
+~*
+*~
+*.tmp
+*.temp
+.~lock.*
+
+# Claude Code session artifacts
+SONNET_CONTEXT_HANDOFF.md
+*_CONTEXT_HANDOFF.md
