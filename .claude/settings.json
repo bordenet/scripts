@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(glab mr list *)",
+      "Bash(glab mr view *)",
+      "Bash(glab mr diff *)",
+      "Bash(glab mr checks *)",
+      "Bash(glab ci status *)",
+      "Bash(glab ci view *)",
+      "Bash(glab ci list *)",
+      "Bash(glab ci run *)",
+      "Bash(glab repo *)",
+      "Bash(nc -z *)",
+      "Bash(curl -s --connect-timeout *)",
+      "Bash(curl -sf *)",
+      "Bash(curl -s -o /dev/null *)",
+      "Bash(git fetch *)",
+      "Bash(git stash)",
+      "Bash(git stash pop)",
+      "Bash(git stash list)",
+      "Bash(git worktree list)",
+      "Bash(git ls-remote *)",
+      "Bash(git log --format=*)",
+      "Bash(git log --oneline *)"
+    ]
+  }
+}

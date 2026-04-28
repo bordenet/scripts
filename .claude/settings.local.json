@@ -40,7 +40,13 @@
       "Bash(shellcheck macos-setup/lib/ui.sh macos-setup/setup-components/90-mcp-claude-code.sh mu.sh purge-identity/lib/common.sh purge-identity/lib/processing.sh purge-identity/lib/ui.sh reset-all-repos.sh schedule-claude.sh scorch-repo.sh squash-commits.sh starter-kit/common.sh validate-script-compliance.sh)",
       "Bash(shellcheck -e \"SC1091,SC2034,SC2129,SC2155,SC2162,SC2097,SC2098,SC2015,SC2317,SC2064\" macos-setup/lib/ui.sh mu.sh purge-identity/lib/common.sh purge-identity/lib/processing.sh purge-identity/lib/ui.sh reset-all-repos.sh schedule-claude.sh scorch-repo.sh squash-commits.sh starter-kit/common.sh validate-script-compliance.sh macos-setup/setup-components/90-mcp-claude-code.sh)",
       "Bash(sed -i '' '389s/.*/SHELLCHECK_EXCLUDES=\"SC1091,SC2034,SC2129,SC2155,SC2162,SC2097,SC2098,SC2015,SC2317,SC2064,SC2059,SC2004,SC2181,SC2001,SC1003,SC2016,SC2329,SC2086\"/' .git/hooks/pre-commit)",
-      "Bash(sed -n '389p' .git/hooks/pre-commit)"
+      "Bash(sed -n '389p' .git/hooks/pre-commit)",
+      "Bash(.venv/bin/python -c \"from cryptography.hazmat.primitives.ciphers.aead import AESGCM; print\\('ok'\\)\")",
+      "Bash(python3 -c \"import hashlib; hashlib.scrypt\\(b'test', salt=b'a'*16, n=32768, r=8, p=1, dklen=32\\); print\\('scrypt ok'\\)\")",
+      "Bash(.venv/bin/python3 -c \"from cryptography.hazmat.primitives.ciphers.aead import AESGCM; print\\('cryptography ok'\\)\")",
+      "Bash(.venv/bin/python3 -c \"import hashlib; hashlib.scrypt\\(b'test', salt=b'a'*16, n=32768, r=8, p=1, dklen=32\\); print\\('scrypt ok'\\)\")",
+      "Bash(chmod +x ~/git/tools/run-battery.sh)",
+      "Bash(bash tools/run-battery.sh --verdict PASS --min-score 7.0)"
     ],
     "deny": [],
     "ask": []
