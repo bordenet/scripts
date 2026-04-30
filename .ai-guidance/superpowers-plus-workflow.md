@@ -21,9 +21,11 @@ git push origin feat/my-feature
 # 2. Accumulate changes in dev until a meaningful batch is ready.
 #    DO NOT promote to staging after every feature.
 
-# 3. Promote dev → staging after multiple verified changes are accumulated in dev
+# 3. Promote dev → staging ONLY when explicitly asked
+#    (after multiple changes are verified working in dev)
 
-# 4. Promote staging → main after a batch code review passes (≥9.2/10)
+# 4. Promote staging → main ONLY when explicitly asked,
+#    after rigorous batch review of ALL changes since last release.
 
 # 5. Sync private fork AFTER production merge
 git checkout main && git pull origin main && git push gitlab main
@@ -55,14 +57,16 @@ git checkout main && git pull origin main && git push gitlab main
 - ❌ **NEVER** branch features from `main` or `staging` (branch from `dev`)
 - ❌ **NEVER** push `dev` or `staging` to the private fork — only `main` is synced
 - ❌ **NEVER** skip the private fork sync after a production merge
-- ❌ **NEVER** promote `dev → staging` prematurely — staging accumulates multiple verified changes before main
+- ❌ **NEVER** promote `staging → main` without explicit human instruction in the current conversation
+- ❌ **NEVER** promote `dev → staging` without explicit human instruction in the current conversation
 - ❌ **NEVER** treat a single feature landing in `dev` as a reason to promote — staging must accumulate multiple verified changes
 - ✅ **Exception:** Emergency hotfixes may branch from `main`, PR into `main`, then cherry-pick back to `dev`
 
 **Staging → Main gate (MANDATORY before any promotion):**
-1. Run a batch code review across ALL changes in staging since the last main release
-2. Show the review verdict before merging
-3. If verdict is PASS (≥9.2/10), proceed with the merge autonomously
+1. Human says explicitly "promote staging to main" or "release" in the current conversation
+2. Run a batch code review across ALL changes in staging since the last main release
+3. Show the human the review verdict before merging
+4. Human approves the merge
 
 | Date | Incident |
 |------|----------|
