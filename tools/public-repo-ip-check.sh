@@ -18,11 +18,11 @@ readonly PATTERNS=(
     "callbox\\.int"
     "gitlab\\.int"
     # Internal product overlays
-    "superpowers-[removed]"
-    "superpowers-[removed]"
-    ***REMOVED***
-    "[removed-service]"
-    "[removed-shared]"
+    "superpowers-callbox"
+    "superpowers-cari"
+    # Internal service names
+    "telephony-service"
+    "cari-shared"
     # Work email pattern
     "mbordenet@callbox"
 )
