@@ -49,7 +49,6 @@ MODULAR-MIGRATION-PROMPT.md
 .agent-gates.tmp
 
 # Symlinked workspace repos (managed independently)
-[COMPANY]/
 Personal/
 Private/
 Public/
@@ -67,6 +66,8 @@ Public/
 # Claude Code session artifacts
 SONNET_CONTEXT_HANDOFF.md
 *_CONTEXT_HANDOFF.md
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # wiki subdir
 wiki/

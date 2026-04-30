@@ -26,7 +26,7 @@ func initRepo(t *testing.T, dir string) {
 }
 
 // initContainerRepo creates a git repo with NO remote — simulates a top-level
-// directory that was `git init`-ed but never pushed (e.g. ~/GitHub/[COMPANY]).
+// directory that was `git init`-ed but never pushed (e.g. ~/GitHub/WorkOrg).
 // discover should recurse into it rather than surfacing it as a skipped leaf.
 func initContainerRepo(t *testing.T, dir string) {
 	t.Helper()
@@ -130,19 +130,19 @@ func TestFind_SourceRepoIsIncluded(t *testing.T) {
 }
 
 // TestFind_ContainerRepoIsRecursed verifies that a git repo with no remote
-// (e.g. ~/GitHub/[COMPANY]) is treated as an organisational container: discover
+// (e.g. ~/GitHub/WorkOrg) is treated as an organisational container: discover
 // recurses into it to find the real repos inside rather than surfacing it as a
 // skipped leaf with "no origin remote".
 func TestFind_ContainerRepoIsRecursed(t *testing.T) {
 	root := t.TempDir()
 
-	// container has .git but no remote — simulates ~/GitHub/[COMPANY]
-	container := filepath.Join(root, "[COMPANY]")
+	// container has .git but no remote — simulates ~/GitHub/WorkOrg
+	container := filepath.Join(root, "WorkOrg")
 	initContainerRepo(t, container)
 
 	// real repos live inside the container
 	inner1 := filepath.Join(container, "tools", "superpowers-plus")
-	inner2 := filepath.Join(container, "Cari", "acquisition-service")
+	inner2 := filepath.Join(container, "platform", "service-a")
 	if err := os.MkdirAll(filepath.Dir(inner1), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestFind_ContainerRepoIsRecursed(t *testing.T) {
 	}
 	for _, r := range repos {
 		base := filepath.Base(r)
-		if base != "superpowers-plus" && base != "acquisition-service" {
+		if base != "superpowers-plus" && base != "service-a" {
 			t.Errorf("unexpected repo in results: %s", r)
 		}
 	}

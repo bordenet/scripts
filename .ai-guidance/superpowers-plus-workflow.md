@@ -36,15 +36,12 @@ git checkout main && git pull origin main && git push gitlab main
 | Location | Role | Editable? |
 |----------|------|-----------|
 | `~/git/Personal/superpowers-plus/` | **Source repo** — GitHub PR workflow | ✅ YES — edit HERE |
-| `~/git/[COMPANY]/superpowers-[removed]/` | **Source repo** — private overlay | ✅ YES — edit here |
 | `~/.codex/superpowers-plus/` | **Installed copy** — deployment target | ❌ NEVER |
 | `~/.codex/skills/` | **Installed skills** — deployment target | ❌ NEVER |
-| `~/git/[COMPANY]/tools/superpowers-plus/` | **Installed copy** — [COMPANY] deployment | ❌ NEVER |
 
 **Workflow:** Edit source repo → run `./install.sh --upgrade` → changes propagate to `~/.codex/`.
 
 - ❌ **NEVER** edit files under `~/.codex/` directly
-- ❌ **NEVER** edit `~/git/[COMPANY]/tools/superpowers-plus/` — it is a deployment target, not a working directory
 - ❌ **NEVER** commit anywhere except `~/git/Personal/superpowers-plus/`
 - ✅ To test a local change before opening a PR: edit the source repo, re-run install, verify in `~/.codex/`
 
@@ -75,8 +72,8 @@ git checkout main && git pull origin main && git push gitlab main
 | 2026-03-25 | Bulk wiki update destroyed 5 pages. New invariant: verify every write. |
 | 2026-03-28 | Migrated from two-tier (main + sync) to three-tier (dev → staging → main). |
 | 2026-03-30 | Agent repeatedly edited `~/.codex/superpowers-plus/` directly, creating stray commits with wrong git identity that were never on GitHub. Stale fork + wrong-author commits required force-reset. |
-| 2026-04-03 | Agent operated against `~/git/[COMPANY]/tools/superpowers-plus/` ([COMPANY] deployment target) instead of `~/git/Personal/superpowers-plus/`. Committed and pushed directly to staging from the wrong repo. Required manual sync to fix. |
+| 2026-04-03 | Agent operated against an installed deployment copy instead of `~/git/Personal/superpowers-plus/`. Committed and pushed directly to staging from the wrong repo. Required manual sync to fix. |
 | 2026-04-14 | Agent pushed `dev` and `staging` branches to `gitlab` remote (only `main` is permitted). Root cause: `superpowers.always.md` rule file was deleted from OneDrive and replaced with a pull-only module, removing auto-injected GitLab restrictions from context. |
-| 2026-04-14 | Agent included [COMPANY]-internal details in commit messages pushed to public `github.com/bordenet/superpowers-plus`. IP leakage. Root cause: same dangling-symlink event dropped the IP boundary rule from context. |
+| 2026-04-14 | Agent included internal employer details in commit messages pushed to public `github.com/bordenet/superpowers-plus`. IP leakage. Root cause: same dangling-symlink event dropped the IP boundary rule from context. |
 
 > ⚠️ **This workflow is SPECIFIC to `superpowers-plus` only.** Other superpowers repos are private — commit directly to them as normal.
