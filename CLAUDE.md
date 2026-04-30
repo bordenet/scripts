@@ -37,17 +37,12 @@ If any file is DANGLING or the directory is missing: **stop immediately and aler
 
 ## 🔴 Push Authorization Gate
 
-Never run `git push` without explicit human approval in the **current conversation**.
-
-Before requesting approval, invoke `superpowers:pre-push-quality-gate` and show the actual terminal output (lint + format + typecheck + test, exit codes visible) inline. Claiming you ran the gate without showing output is a violation — the human granting approval must see passing output to grant it.
+Automated — no per-operation approval required. The pre-push quality gate runs automatically (battery sentinel must match HEAD, IP audit must be clean). Run `superpowers:pre-push-quality-gate` before any push and confirm the output passes.
 
 - Never push any branch to the work CI remote — branch pushes trigger CI/CD pipelines.
-- "Commit approved" ≠ "push approved" — they require separate explicit approval.
-- Never promote staging → main without its own standalone approval (it is a release decision, not housekeeping).
-- Never bundle high-stakes actions (staging → main, branch promotions, releases) into compound questions with low-stakes actions.
-- Never act on push approval from a prior conversation or session.
-- If you are a sub-agent: push authorization must be explicit in your own task prompt — approval granted to the orchestrating agent does not transfer.
-- If push is blocked, surface the block to the user rather than silently skipping the push.
+- Anything reaching a `github.com` remote must contain zero internal information (no employer/product names, internal URLs, internal system references) in commits, PRs, or branch names.
+- If push is blocked by a quality gate, surface the block rather than bypassing it.
+- If you are a sub-agent: confirm push is within scope of your task prompt before pushing.
 
 Full rules: `.ai-guidance/push-authorization-gate.md`
 
@@ -61,11 +56,10 @@ Applies to `Personal/superpowers-plus` only. Three-tier branching: `dev → stag
 - Never push `dev` or `staging` to the `gitlab` remote — only `main` syncs to GitLab after a release.
 - Exception: emergency hotfixes may branch from `main`, PR into `main`, then cherry-pick back to `dev`.
 
-**Staging → main gate (all four steps mandatory):**
-1. Human explicitly says "promote staging to main" or "release" in the current conversation.
-2. Run a batch code review across all changes since the last release.
-3. Show the review verdict to the human before merging.
-4. Human approves the merge.
+**Staging → main gate (all steps mandatory):**
+1. Run a batch code review across all changes since the last release.
+2. Show the review verdict before merging.
+3. If verdict is PASS (≥9.2/10), proceed with the merge autonomously.
 
 Full rules: `.ai-guidance/superpowers-plus-workflow.md`
 
