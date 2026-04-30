@@ -51,6 +51,8 @@ show_match() { echo "❌ IP match in $1:$2: $3"; }
 if [[ "$STAGED_ONLY" == "true" ]]; then
     while IFS= read -r line; do
         [[ "$line" =~ ^\+\+\+ ]] && { current_file="${line#+++ b/}"; continue; }
+        # Skip the scanner's own file — pattern definitions will always self-match
+        [[ "${current_file:-}" == "tools/public-repo-ip-check.sh" ]] && continue
         [[ "$line" =~ ^\+ ]] || continue
         content="${line:1}"
         if echo "$content" | grep -qE "$PATTERN"; then
@@ -63,6 +65,8 @@ elif [[ -n "$COMMIT_RANGE" ]]; then
     while IFS= read -r line; do
         [[ "$line" =~ ^diff\ --git ]] && { current_file="${line##* b/}"; continue; }
         [[ "$line" =~ ^\+\+\+ ]] && { current_file="${line#+++ b/}"; continue; }
+        # Skip the scanner's own file — pattern definitions will always self-match
+        [[ "${current_file:-}" == "tools/public-repo-ip-check.sh" ]] && continue
         [[ "$line" =~ ^\+ ]] || continue
         content="${line:1}"
         if echo "$content" | grep -qE "$PATTERN"; then
