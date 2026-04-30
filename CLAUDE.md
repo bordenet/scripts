@@ -27,7 +27,7 @@ If any file is DANGLING or the directory is missing: **stop immediately and aler
 
 | Repo context | Email | Git user |
 |---|---|---|
-| `github.com/*` (`Personal/`, `Public/`) | `mattbordenet@hotmail.com` | `bordenet` |
+| `github.com/*` (`Personal/`, `Public/`) | `bordenet@users.noreply.github.com` | `bordenet` |
 | Work repos | work email (see repo AGENTS.md) | work user (see repo AGENTS.md) |
 
 - Always verify `git config user.email` before committing. If the expected value is unclear, load the repo's `AGENTS.md`.
