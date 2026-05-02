@@ -118,12 +118,13 @@ func TestShowSummary_StashConflict_ExitsNonZero(t *testing.T) {
 		t.Errorf("ShowSummary with StashConflict must return false (exit 1), got true.\nOutput:\n%s", buf.String())
 	}
 	got := buf.String()
-	if !strings.Contains(got, "had issues") {
-		t.Errorf("issues path must emit warning text, got:\n%s", got)
+	// Compact mode renders errors inline — the repo name must appear on the stash-conflict line.
+	if !strings.Contains(got, "stash conflict") {
+		t.Errorf("issues path must emit stash conflict inline, got:\n%s", got)
 	}
-	// Verdict must not be preceded by a blank line when groups fire — the
-	// needsSeparator logic emits exactly one blank line via fmt.Fprintln(w, "").
-	// Two consecutive newlines (\n\n) would indicate a re-introduced leading \n.
+	if !strings.Contains(got, "r") {
+		t.Errorf("issues path must name the affected repo, got:\n%s", got)
+	}
 	if strings.Contains(got, "\n\n\n") {
 		t.Errorf("issues path must not produce double blank lines, got:\n%q", got)
 	}
@@ -210,7 +211,7 @@ func TestShowSummary_Verbose_GroupsListed(t *testing.T) {
 	}
 }
 
-func TestShowSummary_WithSkipped_SeparatorBeforeVerdict(t *testing.T) {
+func TestShowSummary_WithSkipped_InlineNoSeparator(t *testing.T) {
 	var buf bytes.Buffer
 	results := []sync.RepoResult{
 		{RepoPath: "/repos/a", DisplayName: "a", Status: sync.StatusUpdated},
@@ -221,12 +222,47 @@ func TestShowSummary_WithSkipped_SeparatorBeforeVerdict(t *testing.T) {
 		t.Errorf("run with skipped repos must return true (skipped is not a failure)")
 	}
 	got := buf.String()
-	// When skipped repos are listed (per-repo bullet lines), a blank line must
-	// separate the list from the verdict to prevent visual ambiguity.
-	if !strings.Contains(got, "\n\n") {
-		t.Errorf("summary with skipped repos must have blank line before verdict: %q", got)
+	// Compact mode renders skipped inline — no bullet list means no separator blank line.
+	if strings.Contains(got, "\n\n") {
+		t.Errorf("compact summary with skipped must not contain blank lines, got:\n%q", got)
+	}
+	if !strings.Contains(got, "skipped") {
+		t.Errorf("compact summary must label skipped repos inline, got:\n%q", got)
+	}
+	if !strings.Contains(got, "b") {
+		t.Errorf("compact summary must name the skipped repo, got:\n%q", got)
 	}
 	if !strings.Contains(got, "All repositories processed successfully") {
-		t.Errorf("summary with skipped repos must contain success verdict: %q", got)
+		t.Errorf("summary with skipped repos must contain success verdict, got:\n%s", got)
+	}
+}
+
+func TestShowSummary_CompactMode_SyncedNamed(t *testing.T) {
+	var buf bytes.Buffer
+	results := []sync.RepoResult{
+		{RepoPath: "/repos/foo", DisplayName: "foo", Status: sync.StatusUpdated},
+		{RepoPath: "/repos/bar", DisplayName: "bar", Status: sync.StatusRebased},
+		{RepoPath: "/repos/x", DisplayName: "x", Status: sync.StatusNoOp},
+		{RepoPath: "/repos/y", DisplayName: "y", Status: sync.StatusNoOp},
+	}
+	ok := output.ShowSummary(&buf, results, time.Second, sync.Flags{})
+	if !ok {
+		t.Errorf("all-clean results must return true")
+	}
+	got := buf.String()
+	if !strings.Contains(got, "synced") {
+		t.Errorf("compact summary must contain 'synced', got: %q", got)
+	}
+	if !strings.Contains(got, "foo") || !strings.Contains(got, "bar") {
+		t.Errorf("compact summary must name synced repos, got: %q", got)
+	}
+	if !strings.Contains(got, "2 already current") {
+		t.Errorf("compact summary must count already-current repos, got: %q", got)
+	}
+	// already current comes before synced on the summary line
+	alreadyIdx := strings.Index(got, "already current")
+	syncedIdx := strings.Index(got, "synced")
+	if alreadyIdx > syncedIdx {
+		t.Errorf("'already current' must appear before 'synced', got: %q", got)
 	}
 }

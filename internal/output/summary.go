@@ -67,37 +67,66 @@ func ShowSummary(w io.Writer, results []sync.RepoResult, elapsed time.Duration, 
 		}
 	}
 
+	// printInline renders a single line: "<icon> <n> <label>: name1, name2, ..."
+	// Used in compact mode so all outcomes stay on one line each with no bullet lists.
+	printInline := func(style lipgloss.Style, icon, label string, group []sync.RepoResult) {
+		if len(group) == 0 {
+			return
+		}
+		names := make([]string, len(group))
+		for i, r := range group {
+			names[i] = displayName(r)
+		}
+		fmt.Fprintf(w, "%s %d %s: %s\n", style.Render(icon), len(group), label, strings.Join(names, ", "))
+	}
+
 	if flags.WhatIf {
 		printGroup(styleBlue, "○", "Would update", updated)
 		printGroup(styleBlue, "○", "Would rebase", rebased)
 		printGroup(styleBlue, "○", "Would reset --hard", reset)
 		printGroup(styleBlue, "•", "Up to date", noops)
 		printGroup(styleYellow, "⊘", "Would skip", skipped)
+		printGroup(styleYellow, "⚠", "Stash conflicts", stashConflict)
+		printGroup(styleRed, "✗", "Rebase conflicts", rebaseConflict)
+		printGroup(styleRed, "✗", "Failed", failed)
+		printGroup(styleRed, "✗", "Manual intervention needed", manual)
 	} else if flags.Verbose {
 		printGroup(styleGreen, "✓", "Updated", updated)
 		printGroup(styleGreen, "✓", "Rebased", rebased)
 		printGroup(styleGreen, "✓", "Reset (unrelated history)", reset)
 		printGroup(styleBlue, "•", "Up to date", noops)
 		printGroup(styleYellow, "⊘", "Skipped", skipped)
+		printGroup(styleYellow, "⚠", "Stash conflicts", stashConflict)
+		printGroup(styleRed, "✗", "Rebase conflicts", rebaseConflict)
+		printGroup(styleRed, "✗", "Failed", failed)
+		printGroup(styleRed, "✗", "Manual intervention needed", manual)
 	} else {
-		// Compact: one-liner for clean outcomes; problem repos listed by group below.
+		// Compact: one line for clean outcomes; every problem category also one line.
 		var parts []string
-		if n := len(updated) + len(rebased) + len(reset); n > 0 {
-			parts = append(parts, fmt.Sprintf("%d synced", n))
-		}
 		if len(noops) > 0 {
 			parts = append(parts, fmt.Sprintf("%d already current", len(noops)))
+		}
+		n := len(updated) + len(rebased) + len(reset)
+		if n > 0 {
+			syncedAll := make([]sync.RepoResult, 0, n)
+			syncedAll = append(syncedAll, updated...)
+			syncedAll = append(syncedAll, rebased...)
+			syncedAll = append(syncedAll, reset...)
+			names := make([]string, n)
+			for i, r := range syncedAll {
+				names[i] = displayName(r)
+			}
+			parts = append(parts, fmt.Sprintf("%d synced: %s", n, strings.Join(names, ", ")))
 		}
 		if len(parts) > 0 {
 			fmt.Fprintf(w, "%s %s\n", styleGreen.Render("✓"), strings.Join(parts, ", "))
 		}
-		printGroup(styleYellow, "⊘", "Skipped", skipped)
+		printInline(styleYellow, "⊘", "skipped", skipped)
+		printInline(styleYellow, "⚠", "stash conflict", stashConflict)
+		printInline(styleRed, "✗", "rebase conflict", rebaseConflict)
+		printInline(styleRed, "✗", "failed", failed)
+		printInline(styleRed, "✗", "manual intervention needed", manual)
 	}
-
-	printGroup(styleYellow, "⚠", "Stash conflicts", stashConflict)
-	printGroup(styleRed, "✗", "Rebase conflicts", rebaseConflict)
-	printGroup(styleRed, "✗", "Failed", failed)
-	printGroup(styleRed, "✗", "Manual intervention needed", manual)
 
 	if len(forcePushNeeded) > 0 {
 		printForcePushCommands(w, forcePushNeeded, displayName, flags.WhatIf)
@@ -107,21 +136,15 @@ func ShowSummary(w io.Writer, results []sync.RepoResult, elapsed time.Duration, 
 	// they count as issues that should produce a non-zero exit code.
 	hasIssues := len(failed)+len(rebaseConflict)+len(manual)+len(stashConflict) > 0
 
-	// Add a blank line before the verdict when per-repo group lines were printed
-	// above it — verbose mode and any run with skipped/failed/conflict/force-push
-	// repos all emit indented bullet lines whose visual level matches the verdict
-	// icon, so the separator is needed to distinguish list content from conclusion.
-	// In compact all-clean mode no groups fire, so no separator is added.
-	needsSeparator := flags.Verbose ||
-		len(skipped) > 0 || len(stashConflict) > 0 ||
-		len(rebaseConflict) > 0 || len(failed) > 0 ||
-		len(manual) > 0 || len(forcePushNeeded) > 0
+	// A blank line before the verdict separates indented block content (verbose/WhatIf
+	// bullet lists, force-push command blocks) from the conclusion icon.
+	// Compact mode uses inline format with no indented content, so no separator is needed.
+	needsSeparator := flags.Verbose || flags.WhatIf || len(forcePushNeeded) > 0
 	if needsSeparator {
 		fmt.Fprintln(w, "")
 	}
 
 	if hasIssues {
-		fmt.Fprintf(w, "%s Some repositories had issues. Review above.\n", styleYellow.Render("⚠"))
 		return false
 	}
 	fmt.Fprintf(w, "%s All repositories processed successfully!\n", styleGreen.Render("✓"))
