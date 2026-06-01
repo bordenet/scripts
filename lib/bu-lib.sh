@@ -300,47 +300,193 @@ retry_command() {
     done
 }
 
-# Shared helper: update extensions for any VS Code-compatible editor.
-# Cross-platform: works on macOS and Linux wherever the CLI is in PATH.
-# Usage: _update_editor_extensions "VS Code" "code"
-_update_editor_extensions() {
-    local display_name=$1
-    local cli=$2
-    local task_name="${display_name} extension updates"
+# Background editor extension updates.
+#
+# VS Code's `--update-extensions` takes ~100s on a typical day; running it
+# synchronously dominates total script runtime. Cursor uses the same flag
+# (it's a VS Code fork). We background both at script start and reap them
+# pre-summary so they overlap with brew / npm / mas / softwareupdate.
+#
+# State is held in a single delimited-string array. EDITOR_JOBS entries:
+#     "pid|tempfile|display_name|cli_name"
+# cleanup_editor_jobs() is invoked from the EXIT trap to prevent orphaned
+# processes / tempfiles if the script is aborted between start and wait.
 
-    if ! command_exists "$cli"; then
-        log_warning "${display_name} CLI (${cli}) not found, skipping extension updates"
-        SKIPPED_TASKS+=("$task_name")
+EDITOR_JOBS=()
+
+# Resolve `timeout` to a real binary path once (avoids shell-function-alias
+# pitfalls — if ensure_dependencies installed it as a function wrapping
+# gtimeout, `$!` after backgrounding could capture the wrong PID).
+_resolve_timeout_bin() {
+    # `command -v` on a shell function returns the bare function name (not a
+    # path) — `[[ $bin == /* ]]` rejects that so we fall through to gtimeout
+    # rather than backgrounding a function whose `$!` won't reference the
+    # real timeout process.
+    local bin
+    if bin=$(command -v timeout 2>/dev/null) && [[ "$bin" == /* ]] && [ -x "$bin" ]; then
+        printf '%s' "$bin"
+        return 0
+    fi
+    if bin=$(command -v gtimeout 2>/dev/null) && [[ "$bin" == /* ]] && [ -x "$bin" ]; then
+        printf '%s' "$bin"
+        return 0
+    fi
+    return 1
+}
+
+start_background_editor_updates() {
+    # Pairs are "display_name|cli_name"; pipe is safe (not in any editor name).
+    local editors=("VS Code|code" "Cursor|cursor")
+    local timeout_bin
+    if ! timeout_bin=$(_resolve_timeout_bin); then
+        log_error "neither timeout nor gtimeout found on PATH; cannot bound editor updates"
+        # Without a real timeout binary we won't background — fall back to
+        # recording skipped state and let callers see the gap in the summary.
+        SKIPPED_TASKS+=("VS Code extension updates (timeout binary missing)")
+        SKIPPED_TASKS+=("Cursor extension updates (timeout binary missing)")
         return 0
     fi
 
-    log_info "Updating ${display_name} extensions..."
-    update_status "  Updating ${display_name} extensions..."
+    local spec display_name cli task_name tempfile pid mktemp_err
+    local started_names=()
+    for spec in "${editors[@]}"; do
+        display_name="${spec%|*}"
+        cli="${spec#*|}"
+        task_name="${display_name} extension updates"
 
-    local output
-    if output=$("$cli" --update-extensions 2>&1); then
-        # shellcheck disable=SC2154  # GREEN, NC, SUCCEEDED_TASKS are set in calling script
-        complete_status "${GREEN}✓${NC} Updating ${display_name} extensions"
-        log_success "${display_name} extensions updated"
-        SUCCEEDED_TASKS+=("$task_name")
-        return 0
-    else
-        local exit_code=$?
-        # shellcheck disable=SC2154  # RED, NC, FAILED_TASKS are set in calling script
-        complete_status "${RED}✗${NC} Updating ${display_name} extensions"
-        log_error "${display_name} extension update failed (exit code: $exit_code)"
-        if [ "$VERBOSE" = true ] && [ -n "$output" ]; then
-            log_error "Error output:"
-            # shellcheck disable=SC2001  # no clean bash substitute for multiline indent
-            echo "$output" | sed 's/^/  /' >&2
+        if ! command_exists "$cli"; then
+            log_warning "${display_name} CLI (${cli}) not found, skipping extension updates"
+            SKIPPED_TASKS+=("$task_name")
+            continue
         fi
-        FAILED_TASKS+=("$task_name")
-        return 1
+
+        # Capture mktemp's stderr so the error message is actionable
+        # (TMPDIR full / read-only / permissions all surface here).
+        if ! tempfile=$(mktemp -t bu-editor.XXXXXX 2>&1); then
+            mktemp_err=$tempfile
+            log_error "mktemp failed for ${display_name}: ${mktemp_err} (TMPDIR=${TMPDIR:-/tmp})"
+            FAILED_TASKS+=("$task_name (tempfile creation failed)")
+            continue
+        fi
+
+        log_info "Starting background ${display_name} extension updates"
+        # 10 min cap protects against a hung CLI. Resolved binary path (not
+        # the possibly-aliased `timeout` function) so `$!` reliably captures
+        # the real timeout PID — killing it cascades SIGTERM to the editor.
+        "$timeout_bin" 600 "$cli" --update-extensions >"$tempfile" 2>&1 &
+        pid=$!
+        EDITOR_JOBS+=("$pid|$tempfile|$display_name|$cli")
+        started_names+=("$display_name")
+    done
+
+    # Static announce line so non-verbose users can see backgrounded work
+    # is happening (otherwise the run looks fully serial).
+    if [ "${#started_names[@]}" -gt 0 ] && [ "$VERBOSE" = false ]; then
+        # shellcheck disable=SC2154  # CYAN, NC set in calling script
+        echo -e "  ${CYAN}⋯${NC} Editor extensions updating in background: ${started_names[*]}"
     fi
 }
 
-update_vscode_extensions()  { _update_editor_extensions "VS Code" "code";   }
-update_cursor_extensions()  { _update_editor_extensions "Cursor"  "cursor";  }
+wait_background_editor_updates() {
+    # `set -u` safe: check length before iterating an array we may not have
+    # populated (e.g. neither CLI present, or timeout binary missing).
+    if [ "${#EDITOR_JOBS[@]}" -eq 0 ]; then
+        return 0
+    fi
+
+    update_status "  Finalizing editor extension updates..."
+
+    local job pid tempfile display_name cli task_name rc reason snippet
+    for job in "${EDITOR_JOBS[@]}"; do
+        IFS='|' read -r pid tempfile display_name cli <<< "$job"
+        task_name="${display_name} extension updates"
+
+        # `wait` returns the child's exit code, or 127 if the PID is unknown
+        # to the shell (e.g. reaped externally). We special-case 127 because
+        # it points at "process disappeared", not "editor failed".
+        rc=0
+        wait "$pid" 2>/dev/null || rc=$?
+
+        case "$rc" in
+            0)
+                # shellcheck disable=SC2154  # GREEN, NC, SUCCEEDED_TASKS are set in calling script
+                complete_status "${GREEN}✓${NC} Updating ${display_name} extensions"
+                log_success "${display_name} extensions updated"
+                SUCCEEDED_TASKS+=("$task_name")
+                rm -f "$tempfile"
+                ;;
+            124)
+                # shellcheck disable=SC2154  # RED, NC, FAILED_TASKS are set in calling script
+                complete_status "${RED}✗${NC} Updating ${display_name} extensions (timed out)"
+                log_error "${display_name} extension update timed out after 10 minutes"
+                FAILED_TASKS+=("$task_name (timeout — see $tempfile)")
+                # Keep tempfile for post-mortem
+                ;;
+            127)
+                # Red ✗ because we still add to FAILED_TASKS — the ⊘ glyph
+                # would mismatch the summary's failure section.
+                complete_status "${RED}✗${NC} Updating ${display_name} extensions (process disappeared)"
+                log_warning "${display_name} extension wait returned 127 — PID ${pid} reaped externally (check Console.app / dmesg)"
+                # If reaped before writing, the tempfile is empty and useless —
+                # surface that distinctly so the user doesn't open a blank file.
+                if [ -s "$tempfile" ]; then
+                    FAILED_TASKS+=("$task_name (process disappeared — see $tempfile)")
+                else
+                    FAILED_TASKS+=("$task_name (process disappeared, no output captured; PID $pid)")
+                    rm -f "$tempfile"
+                fi
+                ;;
+            *)
+                # Try to surface an actionable line from the captured output:
+                # grep for common error markers first, then fall back to tail.
+                # Pattern widened beyond English "Failed/Error" to catch Node
+                # error codes (ERR_*), JS exception names, and common
+                # network/filesystem POSIX errors.
+                reason=""
+                if [ -f "$tempfile" ]; then
+                    snippet=$(grep -m1 -iE "(Failed|Error|signature|ENOENT|ETIMEDOUT|EACCES|ENOSPC|TypeError|RangeError|ERR_[A-Z_]+|Cannot|Unable|Refused|Denied|not (found|installed))" "$tempfile" 2>/dev/null | head -c 200)
+                    [ -z "$snippet" ] && snippet=$(tail -n3 "$tempfile" 2>/dev/null | tr '\n' ' ' | head -c 200)
+                    [ -n "$snippet" ] && reason=": $snippet"
+                fi
+                complete_status "${RED}✗${NC} Updating ${display_name} extensions (exit $rc)"
+                log_error "${display_name} extension update failed (exit $rc)${reason}"
+                if [ "$VERBOSE" = true ] && [ -f "$tempfile" ]; then
+                    {
+                        grep -iE "(Failed|Error|signature|ENOENT|ETIMEDOUT|EACCES|ENOSPC|TypeError|RangeError|ERR_[A-Z_]+|Cannot|Unable|Refused|Denied|not (found|installed))" "$tempfile" 2>/dev/null | head -20
+                        echo "    --- tail ---"
+                        tail -10 "$tempfile" 2>/dev/null
+                    } | sed 's/^/    /' >&2
+                fi
+                # Preserve the tempfile on failure so the user can investigate.
+                FAILED_TASKS+=("$task_name (exit $rc — see $tempfile)")
+                ;;
+        esac
+    done
+
+    EDITOR_JOBS=()
+}
+
+# Called from EXIT trap to prevent orphaned background editor processes
+# and leftover tempfiles when the script aborts between start and wait.
+# Each kill is followed by `wait` to reap the child cleanly (otherwise
+# bash prints "Terminated" job-control noise after the trap fires).
+cleanup_editor_jobs() {
+    if [ "${#EDITOR_JOBS[@]}" -eq 0 ]; then
+        return 0
+    fi
+    local job pid tempfile
+    for job in "${EDITOR_JOBS[@]}"; do
+        IFS='|' read -r pid tempfile _ _ <<< "$job"
+        # kill -0 first to narrow the PID-reuse window on macOS (still racy,
+        # but better than blind SIGTERM against a recycled PID).
+        if kill -0 "$pid" 2>/dev/null; then
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+        fi
+        rm -f "$tempfile" 2>/dev/null || true
+    done
+    EDITOR_JOBS=()
+}
 
 # Upgrade all outdated brew packages, escalating strategies until nothing remains
 # or every avenue is exhausted. Stages:
