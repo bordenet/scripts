@@ -89,8 +89,15 @@ if [ "$VERBOSE" = false ]; then
     start_timer
 fi
 
-# Ensure timer stops on exit
-trap stop_timer EXIT
+# Ensure timer stops and any background editor jobs are reaped on exit.
+# Brace-wrapped with `|| true` so a failure in one cleanup step doesn't
+# skip the next (set -u makes naive trap chaining fragile).
+trap '{ cleanup_editor_jobs || true; stop_timer || true; }' EXIT
+
+# --- Background editor extension updates ---
+# Kick off VS Code and Cursor extension updates now so they run concurrently
+# with brew / npm / mas / softwareupdate. Results are reaped pre-summary.
+start_background_editor_updates
 
 # --- Homebrew Updates ---
 if [ "$VERBOSE" = true ]; then
@@ -202,17 +209,8 @@ else
     fi
 fi
 
-# --- VS Code & Cursor Updates ---
-if [ "$VERBOSE" = true ]; then
-    echo
-    echo "========================================================================"
-    echo "  VS Code & Cursor Updates"
-    echo "========================================================================"
-fi
-
-# --update-extensions is supported by both 'code' and 'cursor' on macOS and Linux.
-update_vscode_extensions
-update_cursor_extensions
+# (VS Code + Cursor extension updates were launched in the background after
+# sudo+timer setup; reaped pre-summary below.)
 
 # --- Mac App Store Updates (mas) ---
 if [ "$VERBOSE" = true ]; then
@@ -353,6 +351,11 @@ else
         fi
     fi
 fi
+
+# --- Reap background editor extension updates ---
+# By this point brew / npm / mas / softwareupdate have finished. Wait reaps
+# the editor jobs (usually already done) and records results in the summary.
+wait_background_editor_updates
 
 # --- Completion ---
 
