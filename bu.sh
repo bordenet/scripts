@@ -24,6 +24,12 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/lib/bu-lib.sh"
 ensure_dependencies  # Check/install coreutils for timeout command
 
+# Suppress Homebrew env hints (tap trust warnings, etc.) — they leak to the
+# terminal via /dev/tty and corrupt the status-line display.
+export HOMEBREW_NO_ENV_HINTS=1
+# Keep existing taps allowed by default (current behaviour, no behavioural change).
+export HOMEBREW_NO_REQUIRE_TAP_TRUST=1
+
 # --- Colors for Output (exported for library use) ---
 export RED='\033[0;31m'
 export GREEN='\033[0;32m'
@@ -326,28 +332,45 @@ if [ "$VERBOSE" = true ]; then
     log_warning "This may take several minutes and might require a restart"
 fi
 
-# Software updates can take a long time, don't retry
-# 10 minute timeout ensures script doesn't hang indefinitely
-update_status "  Checking for macOS updates (may take several minutes)..."
-# Note: -R (restart) flag removed — OS restarts should require explicit user action
-if timeout 600 sudo softwareupdate --all --install --force >/dev/null 2>&1; then
-    complete_status "${GREEN}✓${NC} macOS software updates"
-    log_success "macOS software updates completed"
+# Check available updates first (fast); skip install when nothing is pending.
+# softwareupdate --all --install --force hangs indefinitely when no updates are
+# available, turning a no-op run into a guaranteed 10-minute timeout.
+update_status "  Checking for macOS updates..."
+available=$(timeout 60 sudo softwareupdate -l 2>&1)
+list_exit=$?
+if [ "$list_exit" -eq 124 ]; then
+    complete_status "${YELLOW}⊘${NC} macOS software updates (list check timed out)"
+    SKIPPED_TASKS+=("macOS software updates (list timed out)")
+elif [ "$list_exit" -ne 0 ]; then
+    complete_status "${YELLOW}⊘${NC} macOS software updates (could not list — check System Preferences)"
+    SKIPPED_TASKS+=("macOS software updates")
+elif echo "$available" | grep -qi "no new software available"; then
+    complete_status "${GREEN}✓${NC} macOS software updates (up to date)"
+    SUCCEEDED_TASKS+=("macOS software updates")
 else
-    # Capture exit code immediately before any other commands
-    exit_code=$?
-    if [ $exit_code -eq 124 ]; then
-        complete_status "${RED}✗${NC} macOS software updates (timed out after 10 minutes)"
-        if [ "$VERBOSE" = true ]; then
-            log_error "macOS software update timed out after 10 minutes"
-            log_info "You can manually check: System Preferences > Software Update"
-        fi
-        FAILED_TASKS+=("macOS software updates (timeout)")
+    # Updates listed — install them; failure here is actionable (we know updates exist)
+    update_status "  Installing macOS updates (may take several minutes)..."
+    # Note: -R (restart) flag removed — OS restarts should require explicit user action
+    if timeout 600 sudo softwareupdate --all --install --force >/dev/null 2>&1; then
+        complete_status "${GREEN}✓${NC} macOS software updates"
+        log_success "macOS software updates completed"
+        SUCCEEDED_TASKS+=("macOS software updates")
     else
-        complete_status "${YELLOW}⊘${NC} macOS software updates (none available or check System Preferences)"
-        if [ "$VERBOSE" = true ]; then
-            log_warning "macOS software updates failed or no updates available"
-            log_info "You can manually check: System Preferences > Software Update"
+        install_exit=$?
+        if [ "$install_exit" -eq 124 ]; then
+            complete_status "${RED}✗${NC} macOS software updates (install timed out after 10 minutes)"
+            if [ "$VERBOSE" = true ]; then
+                log_error "macOS software update install timed out — updates are available but were not applied"
+                log_info "You can manually check: System Preferences > Software Update"
+            fi
+            FAILED_TASKS+=("macOS software updates (install timed out)")
+        else
+            complete_status "${RED}✗${NC} macOS software updates (install failed — check System Preferences)"
+            if [ "$VERBOSE" = true ]; then
+                log_error "macOS software update install failed (exit $install_exit)"
+                log_info "You can manually check: System Preferences > Software Update"
+            fi
+            FAILED_TASKS+=("macOS software updates (install failed)")
         fi
     fi
 fi

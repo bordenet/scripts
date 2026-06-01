@@ -232,7 +232,8 @@ retry_command() {
                     local latest_package
                     latest_package=$(tail -20 "$tmpfile" | grep -E "^==> (Upgrading|Installing|Downloading)" | tail -1 | sed -E 's/^==> (Upgrading|Installing|Downloading) //' | awk '{print $1}')
 
-                    if [ -n "$latest_package" ] && [ "$latest_package" != "$current_package" ]; then
+                    # Ignore bare numbers ("==> Upgrading 4 outdated packages:" → "4")
+                    if [ -n "$latest_package" ] && [ "$latest_package" != "$current_package" ] && ! [[ "$latest_package" =~ ^[0-9]+$ ]]; then
                         current_package="$latest_package"
                         # shellcheck disable=SC2154
                         update_status "  $spinner_text ${CYAN}$current_package${NC}"
@@ -284,8 +285,16 @@ retry_command() {
         log_warning "$task_name failed (attempt $attempt/$max_attempts, exit code: $exit_code)"
 
         if [ "$attempt" -eq "$max_attempts" ]; then
+            local error_count=0
+            if [ -n "${output:-}" ]; then
+                error_count=$(echo "$output" | grep -cE "^Error:" 2>/dev/null || true)
+            fi
             # shellcheck disable=SC2154  # RED, NC, FAILED_TASKS are set in calling script
-            complete_status "${RED}✗${NC} $spinner_text"
+            if [ "$error_count" -gt 0 ]; then
+                complete_status "${RED}✗${NC} $spinner_text ($error_count failed)"
+            else
+                complete_status "${RED}✗${NC} $spinner_text"
+            fi
             log_error "$task_name failed after $max_attempts attempts"
             if [ "$VERBOSE" = true ]; then
                 log_error "Last error output:"
