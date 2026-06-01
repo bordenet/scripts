@@ -342,6 +342,181 @@ _update_editor_extensions() {
 update_vscode_extensions()  { _update_editor_extensions "VS Code" "code";   }
 update_cursor_extensions()  { _update_editor_extensions "Cursor"  "cursor";  }
 
+# Upgrade all outdated brew packages, escalating strategies until nothing remains
+# or every avenue is exhausted. Stages:
+#   1. brew upgrade — standard batch
+#   2. brew update + brew upgrade — catches mid-run releases
+#   3. per-package brew upgrade — isolates stuck items, with timeout + stderr capture
+#
+# Bookkeeping invariant: exactly ONE entry per logical task in the summary arrays.
+# Pinned formulae go to SKIPPED_TASKS, never to FAILED_TASKS. brew query failures
+# (vs "nothing outdated") are surfaced distinctly.
+brew_upgrade_with_escalation() {
+    local task_name="Homebrew package upgrades"
+    local remaining query_err
+
+    # Stage 1 — standard upgrade. We do bookkeeping at the function level
+    # (one entry per logical task), so we don't route through retry_command,
+    # which would push its own per-attempt entries and create duplicates
+    # whenever stages 2/3 recover.
+    log_info "Stage 1: brew upgrade"
+    update_status "  Upgrading Homebrew packages..."
+    local s1_out
+    s1_out=$(brew upgrade 2>&1) || true
+
+    if ! remaining=$(brew outdated -q 2>&1); then
+        query_err=$remaining
+        complete_status "${RED}✗${NC} Upgrading Homebrew packages"
+        log_error "brew outdated query failed: $query_err"
+        FAILED_TASKS+=("${task_name} (brew outdated query failed)")
+        return 1
+    fi
+
+    if [ -z "$remaining" ]; then
+        local upgrade_count
+        upgrade_count=$(grep -cE "^==> (Upgrading|Installing)" <<< "$s1_out" || true)
+        if [ "$upgrade_count" -gt 0 ]; then
+            complete_status "${GREEN}✓${NC} Upgrading Homebrew packages ($upgrade_count packages)"
+        else
+            complete_status "${GREEN}✓${NC} Upgrading Homebrew packages (up to date)"
+        fi
+        log_success "$task_name completed"
+        SUCCEEDED_TASKS+=("$task_name")
+        return 0
+    fi
+
+    # Stage 2 — refresh catalog and retry. Handles versions released between
+    # the script's initial `brew update` and this point.
+    local count
+    count=$(grep -c . <<< "$remaining")
+    log_warning "Stage 1 left $count package(s) outdated; refreshing catalog"
+    update_status "  Refreshing brew catalog (stage 2, $count remaining)..."
+
+    local update_out
+    if ! update_out=$(brew update 2>&1); then
+        # `brew update` failed (network, auth, corrupt tap). Continue escalation
+        # with stale catalog — Stage 3 may still salvage individual packages.
+        log_warning "brew update failed in stage 2 (continuing with stale catalog)"
+        if [ "$VERBOSE" = true ]; then
+            printf '%s\n' "$update_out" | tail -3 | sed 's/^/    /' >&2
+        fi
+    fi
+
+    update_status "  Upgrading Homebrew packages (stage 2, $count remaining)..."
+    # Capture stage 2 output for diagnostics (mirrors stages 1 and 3).
+    local s2_out
+    s2_out=$(brew upgrade 2>&1) || true
+
+    if ! remaining=$(brew outdated -q 2>&1); then
+        query_err=$remaining
+        complete_status "${RED}✗${NC} Upgrading Homebrew packages"
+        log_error "brew outdated query failed after stage 2: $query_err"
+        if [ "$VERBOSE" = true ] && [ -n "$s2_out" ]; then
+            printf '%s\n' "$s2_out" | tail -5 | sed 's/^/    /' >&2
+        fi
+        FAILED_TASKS+=("${task_name} (brew outdated query failed)")
+        return 1
+    fi
+
+    if [ -z "$remaining" ]; then
+        complete_status "${GREEN}✓${NC} Upgrading Homebrew packages (stage 2 recovered)"
+        log_success "$task_name completed via stage 2"
+        SUCCEEDED_TASKS+=("$task_name")
+        return 0
+    fi
+
+    # Stage 3 — per-package upgrade with progress, stderr capture, and timeout.
+    # `timeout 300` prevents a single wedged bottle from hanging the whole script.
+    count=$(grep -c . <<< "$remaining")
+    log_warning "Stage 2 left $count package(s) outdated; per-package retry"
+
+    # Pinned formulae are intentionally held back — route them to SKIPPED, not FAILED.
+    local pinned
+    pinned=$(brew list --pinned 2>/dev/null || true)
+
+    local i=0
+    local failures=()
+    local skipped_pinned=()
+    local pkg
+    while IFS= read -r pkg; do
+        [ -z "$pkg" ] && continue
+        i=$((i + 1))
+
+        if [ -n "$pinned" ] && grep -qxF "$pkg" <<< "$pinned"; then
+            log_info "Skipping pinned package: $pkg"
+            skipped_pinned+=("$pkg")
+            continue
+        fi
+
+        update_status "  Stage 3: $i/$count ${CYAN}$pkg${NC}..."
+        log_info "Attempting individual upgrade: $pkg"
+
+        # Initialize pkg_rc defensively: if the substitution is interrupted
+        # by a signal before either branch runs, `set -u` would otherwise trip.
+        local pkg_out=""
+        local pkg_rc=0
+        pkg_out=$(timeout 300 brew upgrade "$pkg" 2>&1) || pkg_rc=$?
+        if [ "$pkg_rc" -ne 0 ]; then
+            local reason
+            if [ "$pkg_rc" -eq 124 ]; then
+                reason="timed out after 300s"
+            else
+                # First Error: line is usually the actionable cause; fall back to last line
+                reason=$(grep -m1 -E "^Error:" <<< "$pkg_out" | sed 's/^Error: *//' | head -c 200)
+                [ -z "$reason" ] && reason=$(printf '%s\n' "$pkg_out" | tail -n1 | head -c 200)
+                [ -z "$reason" ] && reason="exit code $pkg_rc"
+            fi
+            log_warning "Individual upgrade failed: $pkg ($reason)"
+            if [ "$VERBOSE" = true ] && [ -n "$pkg_out" ]; then
+                printf '%s\n' "$pkg_out" | tail -10 | sed 's/^/      /' >&2
+            fi
+            failures+=("$pkg: $reason")
+        fi
+    done <<< "$remaining"
+
+    if [ "${#skipped_pinned[@]}" -gt 0 ]; then
+        SKIPPED_TASKS+=("Pinned packages (intentionally held): ${skipped_pinned[*]}")
+    fi
+
+    # Final outdated check, with pinned filtered out
+    if ! remaining=$(brew outdated -q 2>&1); then
+        query_err=$remaining
+        complete_status "${RED}✗${NC} Upgrading Homebrew packages"
+        log_error "brew outdated query failed after stage 3: $query_err"
+        FAILED_TASKS+=("${task_name} (brew outdated query failed)")
+        return 1
+    fi
+
+    local stuck_count=0
+    if [ -n "$remaining" ]; then
+        while IFS= read -r pkg; do
+            [ -z "$pkg" ] && continue
+            if [ -n "$pinned" ] && grep -qxF "$pkg" <<< "$pinned"; then
+                continue
+            fi
+            stuck_count=$((stuck_count + 1))
+        done <<< "$remaining"
+    fi
+
+    if [ "$stuck_count" -eq 0 ]; then
+        complete_status "${GREEN}✓${NC} Upgrading Homebrew packages (stage 3 recovered)"
+        log_success "$task_name completed via stage 3"
+        SUCCEEDED_TASKS+=("$task_name")
+        return 0
+    fi
+
+    complete_status "${RED}✗${NC} Upgrading Homebrew packages ($stuck_count stuck)"
+    if [ "${#failures[@]}" -gt 0 ]; then
+        local f
+        for f in "${failures[@]}"; do
+            FAILED_TASKS+=("brew upgrade $f")
+        done
+    else
+        FAILED_TASKS+=("${task_name} (still outdated after stage 3)")
+    fi
+    return 1
+}
+
 # Execute command without retries but with error handling
 safe_command() {
     local task_name=$1

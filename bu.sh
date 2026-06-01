@@ -102,12 +102,13 @@ fi
 
 retry_command "Homebrew update" "Updating Homebrew" brew update
 
-retry_command "Homebrew package upgrades" "Upgrading Homebrew packages" brew upgrade
+# Upgrade with escalation: standard → refresh+retry → per-package.
+# In Homebrew 5.x, `brew upgrade` handles both formulae and casks, so no
+# separate --cask pass is needed. The escalation handles mid-run releases
+# and isolates any stuck packages instead of giving up on the first miss.
+brew_upgrade_with_escalation
 
 safe_command "Homebrew cleanup" "Cleaning up Homebrew" brew cleanup -s
-
-# Cask upgrades can be flaky, so use retry
-retry_command "Homebrew Cask upgrades" "Upgrading Homebrew Casks" brew upgrade --cask
 
 # Untap is not critical, so don't fail if it doesn't work
 if [ "$VERBOSE" = true ]; then
