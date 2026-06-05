@@ -2,6 +2,8 @@ package output
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/progress"
@@ -20,10 +22,19 @@ const maxRepoLen = 48
 // defaultBarWidth is used until a tea.WindowSizeMsg arrives with the real width.
 const defaultBarWidth = 80
 
+// SlowSyncThreshold is how long a repo sync must be in-flight before the TUI
+// labels it as slow. Exported so main can set the per-goroutine timer to the
+// same value without duplicating the constant.
+const SlowSyncThreshold = 5 * time.Second
+
 // repoStyle pads/truncates the repo name to exactly maxRepoLen display columns.
 // Lipgloss delegates to go-runewidth so CJK double-width characters are handled
 // correctly — no manual byte/rune accounting needed.
 var repoStyle = lipgloss.NewStyle().Width(maxRepoLen).MaxWidth(maxRepoLen)
+
+// slowStyle renders the "slow sync" indicator line in amber so it stands out
+// without being alarming.
+var slowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 
 // MsgResult carries a completed repo result to the Bubble Tea event loop.
 type MsgResult struct {
@@ -38,10 +49,19 @@ type MsgDone struct{}
 // SIGINT handler) without touching the progress counter.
 type MsgPrint struct{ Line string }
 
+// MsgSlowRepo is sent by a repo goroutine after SlowSyncThreshold has elapsed
+// without a result. The TUI adds an amber indicator line so the user can see
+// which repo is holding up the run.
+type MsgSlowRepo struct {
+	Name  string
+	Start time.Time
+}
+
 // ProgressModel is a Bubble Tea model that renders the live compact progress display.
-// Compact mode: animated spinner on line 1, gradient progress bar on line 2.
-// Verbose mode: View() is empty; caller prints lines directly.
-// When done is true, View() returns "" so Bubble Tea erases the display before exit.
+// Compact mode: animated spinner on line 1, optional slow-sync line, gradient
+// progress bar on the last line. Verbose mode: View() is empty; caller prints
+// lines directly. When done is true, View() returns "" so Bubble Tea erases the
+// display before exit.
 type ProgressModel struct {
 	spinner     spinner.Model
 	bar         progress.Model
@@ -51,6 +71,12 @@ type ProgressModel struct {
 	start       time.Time
 	verbose     bool
 	done        bool
+	// slowRepos tracks repos that have been in-flight longer than SlowSyncThreshold.
+	// Key is the display name; value is the time the goroutine acquired the semaphore.
+	slowRepos map[string]time.Time
+	// doneRepos guards against a race where MsgResult arrives before MsgSlowRepo:
+	// if the repo is already done, the slow indicator is suppressed.
+	doneRepos map[string]bool
 }
 
 // NewProgressModel builds the initial model. Pass it to tea.NewProgram.
@@ -65,11 +91,13 @@ func NewProgressModel(total int, verbose bool) ProgressModel {
 	bar.ShowPercentage = false
 
 	return ProgressModel{
-		spinner: s,
-		bar:     bar,
-		total:   total,
-		start:   time.Now(),
-		verbose: verbose,
+		spinner:   s,
+		bar:       bar,
+		total:     total,
+		start:     time.Now(),
+		verbose:   verbose,
+		slowRepos: make(map[string]time.Time),
+		doneRepos: make(map[string]bool),
 	}
 }
 
@@ -114,10 +142,24 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MsgResult:
 		m.currentRepo = msg.Result.DisplayName
 		m.completed++
+		// Clear slow-sync indicator: this repo is done.
+		delete(m.slowRepos, msg.Result.DisplayName)
+		m.doneRepos[msg.Result.DisplayName] = true
 		if msg.Formatted != "" {
 			// tea.Println inserts the line above the progress display without
 			// disturbing the spinner — no manual \r\033[2K needed.
 			return m, tea.Println(msg.Formatted)
+		}
+		return m, nil
+
+	case MsgSlowRepo:
+		if m.verbose {
+			// In verbose mode there is no TUI bar — print a one-time notice instead.
+			return m, tea.Println(fmt.Sprintf("  ~ slow sync: %s (>%ds)", msg.Name, int(SlowSyncThreshold.Seconds())))
+		}
+		// Guard: if MsgResult already arrived (rare race), don't re-add the repo.
+		if !m.doneRepos[msg.Name] {
+			m.slowRepos[msg.Name] = msg.Start
 		}
 		return m, nil
 
@@ -136,9 +178,16 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// View renders the two-line compact progress display:
+// View renders the compact progress display. Normally two lines:
 //
 //	⣾ myrepo                                  [34/89]  0:42
+//	████████████████████░░░░░░░░░░░░░░░░░░░░░░
+//
+// When one or more repos have been in-flight longer than SlowSyncThreshold, a
+// third line is inserted between the spinner line and the progress bar:
+//
+//	⣾ myrepo                                  [34/89]  0:42
+//	  ~ slow: Personal/gitsync (15s)
 //	████████████████████░░░░░░░░░░░░░░░░░░░░░░
 //
 // Bubble Tea calls this after every model update; it owns the cursor.
@@ -158,5 +207,28 @@ func (m ProgressModel) View() string {
 		repoStyle.Render(repo),
 		m.completed, m.total,
 		mins, secs)
-	return line1 + "\n" + m.bar.ViewAs(m.percent()) + "\n"
+
+	slowLine := ""
+	if len(m.slowRepos) > 0 {
+		type slowEntry struct {
+			name    string
+			elapsed time.Duration
+		}
+		now := time.Now()
+		entries := make([]slowEntry, 0, len(m.slowRepos))
+		for name, start := range m.slowRepos {
+			entries = append(entries, slowEntry{name, now.Sub(start)})
+		}
+		// Longest-running first so the most concerning repo appears at the left.
+		sort.Slice(entries, func(i, j int) bool {
+			return entries[i].elapsed > entries[j].elapsed
+		})
+		parts := make([]string, len(entries))
+		for i, e := range entries {
+			parts[i] = fmt.Sprintf("%s (%ds)", e.name, int(e.elapsed.Seconds()))
+		}
+		slowLine = slowStyle.Render("  ~ slow: "+strings.Join(parts, ", ")) + "\n"
+	}
+
+	return line1 + "\n" + slowLine + m.bar.ViewAs(m.percent()) + "\n"
 }

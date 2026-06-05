@@ -127,6 +127,25 @@ func main() {
 	sem := make(chan struct{}, flags.Concurrency)
 	drainDone := make(chan struct{}) // closed by drain goroutine after MsgDone is sent
 
+	// Print header
+	fmt.Printf("%s: %s\n",
+		lipgloss.NewStyle().Bold(true).Render("Git Repository Updates"),
+		strings.Join(targetDirs, ", "))
+
+	formatter := output.NewFormatter(flags.Verbose, maxNameLen)
+	start := time.Now()
+	var allResults []gosync.RepoResult // written by drain goroutine, read after p.Run()
+	var interruptExitCode int          // non-zero on SIGINT/SIGTERM
+
+	// prog is created before the goroutines so they can send MsgSlowRepo directly.
+	// tea.NewProgram does not start the event loop; that happens at prog.Run() below.
+	prog := tea.NewProgram(
+		output.NewProgressModel(totalRepos, flags.Verbose),
+		tea.WithOutput(os.Stdout),
+		tea.WithInput(nil),         // headless runner — disable keyboard to prevent accidental q/ctrl-c races
+		tea.WithoutSignalHandler(), // we own SIGINT/SIGTERM via sigChan; suppress bubbletea's competing handler
+	)
+
 	// Launch goroutines
 	for _, repo := range repos {
 		go func(repoPath string) {
@@ -143,28 +162,20 @@ func main() {
 				return
 			}
 			defer func() { <-sem }()
+
+			displayName := displayNames[repoPath]
+			syncStart := time.Now()
+			// After SlowSyncThreshold, notify the TUI so it can label this repo
+			// as slow. timer.Stop() cancels the notification if we finish in time.
+			slowTimer := time.AfterFunc(output.SlowSyncThreshold, func() {
+				prog.Send(output.MsgSlowRepo{Name: displayName, Start: syncStart})
+			})
 			r := gosync.Run(rootCtx, repoPath, flags, registry, gosync.DefaultSyncer{})
-			r.DisplayName = displayNames[repoPath]
+			slowTimer.Stop()
+			r.DisplayName = displayName
 			results <- r
 		}(repo)
 	}
-
-	// Print header
-	fmt.Printf("%s: %s\n",
-		lipgloss.NewStyle().Bold(true).Render("Git Repository Updates"),
-		strings.Join(targetDirs, ", "))
-
-	formatter := output.NewFormatter(flags.Verbose, maxNameLen)
-	start := time.Now()
-	var allResults []gosync.RepoResult // written by drain goroutine, read after p.Run()
-	var interruptExitCode int          // non-zero on SIGINT/SIGTERM
-
-	prog := tea.NewProgram(
-		output.NewProgressModel(totalRepos, flags.Verbose),
-		tea.WithOutput(os.Stdout),
-		tea.WithInput(nil),              // headless runner — disable keyboard to prevent accidental q/ctrl-c races
-		tea.WithoutSignalHandler(),      // we own SIGINT/SIGTERM via sigChan; suppress bubbletea's competing handler
-	)
 
 	// Drain goroutine: collects results and drives the TUI via p.Send.
 	// Writes to allResults and interruptExitCode before closing drainDone,
