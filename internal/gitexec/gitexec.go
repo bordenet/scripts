@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -132,6 +133,66 @@ func RemoteTrackingRefExists(ctx context.Context, dir, branch string) bool {
 	return err == nil
 }
 
+// isTransientFetchError returns true for network errors that warrant a retry
+// (dropped connections, partial transfers) as opposed to permanent failures
+// (repo not found, auth denied, HTTP 4xx).
+//
+// Patterns are matched against the full lowercased error string returned by run(),
+// which includes git's stderr. "rpc failed" alone is intentionally excluded — it
+// matches HTTP 401/403 auth failures; specific sub-patterns (curl exit codes,
+// pack-layer disconnects) are used instead.
+func isTransientFetchError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "curl 18") ||
+		strings.Contains(msg, "early eof") ||
+		strings.Contains(msg, "unexpected disconnect while reading sideband") ||
+		strings.Contains(msg, "invalid index-pack output")
+}
+
+const fetchMaxAttempts = 3
+
+// fetchWithRetry runs git fetch origin <ref> with up to fetchMaxAttempts attempts
+// on transient network errors (curl 18, early EOF, sideband disconnect).
+// Backoff between attempts: 1s + jitter, then 3s + jitter. Both sleeps respect ctx
+// cancellation so the caller's deadline is never exceeded by more than one git
+// subprocess WaitDelay (5 s).
+func fetchWithRetry(ctx context.Context, dir, ref string) error {
+	// Fixed-size array: len == fetchMaxAttempts-1 so adding an attempt requires
+	// explicitly extending the delays too — prevents a silent index-out-of-range.
+	var baseDelays [fetchMaxAttempts - 1]time.Duration
+	baseDelays[0] = 1 * time.Second
+	baseDelays[1] = 3 * time.Second
+
+	var lastErr error
+	for attempt := 0; attempt < fetchMaxAttempts; attempt++ {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if attempt > 0 {
+			base := baseDelays[attempt-1]
+			// Jitter up to 50 % of base to spread retries across parallel goroutines.
+			jitter := time.Duration(rand.Int63n(int64(base) / 2))
+			select {
+			case <-time.After(base + jitter):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+		_, err := run(ctx, dir, "fetch", "origin", ref)
+		if err == nil {
+			return nil
+		}
+		if !isTransientFetchError(err) {
+			return err
+		}
+		lastErr = err
+	}
+	return lastErr
+}
+
 // FetchMultiRef fetches multiple refs from origin, ignoring refs that don't exist.
 // Returns error only if ALL refs fail to fetch (network unavailable).
 func FetchMultiRef(ctx context.Context, dir string, refs []string) error {
@@ -143,7 +204,7 @@ func FetchMultiRef(ctx context.Context, dir string, refs []string) error {
 		if ctx.Err() != nil {
 			break
 		}
-		_, err := run(ctx, dir, "fetch", "origin", ref)
+		err := fetchWithRetry(ctx, dir, ref)
 		if err == nil {
 			anySucceeded = true
 		} else {
@@ -161,8 +222,7 @@ func FetchMultiRef(ctx context.Context, dir string, refs []string) error {
 
 // FetchSingleRef fetches a single ref from origin.
 func FetchSingleRef(ctx context.Context, dir, ref string) error {
-	_, err := run(ctx, dir, "fetch", "origin", ref)
-	return err
+	return fetchWithRetry(ctx, dir, ref)
 }
 
 // RevParse returns the SHA for a git ref. Returns "" if not found.
