@@ -3,6 +3,7 @@ package gitexec
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -146,7 +147,10 @@ func isTransientFetchError(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "curl 18") ||
+	// "curl 18 " (with a trailing space) matches git's curl exit-code message
+	// "curl 18 transfer closed with outstanding read data remaining" while
+	// avoiding a false positive on "curl 186 bytes transferred" (different code).
+	return strings.Contains(msg, "curl 18 ") ||
 		strings.Contains(msg, "early eof") ||
 		strings.Contains(msg, "unexpected disconnect while reading sideband") ||
 		strings.Contains(msg, "invalid index-pack output")
@@ -154,34 +158,51 @@ func isTransientFetchError(err error) bool {
 
 const fetchMaxAttempts = 3
 
-// fetchWithRetry runs git fetch origin <ref> with up to fetchMaxAttempts attempts
-// on transient network errors (curl 18, early EOF, sideband disconnect).
-// Backoff between attempts: 1s + jitter, then 3s + jitter. Both sleeps respect ctx
-// cancellation so the caller's deadline is never exceeded by more than one git
-// subprocess WaitDelay (5 s).
-func fetchWithRetry(ctx context.Context, dir, ref string) error {
-	// Fixed-size array: len == fetchMaxAttempts-1 so adding an attempt requires
-	// explicitly extending the delays too — prevents a silent index-out-of-range.
-	var baseDelays [fetchMaxAttempts - 1]time.Duration
-	baseDelays[0] = 1 * time.Second
-	baseDelays[1] = 3 * time.Second
+// fetchRetryDelays holds the backoff base duration before each retry attempt
+// (i.e. before attempt 1, before attempt 2, …). Length must equal
+// fetchMaxAttempts-1; TestFetchRetryDelaysInvariant enforces this at test time.
+// To add a fourth attempt: increment fetchMaxAttempts AND add a third entry here.
+var fetchRetryDelays = []time.Duration{1 * time.Second, 3 * time.Second}
 
+// fetchWithRetry calls fetch up to fetchMaxAttempts times, retrying on transient
+// network errors (curl 18, early EOF, sideband disconnect, invalid index-pack
+// output). Backoff uses fetchRetryDelays + up-to-50% jitter; both sleeps are
+// ctx-cancellable via time.NewTimer so no goroutine outlives the call.
+//
+// The global math/rand source is auto-seeded (Go ≥1.20, enforced by go.mod) so
+// jitter is uncorrelated across parallel goroutines without explicit seeding.
+func fetchWithRetry(ctx context.Context, fetch func(context.Context) error) error {
 	var lastErr error
 	for attempt := 0; attempt < fetchMaxAttempts; attempt++ {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 		if attempt > 0 {
-			base := baseDelays[attempt-1]
-			// Jitter up to 50 % of base to spread retries across parallel goroutines.
-			jitter := time.Duration(rand.Int63n(int64(base) / 2))
+			// idx is always in-bounds: TestFetchRetryDelaysInvariant guarantees
+			// len(fetchRetryDelays) == fetchMaxAttempts-1, and attempt-1 ranges
+			// from 0 to fetchMaxAttempts-2 inclusive.
+			base := fetchRetryDelays[attempt-1]
+			// Jitter up to 50% of base to spread retries across parallel goroutines.
+			// Guard against base ≤ 1ns (test fixtures) where int64(base)/2 == 0.
+			jitter := time.Duration(0)
+			if half := int64(base) / 2; half > 0 {
+				jitter = time.Duration(rand.Int63n(half))
+			}
+			t := time.NewTimer(base + jitter)
 			select {
-			case <-time.After(base + jitter):
+			case <-t.C:
 			case <-ctx.Done():
+				// Stop() returns false when the timer already fired and put a value
+				// in t.C's one-element buffer. Drain it now so the buffer is empty;
+				// t is about to go out of scope, but the buffered value would otherwise
+				// sit until GC — draining is the standard Go timer hygiene pattern.
+				if !t.Stop() {
+					<-t.C
+				}
 				return ctx.Err()
 			}
 		}
-		_, err := run(ctx, dir, "fetch", "origin", ref)
+		err := fetch(ctx)
 		if err == nil {
 			return nil
 		}
@@ -190,39 +211,62 @@ func fetchWithRetry(ctx context.Context, dir, ref string) error {
 		}
 		lastErr = err
 	}
-	return lastErr
+	return fmt.Errorf("fetch failed after %d attempts: %w", fetchMaxAttempts, lastErr)
 }
 
-// FetchMultiRef fetches multiple refs from origin, ignoring refs that don't exist.
-// Returns error only if ALL refs fail to fetch (network unavailable).
+// FetchMultiRef attempts to fetch every ref in turn, retrying transient errors
+// per fetchWithRetry. All refs are tried regardless of intermediate successes so
+// the local cache is fully populated. It returns nil if at least one ref
+// succeeds (including partial success where cancellation interrupts later refs).
+// It returns ctx.Err() only when the context is cancelled before any ref has
+// successfully landed. If refs is empty or all refs fail, it returns a wrapped
+// error explaining why.
 func FetchMultiRef(ctx context.Context, dir string, refs []string) error {
 	// Fetch each candidate individually so a missing ref on the remote doesn't
 	// prevent other candidates from being updated.
 	anySucceeded := false
-	var lastErr error
+	var errs []error
 	for _, ref := range refs {
-		if ctx.Err() != nil {
-			break
+		if err := ctx.Err(); err != nil {
+			// Context cancelled before we could attempt this ref.
+			if anySucceeded {
+				// Some refs landed — caller can proceed with what's available.
+				return nil
+			}
+			return err
 		}
-		err := fetchWithRetry(ctx, dir, ref)
+		err := fetchWithRetry(ctx, func(ctx context.Context) error {
+			_, err := run(ctx, dir, "fetch", "origin", ref)
+			return err
+		})
 		if err == nil {
 			anySucceeded = true
 		} else {
-			lastErr = err
+			// Accumulate per-ref errors so the caller sees the full failure picture,
+			// not just the last one. errors.Join preserves errors.Is traversal.
+			errs = append(errs, fmt.Errorf("ref %s: %w", ref, err))
 		}
 	}
 	if anySucceeded {
 		return nil
 	}
-	if lastErr != nil {
-		return fmt.Errorf("all parent candidate refs unavailable: %w", lastErr)
+	// If the context was cancelled mid-loop (fetchWithRetry propagates ctx.Err()
+	// directly), return that rather than a misleading domain error.
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("all parent candidate refs unavailable: %w", errors.Join(errs...))
 	}
 	return fmt.Errorf("no parent candidate refs available")
 }
 
 // FetchSingleRef fetches a single ref from origin.
 func FetchSingleRef(ctx context.Context, dir, ref string) error {
-	return fetchWithRetry(ctx, dir, ref)
+	return fetchWithRetry(ctx, func(ctx context.Context) error {
+		_, err := run(ctx, dir, "fetch", "origin", ref)
+		return err
+	})
 }
 
 // RevParse returns the SHA for a git ref. Returns "" if not found.

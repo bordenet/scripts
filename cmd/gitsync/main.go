@@ -165,10 +165,12 @@ func main() {
 
 			displayName := displayNames[repoPath]
 			syncStart := time.Now()
-			// After SlowSyncThreshold, notify the TUI so it can label this repo
-			// as slow. timer.Stop() cancels the notification if we finish in time.
+			// After SlowSyncThreshold, notify the TUI so it can label this repo as slow.
+			// Stop() returns false when the timer has already fired — MsgSlowRepo is
+			// then in-flight; the doneRepos guard in ProgressModel.Update suppresses it
+			// if MsgResult arrives first.
 			slowTimer := time.AfterFunc(output.SlowSyncThreshold, func() {
-				prog.Send(output.MsgSlowRepo{Name: displayName, Start: syncStart})
+				prog.Send(output.MsgSlowRepo{Name: displayName, SyncStart: syncStart})
 			})
 			r := gosync.Run(rootCtx, repoPath, flags, registry, gosync.DefaultSyncer{})
 			slowTimer.Stop()

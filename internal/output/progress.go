@@ -22,9 +22,9 @@ const maxRepoLen = 48
 // defaultBarWidth is used until a tea.WindowSizeMsg arrives with the real width.
 const defaultBarWidth = 80
 
-// SlowSyncThreshold is how long a repo sync must be in-flight before the TUI
-// labels it as slow. Exported so main can set the per-goroutine timer to the
-// same value without duplicating the constant.
+// SlowSyncThreshold is the minimum in-flight duration before a repo sync is
+// labelled slow in the TUI. Exported so the per-goroutine timer in main uses
+// the same value without duplication.
 const SlowSyncThreshold = 5 * time.Second
 
 // repoStyle pads/truncates the repo name to exactly maxRepoLen display columns.
@@ -51,10 +51,11 @@ type MsgPrint struct{ Line string }
 
 // MsgSlowRepo is sent by a repo goroutine after SlowSyncThreshold has elapsed
 // without a result. The TUI adds an amber indicator line so the user can see
-// which repo is holding up the run.
+// which repo is holding up the run. SyncStart is the time the goroutine
+// acquired the semaphore and began syncing, used to display elapsed time.
 type MsgSlowRepo struct {
-	Name  string
-	Start time.Time
+	Name      string
+	SyncStart time.Time
 }
 
 // ProgressModel is a Bubble Tea model that renders the live compact progress display.
@@ -153,14 +154,17 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case MsgSlowRepo:
+		// Guard first: MsgResult and MsgSlowRepo are sent from different goroutines
+		// and can arrive out of order. Suppress the notice if the repo is already done.
+		if m.doneRepos[msg.Name] {
+			return m, nil
+		}
 		if m.verbose {
 			// In verbose mode there is no TUI bar — print a one-time notice instead.
-			return m, tea.Println(fmt.Sprintf("  ~ slow sync: %s (>%ds)", msg.Name, int(SlowSyncThreshold.Seconds())))
+			// Use %v so Duration.String() handles any threshold value precisely (no truncation).
+			return m, tea.Println(fmt.Sprintf("  ~ slow sync: %s (>%v)", msg.Name, SlowSyncThreshold))
 		}
-		// Guard: if MsgResult already arrived (rare race), don't re-add the repo.
-		if !m.doneRepos[msg.Name] {
-			m.slowRepos[msg.Name] = msg.Start
-		}
+		m.slowRepos[msg.Name] = msg.SyncStart
 		return m, nil
 
 	case MsgPrint:
@@ -216,8 +220,8 @@ func (m ProgressModel) View() string {
 		}
 		now := time.Now()
 		entries := make([]slowEntry, 0, len(m.slowRepos))
-		for name, start := range m.slowRepos {
-			entries = append(entries, slowEntry{name, now.Sub(start)})
+		for name, syncStart := range m.slowRepos {
+			entries = append(entries, slowEntry{name, now.Sub(syncStart)})
 		}
 		// Longest-running first so the most concerning repo appears at the left.
 		sort.Slice(entries, func(i, j int) bool {

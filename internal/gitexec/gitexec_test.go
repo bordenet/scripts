@@ -1,8 +1,11 @@
 package gitexec
 
 import (
+	"context"
 	"errors"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestIsTransientFetchError(t *testing.T) {
@@ -36,17 +39,224 @@ func TestIsTransientFetchError(t *testing.T) {
 		{"does not exist", "git fetch origin main: exit status 128 (stderr: fatal: remote error: repository 'x' does not exist)"},
 		{"context deadline", "context deadline exceeded"},
 		{"context cancelled", "context canceled"},
-		{"nil error", ""},
 	}
 	for _, tc := range permanent {
 		t.Run(tc.name, func(t *testing.T) {
-			var err error
-			if tc.msg != "" {
-				err = errors.New(tc.msg)
-			}
-			if isTransientFetchError(err) {
+			if isTransientFetchError(errors.New(tc.msg)) {
 				t.Errorf("expected transient=false for: %s", tc.msg)
 			}
 		})
 	}
+
+	// Test the nil guard directly — the table loop would pass errors.New("") which
+	// is a non-nil error with an empty message, not a true nil.
+	t.Run("nil error returns false", func(t *testing.T) {
+		if isTransientFetchError(nil) {
+			t.Error("isTransientFetchError(nil) must return false")
+		}
+	})
+
+	// Verify that strings.ToLower is applied — matching must be case-insensitive.
+	t.Run("case insensitive CURL 18", func(t *testing.T) {
+		if !isTransientFetchError(errors.New("CURL 18 TRANSFER CLOSED")) {
+			t.Error("expected transient=true for upper-case CURL 18")
+		}
+	})
+	t.Run("case insensitive EARLY EOF", func(t *testing.T) {
+		if !isTransientFetchError(errors.New("fatal: EARLY EOF")) {
+			t.Error("expected transient=true for upper-case EARLY EOF")
+		}
+	})
+
+	// Guard against substring over-matching: "curl 186" must NOT match "curl 18 ".
+	t.Run("curl 186 does not false-positive as curl 18", func(t *testing.T) {
+		if isTransientFetchError(errors.New("hook: curl 186 bytes processed")) {
+			t.Error("curl 186 should not match the curl 18 transient pattern")
+		}
+	})
+}
+
+// TestFetchRetryDelaysInvariant verifies that fetchRetryDelays has exactly
+// fetchMaxAttempts-1 positive-duration entries. This is the runtime guard for
+// the coupling between the constant and the slice: if fetchMaxAttempts is bumped
+// without a corresponding delay, this test fails at CI time. The positivity check
+// ensures a negative/zero entry cannot silently make retries instantaneous.
+func TestFetchRetryDelaysInvariant(t *testing.T) {
+	want := fetchMaxAttempts - 1
+	if len(fetchRetryDelays) != want {
+		t.Fatalf("fetchRetryDelays has %d entries, want %d (= fetchMaxAttempts-1 = %d-1)",
+			len(fetchRetryDelays), want, fetchMaxAttempts)
+	}
+	for i, d := range fetchRetryDelays {
+		if d <= 0 {
+			t.Errorf("fetchRetryDelays[%d] = %v; must be > 0 to avoid instantaneous retries", i, d)
+		}
+	}
+}
+
+// TestFetchMultiRef covers FetchMultiRef boundary conditions that do not require
+// a real git remote (context cancellation before any ref is attempted, empty
+// refs slice). Scenarios that do reach the network belong in integration tests.
+func TestFetchMultiRef(t *testing.T) {
+	t.Run("empty refs returns no-refs error", func(t *testing.T) {
+		err := FetchMultiRef(context.Background(), t.TempDir(), nil)
+		if err == nil {
+			t.Fatal("want error for empty refs, got nil")
+		}
+		if !strings.Contains(err.Error(), "no parent candidate refs available") {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("pre-cancelled context returns ctx.Err before any network call", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		// The loop guard fires on the first iteration; no git subprocess is launched.
+		err := FetchMultiRef(ctx, t.TempDir(), []string{"refs/heads/main"})
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("want context.Canceled, got %v", err)
+		}
+	})
+
+	t.Run("context deadline expired returns DeadlineExceeded before any network call", func(t *testing.T) {
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+		defer cancel()
+
+		err := FetchMultiRef(ctx, t.TempDir(), []string{"refs/heads/main"})
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("want context.DeadlineExceeded, got %v", err)
+		}
+	})
+}
+
+// TestFetchWithRetry covers the retry-loop behavior using a controllable fetch
+// stub. Because fetchWithRetry accepts a func(context.Context) error, no real
+// git subprocess is required.
+func TestFetchWithRetry(t *testing.T) {
+	transientErr := errors.New("fatal: early eof") // matches isTransientFetchError
+
+	t.Run("succeeds on first attempt", func(t *testing.T) {
+		calls := 0
+		err := fetchWithRetry(context.Background(), func(_ context.Context) error {
+			calls++
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("want nil, got %v", err)
+		}
+		if calls != 1 {
+			t.Fatalf("want 1 call, got %d", calls)
+		}
+	})
+
+	t.Run("retries transient error and succeeds on second attempt", func(t *testing.T) {
+		calls := 0
+		err := fetchWithRetry(context.Background(), func(_ context.Context) error {
+			calls++
+			if calls == 1 {
+				return transientErr
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("want nil after retry, got %v", err)
+		}
+		if calls != 2 {
+			t.Fatalf("want 2 calls, got %d", calls)
+		}
+	})
+
+	t.Run("exhausts all attempts on transient error", func(t *testing.T) {
+		calls := 0
+		err := fetchWithRetry(context.Background(), func(_ context.Context) error {
+			calls++
+			return transientErr
+		})
+		if err == nil {
+			t.Fatal("want error after exhausting attempts, got nil")
+		}
+		if calls != fetchMaxAttempts {
+			t.Fatalf("want %d attempts, got %d", fetchMaxAttempts, calls)
+		}
+		// Error must mention attempt count for operational context.
+		// Check the full prefix so a rename of the message is caught explicitly.
+		if !strings.HasPrefix(err.Error(), "fetch failed after") {
+			t.Errorf("error should start with 'fetch failed after', got: %v", err)
+		}
+	})
+
+	t.Run("does not retry permanent error", func(t *testing.T) {
+		calls := 0
+		err := fetchWithRetry(context.Background(), func(_ context.Context) error {
+			calls++
+			return errors.New("ERROR: Repository not found")
+		})
+		if err == nil {
+			t.Fatal("want error, got nil")
+		}
+		if calls != 1 {
+			t.Fatalf("want exactly 1 attempt (no retry on permanent), got %d", calls)
+		}
+	})
+
+	t.Run("respects already-cancelled context before first attempt", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // cancel before calling
+
+		calls := 0
+		err := fetchWithRetry(ctx, func(_ context.Context) error {
+			calls++
+			return nil
+		})
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("want context.Canceled, got %v", err)
+		}
+		if calls != 0 {
+			t.Fatalf("want 0 fetch calls on pre-cancelled ctx, got %d", calls)
+		}
+	})
+
+	t.Run("respects context cancelled between attempts", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+
+		calls := 0
+		err := fetchWithRetry(ctx, func(_ context.Context) error {
+			calls++
+			cancel() // cancel after first transient failure — fires during next backoff check
+			return transientErr
+		})
+		if err == nil {
+			t.Fatal("want error on cancelled ctx, got nil")
+		}
+		// Should have been cancelled before or during the backoff sleep after attempt 0.
+		if calls > 1 {
+			t.Fatalf("want at most 1 fetch call before ctx cancel propagates, got %d", calls)
+		}
+	})
+
+	t.Run("jitter rand.Int63n branch exercises with non-zero base delay", func(t *testing.T) {
+		// Override fetchRetryDelays to use a small non-zero value so that
+		// int64(base)/2 > 0 and rand.Int63n is actually invoked (not guarded out).
+		// This verifies that the jitter branch runs without panic under realistic delays.
+		orig := fetchRetryDelays
+		fetchRetryDelays = []time.Duration{10 * time.Millisecond}
+		defer func() { fetchRetryDelays = orig }()
+
+		calls := 0
+		err := fetchWithRetry(context.Background(), func(_ context.Context) error {
+			calls++
+			if calls == 1 {
+				return transientErr // triggers backoff + jitter before attempt 2
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("want nil on second attempt, got %v", err)
+		}
+		if calls != 2 {
+			t.Fatalf("want 2 calls (1 transient + 1 success), got %d", calls)
+		}
+		// If we reach here, rand.Int63n(5_000_000) ran without panic.
+	})
 }
