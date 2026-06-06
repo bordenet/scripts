@@ -303,6 +303,26 @@ func TestFormat_RemediationHintForTimeout(t *testing.T) {
 	}
 }
 
+// TestFormat_RemediationHintOnStatusFailed covers the real-world flow where
+// FetchKindTransientGaveUp lands in StatusFailed (via decide.go's FetchErr
+// branch), NOT StatusSkipped. Without hooking the hint into the StatusFailed
+// case, the user would see only the raw failure message with no actionable
+// next step.
+func TestFormat_RemediationHintOnStatusFailed(t *testing.T) {
+	r := sync.RepoResult{
+		RepoPath:       "/x/CallBox/core",
+		DisplayName:    "CallBox/core",
+		Status:         sync.StatusFailed,
+		FailReason:     "fetch failed after 3 attempts: curl 18 ...",
+		FetchKind:      sync.FetchKindTransientGaveUp,
+		FetchLastError: "curl 18 transfer closed",
+	}
+	got := output.NewFormatter(false, 40).Format(r)
+	if !strings.Contains(got, "try: gitsync --fetch-timeout=") {
+		t.Errorf("missing remediation hint on StatusFailed; got: %s", got)
+	}
+}
+
 // TestFormat_NoHintForSuccess verifies success lines stay clean — no "try:" noise.
 func TestFormat_NoHintForSuccess(t *testing.T) {
 	r := sync.RepoResult{RepoPath: "/x", DisplayName: "x", Status: sync.StatusNoOp}

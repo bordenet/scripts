@@ -77,10 +77,16 @@ func classifyFetchError(parentCtx, fetchCtx context.Context, err error) (kind Fe
 	return FetchKindTransientGaveUp, false, false
 }
 
-// truncateError truncates s to at most maxBytes UTF-8 bytes, backing up to
-// the nearest rune boundary so we never emit invalid UTF-8. Appends "…"
-// (U+2026, 3 bytes) when truncation occurred.
+// truncateError flattens s to a single line (replacing \r\n / \n with " | "),
+// then truncates to at most maxBytes UTF-8 bytes, backing up to the nearest
+// rune boundary so we never emit invalid UTF-8. Appends "…" (U+2026, 3 bytes)
+// when truncation occurred.
+//
+// Single-line flattening keeps the formatter's one-line-per-repo contract intact
+// even when git stderr contains multi-line cascade ("error: ... \n fatal: ...").
 func truncateError(s string, maxBytes int) string {
+	s = strings.ReplaceAll(s, "\r\n", " | ")
+	s = strings.ReplaceAll(s, "\n", " | ")
 	if len(s) <= maxBytes {
 		return s
 	}

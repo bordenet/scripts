@@ -102,7 +102,7 @@ func (f *Formatter) Format(r sync.RepoResult) string {
 		return fmt.Sprintf("  %s %s (rebase conflict, rolled back)", cross, namePad)
 
 	case r.Status == sync.StatusFailed:
-		return fmt.Sprintf("  %s %s (failed: %s)", cross, namePad, r.FailReason)
+		return fmt.Sprintf("  %s %s (failed: %s)%s", cross, namePad, r.FailReason, remediationHint(r))
 
 	case r.Status == sync.StatusManualInterventionRequired:
 		return fmt.Sprintf("  %s %s (manual intervention needed: %s)", cross, namePad, r.FailReason)

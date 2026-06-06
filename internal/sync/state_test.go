@@ -290,3 +290,19 @@ func TestTruncateError_NoTruncationNeeded(t *testing.T) {
 		t.Errorf("got %q, want %q (unchanged)", got, s)
 	}
 }
+
+// TestTruncateError_StripsNewlines verifies the single-line contract: git
+// stderr contains "\n"-separated lines, and the formatter renders one line
+// per repo. Embedded newlines would break the layout.
+func TestTruncateError_StripsNewlines(t *testing.T) {
+	s := "error: line 1\nfatal: line 2\r\nfatal: line 3"
+	got := truncateError(s, 200)
+	if strings.Contains(got, "\n") || strings.Contains(got, "\r") {
+		t.Errorf("newlines not stripped: %q", got)
+	}
+	for _, want := range []string{"line 1", "line 2", "line 3", "|"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in %q", want, got)
+		}
+	}
+}
