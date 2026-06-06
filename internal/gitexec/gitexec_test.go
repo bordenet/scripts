@@ -260,3 +260,42 @@ func TestFetchWithRetry(t *testing.T) {
 		// If we reach here, rand.Int63n(5_000_000) ran without panic.
 	})
 }
+
+// TestIsTransientFetchError_NewPatterns covers the additional patterns added
+// alongside the http.version=HTTP/1.1 / lowSpeed mitigation work. curl 28
+// fires on operation-timed-out / lowSpeed thresholds; gnutls_handshake and
+// SSL_read cover TLS-layer flakes on macOS (gnutls) and Linux (openssl).
+func TestIsTransientFetchError_NewPatterns(t *testing.T) {
+	transient := []struct {
+		name string
+		msg  string
+	}{
+		{"curl 28 operation timeout", "git fetch: exit status 128 (stderr: fatal: unable to access 'https://example/': Operation timed out after 60000 ms; curl 28 Operation too slow)"},
+		{"operation timed out lowercase", "fatal: unable to access 'https://x': operation timed out"},
+		{"gnutls handshake", "fatal: unable to access 'https://x': gnutls_handshake() failed: An unexpected TLS packet was received"},
+		{"openssl ssl_read", "fatal: unable to access 'https://x': OpenSSL SSL_read: Connection reset by peer, errno 54"},
+	}
+	for _, tc := range transient {
+		t.Run(tc.name, func(t *testing.T) {
+			if !isTransientFetchError(errors.New(tc.msg)) {
+				t.Errorf("expected transient=true for: %s", tc.msg)
+			}
+		})
+	}
+
+	// Negative guards — patterns that look similar but must NOT match.
+	permanent := []struct {
+		name string
+		msg  string
+	}{
+		{"curl 22 http 404", "fatal: unable to access 'https://x': The requested URL returned error: 404; curl 22 The requested URL returned error"},
+		{"auth failed", "fatal: Authentication failed for 'https://x'"},
+	}
+	for _, tc := range permanent {
+		t.Run(tc.name, func(t *testing.T) {
+			if isTransientFetchError(errors.New(tc.msg)) {
+				t.Errorf("expected transient=false for: %s", tc.msg)
+			}
+		})
+	}
+}

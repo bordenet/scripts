@@ -147,13 +147,21 @@ func isTransientFetchError(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	// "curl 18 " (with a trailing space) matches git's curl exit-code message
-	// "curl 18 transfer closed with outstanding read data remaining" while
-	// avoiding a false positive on "curl 186 bytes transferred" (different code).
+	// Trailing-space discipline on curl exit codes ("curl 18 ", "curl 28 ")
+	// avoids false positives on "curl 186" / "curl 280" etc.
+	// curl 28 fires when http.lowSpeedTime triggers OR when the operation
+	// times out at the curl layer; "operation timed out" covers the same
+	// class without the curl-code prefix on some git versions.
+	// gnutls_handshake / SSL_read cover TLS-layer flakes (macOS gnutls,
+	// Linux openssl) that present as transient connection drops.
 	return strings.Contains(msg, "curl 18 ") ||
+		strings.Contains(msg, "curl 28 ") ||
+		strings.Contains(msg, "operation timed out") ||
 		strings.Contains(msg, "early eof") ||
 		strings.Contains(msg, "unexpected disconnect while reading sideband") ||
-		strings.Contains(msg, "invalid index-pack output")
+		strings.Contains(msg, "invalid index-pack output") ||
+		strings.Contains(msg, "gnutls_handshake") ||
+		strings.Contains(msg, "ssl_read")
 }
 
 const fetchMaxAttempts = 3
