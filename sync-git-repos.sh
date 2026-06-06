@@ -79,9 +79,40 @@ current_hash=$(
 )
 cached_hash=$(cat "$HASH_FILE" 2>/dev/null || echo "")
 
-# 5. Rebuild if hash changed or binary missing
-if [[ "$current_hash" != "$cached_hash" ]] || [[ ! -x "$BINARY" ]]; then
-    echo "Building gitsync..." >&2
+# 4b. Belt-and-suspenders mtime check. If a previous rebuild was suppressed
+#     (e.g., hash file overwritten by an external sync between checks, OneDrive
+#     replication mid-build, or a flock-aborted invocation), the hash compare
+#     can return "match" even though source files are newer than the binary.
+#     Compare the newest source mtime against the binary mtime as a fallback.
+#     macOS uses `stat -f %m`, Linux/WSL uses `stat -c %Y`.
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    STAT_MTIME=(stat -f %m)
+else
+    STAT_MTIME=(stat -c %Y)
+fi
+newest_source_mtime=0
+while IFS= read -r _f; do
+    _m=$("${STAT_MTIME[@]}" "$_f" 2>/dev/null || echo 0)
+    (( _m > newest_source_mtime )) && newest_source_mtime=$_m
+done < <(
+    find "$SCRIPT_DIR/cmd" "$SCRIPT_DIR/internal" -name "*.go" -type f
+    printf '%s\n' "$SCRIPT_DIR/go.mod"
+    [[ -f "$SCRIPT_DIR/go.sum" ]] && printf '%s\n' "$SCRIPT_DIR/go.sum"
+)
+binary_mtime=0
+[[ -x "$BINARY" ]] && binary_mtime=$("${STAT_MTIME[@]}" "$BINARY" 2>/dev/null || echo 0)
+unset _f _m
+
+# 5. Rebuild if hash changed OR binary missing OR source newer than binary
+mtime_stale=0
+(( newest_source_mtime > binary_mtime )) && mtime_stale=1
+
+if [[ "$current_hash" != "$cached_hash" ]] || [[ ! -x "$BINARY" ]] || (( mtime_stale )); then
+    if (( mtime_stale )) && [[ "$current_hash" == "$cached_hash" ]]; then
+        echo "Building gitsync... (source newer than binary; hash check was stale)" >&2
+    else
+        echo "Building gitsync..." >&2
+    fi
     rm -f "$SCRIPT_DIR/gitsync_new"
     if (cd "$SCRIPT_DIR" && go build -o "$SCRIPT_DIR/gitsync_new" ./cmd/gitsync/); then
         mv "$SCRIPT_DIR/gitsync_new" "$BINARY"
