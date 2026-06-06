@@ -297,7 +297,7 @@ func parseFlags() (gosync.Flags, []string) {
 		noStash       = flag.Bool("no-stash", false, "skip repos with local changes instead of stashing")
 		forceRebase   = flag.Bool("force-rebase", false, "rebase pushed branches (solo repos only)")
 		concurrency   = flag.Int("concurrency", int(math.Min(float64(runtime.NumCPU()), 8)), "max parallel repos")
-		fetchTimeout  = flag.Int("fetch-timeout", 30, "per-repo fetch timeout in seconds")
+		fetchTimeout  = flag.Int("fetch-timeout", 60, "per-repo fetch timeout in seconds")
 		rebaseTimeout = flag.Int("rebase-timeout", 120, "per-repo rebase timeout in seconds")
 		// Deprecated/compat flags — accepted silently, have no effect.
 		_ = flag.Bool("all", false, "")
