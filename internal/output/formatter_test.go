@@ -271,8 +271,8 @@ func TestShowSummary_CompactMode_SyncedNamed(t *testing.T) {
 // a concrete shell-command hint for transient retry-exhaustion failures.
 func TestFormat_RemediationHintForTransientGaveUp(t *testing.T) {
 	r := sync.RepoResult{
-		RepoPath:       "/x/CallBox/core",
-		DisplayName:    "CallBox/core",
+		RepoPath:       "/x/example/large-monorepo",
+		DisplayName:    "example/large-monorepo",
 		Status:         sync.StatusSkipped,
 		SkipReason:     sync.SkipFetchTimeout,
 		FetchKind:      sync.FetchKindTransientGaveUp,
@@ -291,8 +291,8 @@ func TestFormat_RemediationHintForTransientGaveUp(t *testing.T) {
 // for plain timeout failures (no last-error suffix needed).
 func TestFormat_RemediationHintForTimeout(t *testing.T) {
 	r := sync.RepoResult{
-		RepoPath:    "/x/CallBox/core",
-		DisplayName: "CallBox/core",
+		RepoPath:    "/x/example/large-monorepo",
+		DisplayName: "example/large-monorepo",
 		Status:      sync.StatusSkipped,
 		SkipReason:  sync.SkipFetchTimeout,
 		FetchKind:   sync.FetchKindTimeout,
@@ -310,8 +310,8 @@ func TestFormat_RemediationHintForTimeout(t *testing.T) {
 // next step.
 func TestFormat_RemediationHintOnStatusFailed(t *testing.T) {
 	r := sync.RepoResult{
-		RepoPath:       "/x/CallBox/core",
-		DisplayName:    "CallBox/core",
+		RepoPath:       "/x/example/large-monorepo",
+		DisplayName:    "example/large-monorepo",
 		Status:         sync.StatusFailed,
 		FailReason:     "fetch failed after 3 attempts: curl 18 ...",
 		FetchKind:      sync.FetchKindTransientGaveUp,
@@ -337,8 +337,8 @@ func TestFormat_NoHintForSuccess(t *testing.T) {
 // is in their working tree, not in --fetch-timeout).
 func TestFormat_UntrackedConflict_NoHintNoise(t *testing.T) {
 	r := sync.RepoResult{
-		RepoPath:    "/x/CallBox/Tools/gitsync",
-		DisplayName: "CallBox/Tools/gitsync",
+		RepoPath:    "/x/example/mirror-fork",
+		DisplayName: "example/mirror-fork",
 		Status:      sync.StatusSkipped,
 		SkipReason:  sync.SkipUntrackedConflict,
 	}
