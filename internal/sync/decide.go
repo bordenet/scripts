@@ -34,6 +34,8 @@ func Decide(state RepoState, flags Flags) Action {
 		return skip(SkipMergeInProgress)
 	}
 	switch state.FetchKind {
+	case FetchKindOK:
+		// happy path — fall through to position-SHA checks below
 	case FetchKindTimeout:
 		return skip(SkipFetchTimeout)
 	case FetchKindCancelled:
@@ -44,10 +46,15 @@ func Decide(state RepoState, flags Flags) Action {
 		if state.FetchErr != nil {
 			return fail(state.FetchErr.Error())
 		}
+		// Defensive: TransientGaveUp without FetchErr is a caller bug (Run
+		// applied the kind without setting err). Fall through rather than
+		// panic — the absence of err makes the success path benign.
+	default:
+		// Unhandled FetchKind enum value. Panic on the spot so a future
+		// kind added to types.go MUST add a case here — silent fall-through
+		// to the success path would treat an unfetched repo as up-to-date.
+		panic("unhandled FetchKind in Decide: " + state.FetchKind.String())
 	}
-	// Defensive: any non-OK kind without an err means classifyFetchError set
-	// a kind but applyFetchFailure was not called (caller bug). Fall through
-	// to the success path; the absence of err makes that benign.
 	if state.BranchType == BranchTypeAmbiguous {
 		return skip(SkipAmbiguousBranch)
 	}

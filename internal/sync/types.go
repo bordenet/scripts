@@ -112,7 +112,6 @@ type RepoState struct {
 
 // FetchKind classifies the outcome of the fetch step. decide.go switches
 // on this enum directly; no parallel bool encoding.
-//   - FetchKindRepoGone        → FetchTimeout=false, RemoteGone=true
 //
 // Cancellation MUST be checked before timeout in the classifier — SIGINT
 // from main.go propagates as context.Canceled and must NOT be conflated
