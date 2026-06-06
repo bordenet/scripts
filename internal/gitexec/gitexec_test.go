@@ -365,14 +365,16 @@ func TestFetchWithRetry_SIGINTDuringAttempt(t *testing.T) {
 
 	attempts := 0
 	errCh := make(chan error, 1)
+	entered := make(chan struct{})
 	go func() {
 		errCh <- fetchWithRetry(parentCtx, perAttempt, func(attemptCtx context.Context) error {
 			attempts++
+			close(entered) // deterministic: cancel only fires after lambda starts
 			<-attemptCtx.Done()
 			return attemptCtx.Err()
 		})
 	}()
-	time.Sleep(10 * time.Millisecond)
+	<-entered
 	cancel()
 
 	select {

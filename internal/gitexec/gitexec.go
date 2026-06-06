@@ -256,9 +256,14 @@ func FetchMultiRef(parentCtx context.Context, perAttempt time.Duration, dir stri
 			}
 			return err
 		}
+		// HTTP/1.1 downgrade is reserved for retry attempts only — happy-path
+		// fetches use git's default HTTP/2 multiplexing. The closure-captured
+		// `attempt` counter resets per ref.
+		attempt := 0
 		err := fetchWithRetry(parentCtx, perAttempt, func(ctx context.Context) error {
-			_, err := runFetch(ctx, dir, ref)
-			return err
+			forceHTTP1 := attempt > 0
+			attempt++
+			return runFetch(ctx, dir, ref, forceHTTP1)
 		})
 		if err == nil {
 			anySucceeded = true
@@ -282,20 +287,30 @@ func FetchMultiRef(parentCtx context.Context, perAttempt time.Duration, dir stri
 	return fmt.Errorf("no parent candidate refs available")
 }
 
-// FetchSingleRef fetches a single ref from origin.
+// FetchSingleRef fetches a single ref from origin. HTTP/1.1 downgrade is
+// reserved for retry attempts only — happy-path fetches use HTTP/2.
 func FetchSingleRef(parentCtx context.Context, perAttempt time.Duration, dir, ref string) error {
+	attempt := 0
 	return fetchWithRetry(parentCtx, perAttempt, func(ctx context.Context) error {
-		_, err := runFetch(ctx, dir, ref)
-		return err
+		forceHTTP1 := attempt > 0
+		attempt++
+		return runFetch(ctx, dir, ref, forceHTTP1)
 	})
 }
 
-// runFetch invokes `git -c http.version=HTTP/1.1 fetch origin <ref>`. The
-// HTTP/1.1 downgrade applies only to this subprocess (no global git config
-// mutation) and mitigates HTTP/2 multiplexing failures (curl 18 / sideband
-// disconnect) on flaky links / large packs.
-func runFetch(ctx context.Context, dir, ref string) (string, error) {
-	return run(ctx, dir, "-c", "http.version=HTTP/1.1", "fetch", "origin", ref)
+// runFetch invokes `git fetch origin <ref>`, optionally downgrading to
+// HTTP/1.1 via `-c http.version=HTTP/1.1` for retry attempts. Subprocess-only
+// — no global git config mutation. HTTP/2 multiplexing failures (curl 18 /
+// sideband disconnect) on flaky links correlate with the multiplexed transport,
+// so downgrading on retry trades latency for reliability.
+func runFetch(ctx context.Context, dir, ref string, forceHTTP1 bool) error {
+	args := make([]string, 0, 5)
+	if forceHTTP1 {
+		args = append(args, "-c", "http.version=HTTP/1.1")
+	}
+	args = append(args, "fetch", "origin", ref)
+	_, err := run(ctx, dir, args...)
+	return err
 }
 
 // RevParse returns the SHA for a git ref. Returns "" if not found.

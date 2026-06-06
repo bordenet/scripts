@@ -14,16 +14,21 @@ import (
 // parentCandidates is the ordered list of candidate parent branches.
 var parentCandidates = []string{"main", "master", "dev", "develop", "staging"}
 
-// fetchWithBudget runs fn with a fetch ctx whose deadline is the total retry
-// budget (perAttempt × FetchMaxAttempts). It calls cancel() before returning
-// so the caller never sees a leaked context.
+// fetchWithBudget runs fn with a fetch ctx whose deadline is
+// perAttempt × FetchMaxAttempts × refCount. It calls cancel() before
+// returning so the caller never sees a leaked context.
+//
+// refCount lets multi-ref callers (FetchMultiRef iterates 5 parent candidates)
+// allocate a fair share to every ref instead of letting a flaky first ref
+// drain the whole budget — without refCount, the second-through-Nth refs
+// would never run when ref-1 hits transient errors. Single-ref callers pass 1.
 //
 // Budget semantics:
-//   - perAttempt > 0  → totalBudget = perAttempt × FetchMaxAttempts.
+//   - perAttempt > 0  → totalBudget = perAttempt × FetchMaxAttempts × refCount.
 //   - perAttempt <= 0 → totalBudget = 0, which context.WithTimeout treats as
 //     an already-expired ctx. Preserves the existing test pattern where
 //     FetchTimeout=0 forces immediate expiry. CLI users cannot reach this
-//     state (parseFlags rejects <1 in Task 7).
+//     state (main.go rejects <1).
 //
 // Context layering:
 //
@@ -31,16 +36,45 @@ var parentCandidates = []string{"main", "master", "dev", "develop", "staging"}
 //	  └─ ctx (CollectState's parent)
 //	       └─ fetchCtx (this function's WithTimeout, TOTAL budget)
 //	            └─ attemptCtx (inside fetchWithRetry, per-attempt)
-func fetchWithBudget(ctx context.Context, perAttempt time.Duration, fn func(fetchCtx context.Context) error) (kind FetchKind, isTimeout, isGone bool, fetchErr error) {
-	totalBudget := perAttempt * time.Duration(gitexec.FetchMaxAttempts)
+func fetchWithBudget(ctx context.Context, perAttempt time.Duration, refCount int, fn func(fetchCtx context.Context) error) (FetchKind, error) {
+	if refCount < 1 {
+		refCount = 1
+	}
+	totalBudget := perAttempt * time.Duration(gitexec.FetchMaxAttempts) * time.Duration(refCount)
 	fetchCtx, cancel := context.WithTimeout(ctx, totalBudget)
 	defer cancel()
 	err := fn(fetchCtx)
 	if err == nil {
-		return FetchKindOK, false, false, nil
+		return FetchKindOK, nil
 	}
-	k, t, g := classifyFetchError(ctx, fetchCtx, err)
-	return k, t, g, err
+	kind, _, _ := classifyFetchError(ctx, fetchCtx, err)
+	return kind, err
+}
+
+// applyFetchFailure sets the failure-related fields on state from a
+// (FetchKind, error) pair. Centralizes the mapping from FetchKind back to
+// the legacy FetchTimeout / RemoteGone / FetchCancelled bools that
+// decide.go reads. FetchLastError is populated for Timeout and
+// TransientGaveUp — both benefit from the underlying error context in the
+// formatter's remediation hint. Cancelled fetches have no useful error
+// (it's ctx.Canceled), so we skip FetchLastError there.
+func applyFetchFailure(s *RepoState, kind FetchKind, err error) {
+	s.FetchKind = kind
+	switch kind {
+	case FetchKindCancelled:
+		s.FetchCancelled = true
+	case FetchKindTimeout:
+		s.FetchTimeout = true
+		s.FetchLastError = truncateError(err.Error(), 200)
+	case FetchKindRepoGone:
+		s.RemoteGone = true
+	case FetchKindTransientGaveUp:
+		s.FetchErr = err
+		s.FetchLastError = truncateError(err.Error(), 200)
+	default:
+		// FetchKindOK should not reach here; defensive fall-through preserves err
+		s.FetchErr = err
+	}
 }
 
 // classifyFetchError maps a fetch error + the two relevant contexts to a
@@ -141,22 +175,14 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 		state.IsPushed = gitexec.RemoteTrackingRefExists(ctx, repoPath, state.CurrentBranch)
 
 		// 12b. Multi-ref fetch (covers parent detection AND data sync in one call)
-		// fetchWithBudget gives FetchMultiRef the TOTAL retry budget; the inner
-		// fetchWithRetry derives per-attempt children from it.
+		// Multi-ref budget scales by len(parentCandidates): each candidate
+		// gets a fair retry budget, so a flaky first ref cannot drain refs 2..N.
 		perAttempt := time.Duration(flags.FetchTimeout) * time.Second
-		kind, isTimeout, isGone, ferr := fetchWithBudget(ctx, perAttempt, func(fetchCtx context.Context) error {
+		kind, ferr := fetchWithBudget(ctx, perAttempt, len(parentCandidates), func(fetchCtx context.Context) error {
 			return gitexec.FetchMultiRef(fetchCtx, perAttempt, repoPath, parentCandidates)
 		})
 		if ferr != nil {
-			state.FetchKind = kind
-			state.FetchTimeout = isTimeout
-			state.RemoteGone = isGone
-			if kind == FetchKindCancelled {
-				state.FetchCancelled = true
-			} else if !isTimeout && !isGone {
-				state.FetchErr = ferr
-				state.FetchLastError = truncateError(ferr.Error(), 200)
-			}
+			applyFetchFailure(&state, kind, ferr)
 			return state
 		}
 		state.FetchKind = FetchKindOK
@@ -182,19 +208,11 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 		state.ParentBranch = parent
 
 		perAttempt := time.Duration(flags.FetchTimeout) * time.Second
-		kind, isTimeout, isGone, ferr := fetchWithBudget(ctx, perAttempt, func(fetchCtx context.Context) error {
+		kind, ferr := fetchWithBudget(ctx, perAttempt, 1, func(fetchCtx context.Context) error {
 			return gitexec.FetchSingleRef(fetchCtx, perAttempt, repoPath, parent)
 		})
 		if ferr != nil {
-			state.FetchKind = kind
-			state.FetchTimeout = isTimeout
-			state.RemoteGone = isGone
-			if kind == FetchKindCancelled {
-				state.FetchCancelled = true
-			} else if !isTimeout && !isGone {
-				state.FetchErr = ferr
-				state.FetchLastError = truncateError(ferr.Error(), 200)
-			}
+			applyFetchFailure(&state, kind, ferr)
 			return state
 		}
 		state.FetchKind = FetchKindOK

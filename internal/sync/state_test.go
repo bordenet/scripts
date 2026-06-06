@@ -136,14 +136,28 @@ func TestClassifyFetchError_FetchKindBoolInvariant(t *testing.T) {
 		},
 	}
 	// Sanity: ensure we cover every non-OK FetchKind. FetchKindOK is the
-	// success path and classifyFetchError isn't called for it.
-	nonOKKinds := int(FetchKindRepoGone) // last enum value
+	// success path and classifyFetchError isn't called for it. Listing the
+	// kinds explicitly here (rather than deriving from `int(FetchKindRepoGone)`)
+	// keeps the contract robust to enum reordering or insertion of new
+	// values — a new kind must be added to BOTH this slice and the setups
+	// table for the test to compile and pass.
+	requiredKinds := []FetchKind{
+		FetchKindTimeout,
+		FetchKindCancelled,
+		FetchKindTransientGaveUp,
+		FetchKindRepoGone,
+	}
 	seen := map[FetchKind]bool{}
 	for _, c := range setups {
 		seen[c.wantKind] = true
 	}
-	if len(seen) != nonOKKinds {
-		t.Fatalf("setups cover %d distinct FetchKinds, want %d (every non-OK kind)", len(seen), nonOKKinds)
+	for _, k := range requiredKinds {
+		if !seen[k] {
+			t.Fatalf("setups missing coverage for %v — add a case", k)
+		}
+	}
+	if len(seen) != len(requiredKinds) {
+		t.Fatalf("setups cover %d kinds, want exactly %d (no extras, no missing)", len(seen), len(requiredKinds))
 	}
 	for _, tc := range setups {
 		t.Run(tc.name, func(t *testing.T) {
@@ -187,7 +201,7 @@ func TestClassifyFetchError_CancelWinsOverTimeout(t *testing.T) {
 // internal Flags struct accepts 0 for test purposes.
 func TestFetchWithBudget_ZeroPerAttemptYieldsExpiredCtx(t *testing.T) {
 	var observed context.Context
-	kind, isTimeout, _, ferr := fetchWithBudget(context.Background(), 0, func(fctx context.Context) error {
+	kind, ferr := fetchWithBudget(context.Background(), 0, 1, func(fctx context.Context) error {
 		observed = fctx
 		return fctx.Err()
 	})
@@ -197,8 +211,8 @@ func TestFetchWithBudget_ZeroPerAttemptYieldsExpiredCtx(t *testing.T) {
 	if !errors.Is(observed.Err(), context.DeadlineExceeded) {
 		t.Errorf("fetchCtx.Err() = %v, want DeadlineExceeded for zero per-attempt budget", observed.Err())
 	}
-	if !isTimeout || kind != FetchKindTimeout {
-		t.Errorf("kind = %v, isTimeout = %v; want FetchKindTimeout/true", kind, isTimeout)
+	if kind != FetchKindTimeout {
+		t.Errorf("kind = %v; want FetchKindTimeout", kind)
 	}
 	if ferr == nil {
 		t.Error("expected non-nil err for expired ctx")
@@ -206,13 +220,14 @@ func TestFetchWithBudget_ZeroPerAttemptYieldsExpiredCtx(t *testing.T) {
 }
 
 // TestFetchWithBudget_PositivePerAttemptScalesByMaxAttempts verifies that the
-// deadline on fetchCtx is perAttempt × FetchMaxAttempts.
+// deadline on fetchCtx is perAttempt × FetchMaxAttempts × refCount.
 func TestFetchWithBudget_PositivePerAttemptScalesByMaxAttempts(t *testing.T) {
 	perAttempt := 500 * time.Millisecond
-	expectedTotal := perAttempt * time.Duration(gitexec.FetchMaxAttempts)
+	refCount := 1
+	expectedTotal := perAttempt * time.Duration(gitexec.FetchMaxAttempts) * time.Duration(refCount)
 	var observedRemaining time.Duration
 	startCall := time.Now()
-	_, _, _, _ = fetchWithBudget(context.Background(), perAttempt, func(fctx context.Context) error {
+	_, _ = fetchWithBudget(context.Background(), perAttempt, refCount, func(fctx context.Context) error {
 		deadline, ok := fctx.Deadline()
 		if !ok {
 			t.Error("fetchCtx has no deadline")
@@ -230,6 +245,44 @@ func TestFetchWithBudget_PositivePerAttemptScalesByMaxAttempts(t *testing.T) {
 	}
 }
 
+// TestFetchWithBudget_RefCountScalesTotal verifies that refCount>1 multiplies
+// the total budget, giving each ref a fair share when called with a multi-ref
+// caller like FetchMultiRef.
+func TestFetchWithBudget_RefCountScalesTotal(t *testing.T) {
+	perAttempt := 200 * time.Millisecond
+	refCount := 5
+	expectedTotal := perAttempt * time.Duration(gitexec.FetchMaxAttempts) * time.Duration(refCount)
+	var observedRemaining time.Duration
+	startCall := time.Now()
+	_, _ = fetchWithBudget(context.Background(), perAttempt, refCount, func(fctx context.Context) error {
+		deadline, _ := fctx.Deadline()
+		observedRemaining = time.Until(deadline)
+		return nil
+	})
+	elapsed := time.Since(startCall)
+	lower := expectedTotal - 200*time.Millisecond - elapsed
+	upper := expectedTotal + 200*time.Millisecond
+	if observedRemaining < lower || observedRemaining > upper {
+		t.Errorf("remaining = %v, want within [%v, %v] for refCount=%d", observedRemaining, lower, upper, refCount)
+	}
+}
+
+// TestFetchWithBudget_RefCountFloorsToOne ensures refCount<1 is normalized
+// to 1 — defensive against caller bugs that pass len() of an empty slice.
+func TestFetchWithBudget_RefCountFloorsToOne(t *testing.T) {
+	perAttempt := 100 * time.Millisecond
+	expectedTotal := perAttempt * time.Duration(gitexec.FetchMaxAttempts) // refCount=1 floor
+	var observedRemaining time.Duration
+	_, _ = fetchWithBudget(context.Background(), perAttempt, 0, func(fctx context.Context) error {
+		deadline, _ := fctx.Deadline()
+		observedRemaining = time.Until(deadline)
+		return nil
+	})
+	if observedRemaining > expectedTotal+50*time.Millisecond || observedRemaining < expectedTotal-200*time.Millisecond {
+		t.Errorf("refCount=0 not floored to 1: remaining = %v, want ~%v", observedRemaining, expectedTotal)
+	}
+}
+
 // TestFetchWithBudget_SIGINTDuringFetch is the end-to-end SIGINT test through
 // fetchWithBudget — closes the integration gap that classifier-in-isolation
 // tests don't cover.
@@ -237,35 +290,26 @@ func TestFetchWithBudget_SIGINTDuringFetch(t *testing.T) {
 	parentCtx, cancel := context.WithCancel(context.Background())
 	perAttempt := 5 * time.Second
 
-	type result struct {
-		kind      FetchKind
-		isTimeout bool
-		isGone    bool
-	}
-	resultCh := make(chan result, 1)
+	resultCh := make(chan FetchKind, 1)
+	entered := make(chan struct{})
 	go func() {
-		k, isTimeout, isGone, _ := fetchWithBudget(parentCtx, perAttempt, func(fctx context.Context) error {
+		k, _ := fetchWithBudget(parentCtx, perAttempt, 1, func(fctx context.Context) error {
+			close(entered) // deterministic: signal we're in the lambda
 			<-fctx.Done()
 			return fctx.Err()
 		})
-		resultCh <- result{kind: k, isTimeout: isTimeout, isGone: isGone}
+		resultCh <- k
 	}()
-	time.Sleep(10 * time.Millisecond)
+	<-entered // wait for goroutine to enter lambda — no sleep-based heuristic
 	cancel()
-	var got result
+	var got FetchKind
 	select {
 	case got = <-resultCh:
 	case <-time.After(2 * time.Second):
 		t.Fatal("fetchWithBudget did not return after parent SIGINT")
 	}
-	if got.kind != FetchKindCancelled {
-		t.Errorf("kind = %v, want FetchKindCancelled (SIGINT must propagate through fetchWithBudget)", got.kind)
-	}
-	if got.isTimeout {
-		t.Error("isTimeout=true on SIGINT — would misleadingly suggest --fetch-timeout hint to user")
-	}
-	if got.isGone {
-		t.Error("isGone=true on SIGINT — misclassification")
+	if got != FetchKindCancelled {
+		t.Errorf("kind = %v, want FetchKindCancelled (SIGINT must propagate through fetchWithBudget)", got)
 	}
 }
 
