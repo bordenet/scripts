@@ -33,18 +33,21 @@ func Decide(state RepoState, flags Flags) Action {
 	if state.HasMergeHead {
 		return skip(SkipMergeInProgress)
 	}
-	if state.FetchTimeout {
+	switch state.FetchKind {
+	case FetchKindTimeout:
 		return skip(SkipFetchTimeout)
-	}
-	if state.FetchCancelled {
+	case FetchKindCancelled:
 		return skip(SkipCancelled)
-	}
-	if state.RemoteGone {
+	case FetchKindRepoGone:
 		return skip(SkipRemoteGone)
+	case FetchKindTransientGaveUp:
+		if state.FetchErr != nil {
+			return fail(state.FetchErr.Error())
+		}
 	}
-	if state.FetchErr != nil {
-		return fail(state.FetchErr.Error())
-	}
+	// Defensive: any non-OK kind without an err means classifyFetchError set
+	// a kind but applyFetchFailure was not called (caller bug). Fall through
+	// to the success path; the absence of err makes that benign.
 	if state.BranchType == BranchTypeAmbiguous {
 		return skip(SkipAmbiguousBranch)
 	}

@@ -47,69 +47,60 @@ func fetchWithBudget(ctx context.Context, perAttempt time.Duration, refCount int
 	if err == nil {
 		return FetchKindOK, nil
 	}
-	kind, _, _ := classifyFetchError(ctx, fetchCtx, err)
-	return kind, err
+	return classifyFetchError(ctx, fetchCtx, err), err
 }
 
 // applyFetchFailure sets the failure-related fields on state from a
-// (FetchKind, error) pair. Centralizes the mapping from FetchKind back to
-// the legacy FetchTimeout / RemoteGone / FetchCancelled bools that
-// decide.go reads. FetchLastError is populated for Timeout and
-// TransientGaveUp — both benefit from the underlying error context in the
-// formatter's remediation hint. Cancelled fetches have no useful error
-// (it's ctx.Canceled), so we skip FetchLastError there.
+// (FetchKind, error) pair. FetchErr is populated only for
+// FetchKindTransientGaveUp (the only path that should surface as
+// StatusFailed via decide.go). FetchLastError carries the truncated remote
+// error for the formatter's remediation hint on Timeout and TransientGaveUp.
+// Cancelled fetches have no useful error (it's ctx.Canceled), so we skip
+// FetchLastError there.
 func applyFetchFailure(s *RepoState, kind FetchKind, err error) {
 	s.FetchKind = kind
 	switch kind {
-	case FetchKindCancelled:
-		s.FetchCancelled = true
 	case FetchKindTimeout:
-		s.FetchTimeout = true
 		s.FetchLastError = truncateError(err.Error(), 200)
-	case FetchKindRepoGone:
-		s.RemoteGone = true
 	case FetchKindTransientGaveUp:
 		s.FetchErr = err
 		s.FetchLastError = truncateError(err.Error(), 200)
 	}
-	// FetchKindOK is unreachable here: callers only invoke applyFetchFailure
-	// after fetchWithBudget returns a non-nil error. A future kind added
-	// without a case will silently leave only FetchKind set, which the
-	// formatter can still render — better than mis-attributing the error.
+	// FetchKindCancelled / RepoGone / OK: no extra state. decide.go switches
+	// on FetchKind directly; no bool aliases to keep in sync.
 }
 
 // classifyFetchError maps a fetch error + the two relevant contexts to a
-// FetchKind plus the legacy FetchTimeout / RemoteGone bools. The bools are
-// retained so decide.go's existing branching is untouched.
+// FetchKind. decide.go switches on this enum directly.
 //
 // CRITICAL: Cancellation MUST be checked before timeout. SIGINT from main.go
 // propagates via rootCtx → ctx → fetchCtx as context.Canceled. Misclassifying
 // SIGINT as Timeout would spam the user with "fetch timed out" messages on
 // Ctrl-C of a large multi-repo sync.
-func classifyFetchError(parentCtx, fetchCtx context.Context, err error) (kind FetchKind, isTimeout bool, isGone bool) {
+func classifyFetchError(parentCtx, fetchCtx context.Context, err error) FetchKind {
 	// 1. SIGINT (Canceled) wins. Check parent first because cancellation
 	//    propagates parent → child; once parent is Canceled, fetchCtx is
 	//    also Canceled but the root cause is the parent.
 	if errors.Is(parentCtx.Err(), context.Canceled) {
-		return FetchKindCancelled, false, false
+		return FetchKindCancelled
 	}
 	if errors.Is(fetchCtx.Err(), context.Canceled) {
-		return FetchKindCancelled, false, false
+		return FetchKindCancelled
 	}
 	// 2. Total-budget exhaustion (parent's WithTimeout fired).
 	if errors.Is(parentCtx.Err(), context.DeadlineExceeded) {
-		return FetchKindTimeout, true, false
+		return FetchKindTimeout
 	}
 	// 3. Per-attempt / fetch budget elapsed without parent expiry.
 	if errors.Is(fetchCtx.Err(), context.DeadlineExceeded) {
-		return FetchKindTimeout, true, false
+		return FetchKindTimeout
 	}
 	// 4. Remote-side permanent failure (repo not found / deleted).
 	if isRemoteGoneError(err) {
-		return FetchKindRepoGone, false, true
+		return FetchKindRepoGone
 	}
 	// 5. Default: transient retries exhausted, parent budget intact.
-	return FetchKindTransientGaveUp, false, false
+	return FetchKindTransientGaveUp
 }
 
 // truncateError flattens s to a single line (replacing \r\n / \n with " | "),

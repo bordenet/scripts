@@ -163,9 +163,9 @@ func TestDecide_AllScenarios(t *testing.T) {
 		{
 			name: "15_fetch_timeout",
 			state: syncp.RepoState{
-				HasOrigin:    true,
+				HasOrigin:     true,
 				CurrentBranch: "main",
-				FetchTimeout: true,
+				FetchKind:     syncp.FetchKindTimeout,
 			},
 			flags:          defaultFlags(),
 			wantAction:     syncp.ActionSkip,
@@ -241,11 +241,15 @@ func TestDecide_AllScenarios(t *testing.T) {
 	}
 }
 
-// TestDecide_FetchError verifies a transient FetchErr → ActionFail
+// TestDecide_FetchError verifies a transient FetchErr → ActionFail.
+// applyFetchFailure populates FetchKind=TransientGaveUp + FetchErr in
+// real flow; the test pins both fields so the decide-side switch on
+// FetchKind routes to the FetchErr branch.
 func TestDecide_FetchError(t *testing.T) {
 	state := syncp.RepoState{
 		HasOrigin:     true,
 		CurrentBranch: "main",
+		FetchKind:     syncp.FetchKindTransientGaveUp,
 		FetchErr:      errors.New("connection refused"),
 	}
 	action := syncp.Decide(state, defaultFlags())
@@ -272,7 +276,7 @@ func TestDecide_RemoteGone(t *testing.T) {
 				HasOrigin:     true,
 				CurrentBranch: "main",
 				FetchErr:      errors.New(tc.msg),
-				RemoteGone:    true,
+				FetchKind:     syncp.FetchKindRepoGone,
 			}
 			action := syncp.Decide(state, defaultFlags())
 			if action.Type != syncp.ActionSkip {

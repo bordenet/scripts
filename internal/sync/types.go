@@ -101,27 +101,17 @@ type RepoState struct {
 	HasSubmodules   bool // .gitmodules file exists in repo root
 	IsPushed        bool // refs/remotes/origin/<CurrentBranch> exists locally (Feature only)
 	HasOrigin       bool
-	FetchErr        error
-	FetchTimeout    bool
-	FetchCancelled  bool // true when fetch was cancelled by parent context (SIGINT), not a timeout
-	RemoteGone      bool // true when fetch fails because the remote repo was deleted or moved
-	// FetchKind is the enum classification set by classifyFetchError; the
-	// existing FetchTimeout/RemoteGone/FetchCancelled bools remain
-	// authoritative for decide.go logic.
+	// FetchErr is set only when FetchKind == FetchKindTransientGaveUp — it
+	// carries the wrapped git error so decide.go can surface it as FailReason.
+	FetchErr error
+	// FetchKind classifies the fetch outcome; decide.go switches on it
+	// to route Skip / Fail / continue.
 	FetchKind      FetchKind
 	FetchLastError string // truncated remote error string for remediation hints
 }
 
-// FetchKind classifies the outcome of the fetch step. The existing
-// FetchTimeout / RemoteGone / FetchCancelled bools remain authoritative for
-// decide.go; FetchKind provides a single enum value for the formatter to
-// drive per-kind remediation hints.
-//
-// CONTRACT (verified by TestClassifyFetchError_FetchKindBoolInvariant):
-//   - FetchKindOK              → FetchTimeout=false, RemoteGone=false
-//   - FetchKindTimeout         → FetchTimeout=true,  RemoteGone=false
-//   - FetchKindCancelled       → FetchTimeout=false, RemoteGone=false
-//   - FetchKindTransientGaveUp → FetchTimeout=false, RemoteGone=false (FetchErr set)
+// FetchKind classifies the outcome of the fetch step. decide.go switches
+// on this enum directly; no parallel bool encoding.
 //   - FetchKindRepoGone        → FetchTimeout=false, RemoteGone=true
 //
 // Cancellation MUST be checked before timeout in the classifier — SIGINT

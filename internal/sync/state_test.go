@@ -21,15 +21,9 @@ func TestClassifyFetchError_SIGINT_NotTimeout(t *testing.T) {
 	cancel()
 	fetchCtx, fcancel := context.WithCancel(parentCtx)
 	defer fcancel()
-	kind, isTimeout, isGone := classifyFetchError(parentCtx, fetchCtx, context.Canceled)
+	kind := classifyFetchError(parentCtx, fetchCtx, context.Canceled)
 	if kind != FetchKindCancelled {
 		t.Errorf("kind = %v, want FetchKindCancelled — SIGINT MUST NOT be classified as Timeout", kind)
-	}
-	if isTimeout {
-		t.Error("SIGINT misclassified as Timeout — would spam user with timeout messages on Ctrl-C")
-	}
-	if isGone {
-		t.Error("SIGINT misclassified as RemoteGone")
 	}
 }
 
@@ -40,28 +34,24 @@ func TestClassifyFetchError_ParentTimeoutDistinctFromCancel(t *testing.T) {
 	parentCtx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 	defer cancel()
 	time.Sleep(2 * time.Millisecond)
-	kind, isTimeout, _ := classifyFetchError(parentCtx, parentCtx, context.DeadlineExceeded)
+	kind := classifyFetchError(parentCtx, parentCtx, context.DeadlineExceeded)
 	if kind != FetchKindTimeout {
 		t.Errorf("kind = %v, want FetchKindTimeout for parent DeadlineExceeded", kind)
 	}
-	if !isTimeout {
-		t.Error("FetchTimeout bool should be true for parent total-budget expiry")
-	}
 }
 
-// TestClassifyFetchError_FetchKindBoolInvariant exhaustively verifies the
-// contract between FetchKind and the legacy FetchTimeout/RemoteGone bools.
-// If you add a new FetchKind, add a case below AND update the contract
-// comment in types.go.
-func TestClassifyFetchError_FetchKindBoolInvariant(t *testing.T) {
+// TestClassifyFetchError_AllKinds exhaustively verifies that classifyFetchError
+// returns the correct FetchKind for every distinguishable (parentCtx state,
+// fetchCtx state, err) input. A new FetchKind requires adding a case below
+// AND updating requiredKinds — if either is missing the test fails to
+// compile or fails at runtime, preventing silent drift.
+func TestClassifyFetchError_AllKinds(t *testing.T) {
 	type setup struct {
 		name        string
 		buildParent func() (context.Context, context.CancelFunc)
 		buildFetch  func(parent context.Context) (context.Context, context.CancelFunc)
 		err         error
 		wantKind    FetchKind
-		wantTimeout bool
-		wantGone    bool
 	}
 	setups := []setup{
 		{
@@ -71,24 +61,20 @@ func TestClassifyFetchError_FetchKindBoolInvariant(t *testing.T) {
 				cancel()
 				return ctx, func() {}
 			},
-			buildFetch:  func(p context.Context) (context.Context, context.CancelFunc) { return p, func() {} },
-			err:         context.Canceled,
-			wantKind:    FetchKindCancelled,
-			wantTimeout: false,
-			wantGone:    false,
+			buildFetch: func(p context.Context) (context.Context, context.CancelFunc) { return p, func() {} },
+			err:        context.Canceled,
+			wantKind:   FetchKindCancelled,
 		},
 		{
-			name:        "Cancelled — fetchCtx only (uncovered branch from PHR R2)",
+			name:        "Cancelled — fetchCtx only",
 			buildParent: func() (context.Context, context.CancelFunc) { return context.Background(), func() {} },
 			buildFetch: func(p context.Context) (context.Context, context.CancelFunc) {
 				ctx, cancel := context.WithCancel(p)
 				cancel()
 				return ctx, func() {}
 			},
-			err:         context.Canceled,
-			wantKind:    FetchKindCancelled,
-			wantTimeout: false,
-			wantGone:    false,
+			err:      context.Canceled,
+			wantKind: FetchKindCancelled,
 		},
 		{
 			name: "Timeout — parent DeadlineExceeded",
@@ -97,11 +83,9 @@ func TestClassifyFetchError_FetchKindBoolInvariant(t *testing.T) {
 				time.Sleep(2 * time.Millisecond)
 				return ctx, cancel
 			},
-			buildFetch:  func(p context.Context) (context.Context, context.CancelFunc) { return p, func() {} },
-			err:         context.DeadlineExceeded,
-			wantKind:    FetchKindTimeout,
-			wantTimeout: true,
-			wantGone:    false,
+			buildFetch: func(p context.Context) (context.Context, context.CancelFunc) { return p, func() {} },
+			err:        context.DeadlineExceeded,
+			wantKind:   FetchKindTimeout,
 		},
 		{
 			name:        "Timeout — fetchCtx DeadlineExceeded only",
@@ -111,10 +95,8 @@ func TestClassifyFetchError_FetchKindBoolInvariant(t *testing.T) {
 				time.Sleep(2 * time.Millisecond)
 				return ctx, cancel
 			},
-			err:         context.DeadlineExceeded,
-			wantKind:    FetchKindTimeout,
-			wantTimeout: true,
-			wantGone:    false,
+			err:      context.DeadlineExceeded,
+			wantKind: FetchKindTimeout,
 		},
 		{
 			name:        "RepoGone — repository not found",
@@ -122,8 +104,6 @@ func TestClassifyFetchError_FetchKindBoolInvariant(t *testing.T) {
 			buildFetch:  func(p context.Context) (context.Context, context.CancelFunc) { return p, func() {} },
 			err:         fmt.Errorf("ERROR: Repository not found"),
 			wantKind:    FetchKindRepoGone,
-			wantTimeout: false,
-			wantGone:    true,
 		},
 		{
 			name:        "TransientGaveUp — exhausted retries",
@@ -131,16 +111,8 @@ func TestClassifyFetchError_FetchKindBoolInvariant(t *testing.T) {
 			buildFetch:  func(p context.Context) (context.Context, context.CancelFunc) { return p, func() {} },
 			err:         fmt.Errorf("fetch failed after 3 attempts: curl 18 transfer closed"),
 			wantKind:    FetchKindTransientGaveUp,
-			wantTimeout: false,
-			wantGone:    false,
 		},
 	}
-	// Sanity: ensure we cover every non-OK FetchKind. FetchKindOK is the
-	// success path and classifyFetchError isn't called for it. Listing the
-	// kinds explicitly here (rather than deriving from `int(FetchKindRepoGone)`)
-	// keeps the contract robust to enum reordering or insertion of new
-	// values — a new kind must be added to BOTH this slice and the setups
-	// table for the test to compile and pass.
 	requiredKinds := []FetchKind{
 		FetchKindTimeout,
 		FetchKindCancelled,
@@ -165,15 +137,8 @@ func TestClassifyFetchError_FetchKindBoolInvariant(t *testing.T) {
 			defer pcancel()
 			fetch, fcancel := tc.buildFetch(parent)
 			defer fcancel()
-			kind, isTimeout, isGone := classifyFetchError(parent, fetch, tc.err)
-			if kind != tc.wantKind {
-				t.Errorf("kind = %v, want %v", kind, tc.wantKind)
-			}
-			if isTimeout != tc.wantTimeout {
-				t.Errorf("isTimeout = %v, want %v (contract drift)", isTimeout, tc.wantTimeout)
-			}
-			if isGone != tc.wantGone {
-				t.Errorf("isGone = %v, want %v (contract drift)", isGone, tc.wantGone)
+			if got := classifyFetchError(parent, fetch, tc.err); got != tc.wantKind {
+				t.Errorf("kind = %v, want %v", got, tc.wantKind)
 			}
 		})
 	}
@@ -189,12 +154,8 @@ func TestClassifyFetchError_FetchKindBoolInvariant(t *testing.T) {
 func TestClassifyFetchError_CancelBeforeDeadlineWins(t *testing.T) {
 	parentCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	cancel() // fires immediately, before the 10s deadline
-	kind, isTimeout, _ := classifyFetchError(parentCtx, parentCtx, context.Canceled)
-	if kind != FetchKindCancelled {
-		t.Errorf("kind = %v, want FetchKindCancelled (cancel before deadline = SIGINT semantics)", kind)
-	}
-	if isTimeout {
-		t.Error("isTimeout must be false for Cancelled kind")
+	if got := classifyFetchError(parentCtx, parentCtx, context.Canceled); got != FetchKindCancelled {
+		t.Errorf("kind = %v, want FetchKindCancelled (cancel before deadline = SIGINT semantics)", got)
 	}
 }
 
