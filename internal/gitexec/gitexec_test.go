@@ -351,6 +351,43 @@ func TestFetchWithRetry_PerAttemptCancelsLongAttempt(t *testing.T) {
 	}
 }
 
+// TestFetchWithRetry_SIGINTDuringAttempt is a regression guard for the
+// classifier ordering: SIGINT mid-attempt must propagate as context.Canceled
+// and must NOT trigger a retry (the per-attempt expiry retry path applies
+// only when parentCtx is still alive).
+func TestFetchWithRetry_SIGINTDuringAttempt(t *testing.T) {
+	origDelays := fetchRetryDelays
+	fetchRetryDelays = []time.Duration{1 * time.Millisecond, 1 * time.Millisecond}
+	defer func() { fetchRetryDelays = origDelays }()
+
+	parentCtx, cancel := context.WithCancel(context.Background())
+	perAttempt := 5 * time.Second
+
+	attempts := 0
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- fetchWithRetry(parentCtx, perAttempt, func(attemptCtx context.Context) error {
+			attempts++
+			<-attemptCtx.Done()
+			return attemptCtx.Err()
+		})
+	}()
+	time.Sleep(10 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-errCh:
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("err = %v, want context.Canceled (SIGINT must propagate as Canceled, not wrapped transient)", err)
+		}
+		if attempts > 1 {
+			t.Errorf("got %d attempts; SIGINT mid-attempt should not trigger retry", attempts)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("fetchWithRetry did not return after parent cancel")
+	}
+}
+
 // TestIsTransientFetchError_NewPatterns covers the additional patterns added
 // alongside the http.version=HTTP/1.1 / lowSpeed mitigation work. curl 28
 // fires on operation-timed-out / lowSpeed thresholds; gnutls_handshake and
