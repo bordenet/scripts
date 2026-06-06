@@ -182,16 +182,19 @@ func TestClassifyFetchError_FetchKindBoolInvariant(t *testing.T) {
 // TestClassifyFetchError_CancelWinsOverTimeout pins the deterministic behavior
 // when parent ctx is both past-deadline AND cancelled. Whichever wins, the
 // classifier must not enter an undefined state.
-func TestClassifyFetchError_CancelWinsOverTimeout(t *testing.T) {
-	parentCtx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
-	time.Sleep(2 * time.Millisecond)
-	cancel()
+// TestClassifyFetchError_CancelBeforeDeadlineWins models the real production
+// path: a parent ctx with a deadline gets cancel()ed (SIGINT propagation)
+// BEFORE the deadline elapses. Per Go semantics, Canceled wins because it
+// is the first error set on the ctx. The classifier MUST return Cancelled.
+func TestClassifyFetchError_CancelBeforeDeadlineWins(t *testing.T) {
+	parentCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	cancel() // fires immediately, before the 10s deadline
 	kind, isTimeout, _ := classifyFetchError(parentCtx, parentCtx, context.Canceled)
-	if kind != FetchKindCancelled && kind != FetchKindTimeout {
-		t.Errorf("kind = %v, want Cancelled or Timeout (deterministic)", kind)
+	if kind != FetchKindCancelled {
+		t.Errorf("kind = %v, want FetchKindCancelled (cancel before deadline = SIGINT semantics)", kind)
 	}
-	if kind == FetchKindTimeout && !isTimeout {
-		t.Error("FetchKindTimeout implies isTimeout=true")
+	if isTimeout {
+		t.Error("isTimeout must be false for Cancelled kind")
 	}
 }
 
@@ -237,8 +240,12 @@ func TestFetchWithBudget_PositivePerAttemptScalesByMaxAttempts(t *testing.T) {
 		return nil
 	})
 	elapsed := time.Since(startCall)
-	lower := expectedTotal - 200*time.Millisecond - elapsed
-	upper := expectedTotal + 200*time.Millisecond
+	// ±500ms slack to absorb scheduling jitter on loaded CI runners (macOS GHA
+	// has been observed to drift >200ms on sleep precision). The point of this
+	// test is that "budget scales by FetchMaxAttempts" — sub-millisecond
+	// precision is not what we're measuring.
+	lower := expectedTotal - 500*time.Millisecond - elapsed
+	upper := expectedTotal + 500*time.Millisecond
 	if observedRemaining < lower || observedRemaining > upper {
 		t.Errorf("remaining = %v, want within [%v, %v] (expectedTotal=%v, elapsed=%v)",
 			observedRemaining, lower, upper, expectedTotal, elapsed)
@@ -260,8 +267,8 @@ func TestFetchWithBudget_RefCountScalesTotal(t *testing.T) {
 		return nil
 	})
 	elapsed := time.Since(startCall)
-	lower := expectedTotal - 200*time.Millisecond - elapsed
-	upper := expectedTotal + 200*time.Millisecond
+	lower := expectedTotal - 500*time.Millisecond - elapsed
+	upper := expectedTotal + 500*time.Millisecond
 	if observedRemaining < lower || observedRemaining > upper {
 		t.Errorf("remaining = %v, want within [%v, %v] for refCount=%d", observedRemaining, lower, upper, refCount)
 	}
@@ -278,7 +285,7 @@ func TestFetchWithBudget_RefCountFloorsToOne(t *testing.T) {
 		observedRemaining = time.Until(deadline)
 		return nil
 	})
-	if observedRemaining > expectedTotal+50*time.Millisecond || observedRemaining < expectedTotal-200*time.Millisecond {
+	if observedRemaining > expectedTotal+500*time.Millisecond || observedRemaining < expectedTotal-500*time.Millisecond {
 		t.Errorf("refCount=0 not floored to 1: remaining = %v, want ~%v", observedRemaining, expectedTotal)
 	}
 }
@@ -392,5 +399,30 @@ func TestIsUntrackedConflictError(t *testing.T) {
 	}
 	if isUntrackedConflictError(nil) {
 		t.Error("isUntrackedConflictError(nil) should return false")
+	}
+}
+
+// TestShellQuotePath covers the POSIX-shell quoting helper used by
+// execute.go when building ManualSteps. Any path output as part of a
+// copy-pasteable command MUST go through this helper so that paths with
+// shell metacharacters cannot be accidentally evaluated.
+func TestShellQuotePath(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"/tmp/repo", "'/tmp/repo'"},
+		{"/path with spaces/x", "'/path with spaces/x'"},
+		{"/has$dollar", "'/has$dollar'"},
+		{"/has;semi", "'/has;semi'"},
+		{"/has`backtick`", "'/has`backtick`'"},
+		{"/has*star", "'/has*star'"},
+		{"/it's/got/quote", `'/it'\''s/got/quote'`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.in, func(t *testing.T) {
+			if got := shellQuotePath(tc.in); got != tc.want {
+				t.Errorf("shellQuotePath(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
 	}
 }

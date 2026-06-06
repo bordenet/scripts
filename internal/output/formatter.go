@@ -3,6 +3,7 @@ package output
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -93,23 +94,45 @@ func (f *Formatter) Format(r sync.RepoResult) string {
 		return fmt.Sprintf("  %s %s (up to date)", bullet, namePad)
 
 	case r.Status == sync.StatusSkipped:
-		return fmt.Sprintf("  %s %s (%s)%s", skip, namePad, r.SkipReason, remediationHint(r))
+		return fmt.Sprintf("  %s %s (%s)%s%s", skip, namePad, r.SkipReason, remediationHint(r), manualStepsBlock(r))
 
 	case r.Status == sync.StatusStashConflict:
-		return fmt.Sprintf("  %s %s (stash pop conflict — run: git stash pop)", skip, namePad)
+		return fmt.Sprintf("  %s %s (stash pop conflict — run: git stash pop)%s", skip, namePad, manualStepsBlock(r))
 
 	case r.Status == sync.StatusRebaseConflict:
-		return fmt.Sprintf("  %s %s (rebase conflict, rolled back)", cross, namePad)
+		return fmt.Sprintf("  %s %s (rebase conflict, rolled back)%s", cross, namePad, manualStepsBlock(r))
 
 	case r.Status == sync.StatusFailed:
-		return fmt.Sprintf("  %s %s (failed: %s)%s", cross, namePad, r.FailReason, remediationHint(r))
+		return fmt.Sprintf("  %s %s (failed: %s)%s%s", cross, namePad, r.FailReason, remediationHint(r), manualStepsBlock(r))
 
 	case r.Status == sync.StatusManualInterventionRequired:
-		return fmt.Sprintf("  %s %s (manual intervention needed: %s)", cross, namePad, r.FailReason)
+		return fmt.Sprintf("  %s %s (manual intervention needed: %s)%s", cross, namePad, r.FailReason, manualStepsBlock(r))
 
 	default:
 		return fmt.Sprintf("  ? %s (unknown status %d)", namePad, r.Status)
 	}
+}
+
+// manualStepsBlock renders r.ManualSteps as indented continuation lines below
+// the main result line. Returns "" when ManualSteps is empty so the common
+// success path stays compact. Each step is prefixed with "\n      " to match
+// the depth of the existing remediation hint indentation.
+//
+// String commands originating from caller code (e.g., "cd <repo>") are
+// passed through verbatim. Paths embedded in command strings are NOT shell-
+// escaped here — callers in execute.go are responsible for emitting commands
+// that are safe to paste (they currently use trusted-only repo paths from
+// the discovery walk, never user-supplied input).
+func manualStepsBlock(r sync.RepoResult) string {
+	if len(r.ManualSteps) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, step := range r.ManualSteps {
+		b.WriteString("\n      ")
+		b.WriteString(step)
+	}
+	return b.String()
 }
 
 // remediationHint returns a concrete shell-command hint for fetch-failure

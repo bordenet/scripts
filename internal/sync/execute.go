@@ -23,6 +23,19 @@ func isUntrackedConflictError(err error) bool {
 		"untracked working tree files would be overwritten")
 }
 
+// shellQuotePath wraps a path in single quotes so it is safe to paste into
+// a POSIX shell, even when the path contains spaces, `$`, backticks, `;`,
+// `*`, or other metacharacters. Single-quote literals are escaped via the
+// standard `'\''` close-reopen sequence.
+//
+// Repos discovered by the walk should never contain such characters in
+// practice — but rendering paths into copy/pasteable command suggestions
+// without escaping is a footgun. The formatter consumes ManualSteps verbatim,
+// so the escape MUST happen at the producer side here in execute.go.
+func shellQuotePath(p string) string {
+	return "'" + strings.ReplaceAll(p, "'", `'\''`) + "'"
+}
+
 // Execute carries out the Action for a repo. It manages stash lifecycle explicitly
 // (NOT via defer — stash pop is suppressed when rebase fails to avoid popping on
 // a half-rebased repo).
@@ -140,10 +153,10 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 				r := withStatus(base, StatusSkipped)
 				r.SkipReason = SkipUntrackedConflict
 				r.ManualSteps = []string{
-					"cd " + state.RepoPath,
+					"cd " + shellQuotePath(state.RepoPath),
 					"git status                          # find the untracked file(s)",
 					"git stash push --include-untracked  # or move/delete them",
-					"gitsync " + state.RepoPath + "      # retry",
+					"gitsync " + shellQuotePath(state.RepoPath) + "      # retry",
 				}
 				return r
 			}
@@ -153,7 +166,7 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 		}
 		if popStash() {
 			r := withStatus(base, StatusStashConflict)
-			r.ManualSteps = []string{"cd " + state.RepoPath, "git stash pop  # resolve conflicts manually"}
+			r.ManualSteps = []string{"cd " + shellQuotePath(state.RepoPath), "git stash pop  # resolve conflicts manually"}
 			return r
 		}
 		return withStatus(base, StatusUpdated)
@@ -168,7 +181,7 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 				r := withStatus(base, StatusManualInterventionRequired)
 				r.FailReason = "rebase and abort both failed"
 				r.ManualSteps = []string{
-					"cd " + state.RepoPath,
+					"cd " + shellQuotePath(state.RepoPath),
 					"git rebase --abort  # or: git reset --hard HEAD",
 					"git stash list     # check for orphaned stash",
 				}
@@ -178,7 +191,7 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 			// If stash pop also conflicts, surface that to the user.
 			if popStash() {
 				r := withStatus(base, StatusStashConflict)
-				r.ManualSteps = []string{"cd " + state.RepoPath, "git stash pop  # rebase rolled back; stash pop also conflicted"}
+				r.ManualSteps = []string{"cd " + shellQuotePath(state.RepoPath), "git stash pop  # rebase rolled back; stash pop also conflicted"}
 				return r
 			}
 			r := withStatus(base, StatusRebaseConflict)
@@ -188,7 +201,7 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 		// Rebase succeeded — pop stash
 		if popStash() {
 			r := withStatus(base, StatusStashConflict)
-			r.ManualSteps = []string{"cd " + state.RepoPath, "git stash pop  # resolve conflicts manually"}
+			r.ManualSteps = []string{"cd " + shellQuotePath(state.RepoPath), "git stash pop  # resolve conflicts manually"}
 			return r
 		}
 		r := withStatus(base, StatusRebased)

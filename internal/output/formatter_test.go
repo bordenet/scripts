@@ -369,3 +369,45 @@ func TestFormat_NoHintForRepoGone(t *testing.T) {
 		t.Errorf("remediation hint should not appear for RepoGone: %s", got)
 	}
 }
+
+// TestFormat_RendersManualSteps verifies the formatter now surfaces
+// r.ManualSteps as indented continuation lines below the main result line.
+// Before this fix, ManualSteps was populated in execute.go for the new
+// untracked-conflict and pre-existing stash-conflict paths but never
+// rendered — silent dead code that defeated the purpose of the populated
+// recovery commands.
+func TestFormat_RendersManualSteps(t *testing.T) {
+	r := sync.RepoResult{
+		RepoPath:    "/x/repo",
+		DisplayName: "repo",
+		Status:      sync.StatusSkipped,
+		SkipReason:  sync.SkipUntrackedConflict,
+		ManualSteps: []string{
+			"cd '/x/repo'",
+			"git status",
+		},
+	}
+	got := output.NewFormatter(false, 40).Format(r)
+	if !strings.Contains(got, "cd '/x/repo'") {
+		t.Errorf("missing first ManualStep; got: %s", got)
+	}
+	if !strings.Contains(got, "git status") {
+		t.Errorf("missing second ManualStep; got: %s", got)
+	}
+	if !strings.Contains(got, "\n      ") {
+		t.Errorf("ManualSteps not rendered as indented continuation lines; got: %s", got)
+	}
+}
+
+// TestFormat_EmptyManualStepsNoTrailingNewline verifies that when
+// ManualSteps is empty (the common case), the formatter doesn't emit
+// a stray trailing newline that would corrupt the TUI layout.
+func TestFormat_EmptyManualStepsNoTrailingNewline(t *testing.T) {
+	r := sync.RepoResult{
+		RepoPath: "/x", DisplayName: "x", Status: sync.StatusNoOp,
+	}
+	got := output.NewFormatter(false, 40).Format(r)
+	if strings.Contains(got, "\n") {
+		t.Errorf("unexpected newline in compact result line: %q", got)
+	}
+}
