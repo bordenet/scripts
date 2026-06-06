@@ -104,6 +104,53 @@ type RepoState struct {
 	FetchTimeout    bool
 	FetchCancelled  bool // true when fetch was cancelled by parent context (SIGINT), not a timeout
 	RemoteGone      bool // true when fetch fails because the remote repo was deleted or moved
+	// FetchKind is the enum classification set by classifyFetchError; the
+	// existing FetchTimeout/RemoteGone/FetchCancelled bools remain
+	// authoritative for decide.go logic.
+	FetchKind      FetchKind
+	FetchLastError string // truncated remote error string for remediation hints
+}
+
+// FetchKind classifies the outcome of the fetch step. The existing
+// FetchTimeout / RemoteGone / FetchCancelled bools remain authoritative for
+// decide.go; FetchKind provides a single enum value for the formatter to
+// drive per-kind remediation hints.
+//
+// CONTRACT (verified by TestClassifyFetchError_FetchKindBoolInvariant):
+//   - FetchKindOK              → FetchTimeout=false, RemoteGone=false
+//   - FetchKindTimeout         → FetchTimeout=true,  RemoteGone=false
+//   - FetchKindCancelled       → FetchTimeout=false, RemoteGone=false
+//   - FetchKindTransientGaveUp → FetchTimeout=false, RemoteGone=false (FetchErr set)
+//   - FetchKindRepoGone        → FetchTimeout=false, RemoteGone=true
+//
+// Cancellation MUST be checked before timeout in the classifier — SIGINT
+// from main.go propagates as context.Canceled and must NOT be conflated
+// with a network timeout.
+type FetchKind int
+
+const (
+	FetchKindOK FetchKind = iota
+	FetchKindTimeout         // parent ctx OR fetch ctx DeadlineExceeded
+	FetchKindCancelled       // ctx.Canceled (SIGINT propagation) — distinct from Timeout
+	FetchKindTransientGaveUp // FetchMaxAttempts exhausted on curl 18 / EOF / etc.
+	FetchKindRepoGone        // repository not found / does not exist
+)
+
+func (k FetchKind) String() string {
+	switch k {
+	case FetchKindOK:
+		return "ok"
+	case FetchKindTimeout:
+		return "timeout"
+	case FetchKindCancelled:
+		return "cancelled"
+	case FetchKindTransientGaveUp:
+		return "transient-gave-up"
+	case FetchKindRepoGone:
+		return "repo-gone"
+	default:
+		return "unknown"
+	}
 }
 
 // RepoResult is sent on the results channel after a repo is processed.
@@ -120,6 +167,10 @@ type RepoResult struct {
 	WhatIfAction  string   // non-empty when --what-if
 	ElapsedMs     int64
 	ManualSteps   []string // actionable recovery instructions
+	// FetchKind / FetchLastError are propagated from RepoState by Execute()
+	// so the formatter can render per-kind remediation hints.
+	FetchKind      FetchKind
+	FetchLastError string
 }
 
 // Flags holds all parsed CLI flags.
