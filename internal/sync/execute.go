@@ -13,10 +13,12 @@ import (
 // a half-rebased repo).
 func Execute(ctx context.Context, state RepoState, action Action, flags Flags, registry *StashRegistry, syncer RepoSyncer) RepoResult {
 	base := RepoResult{
-		RepoPath:      state.RepoPath,
-		CurrentBranch: state.CurrentBranch,
-		ParentBranch:  state.ParentBranch,
-		BranchType:    state.BranchType,
+		RepoPath:       state.RepoPath,
+		CurrentBranch:  state.CurrentBranch,
+		ParentBranch:   state.ParentBranch,
+		BranchType:     state.BranchType,
+		FetchKind:      state.FetchKind,
+		FetchLastError: state.FetchLastError,
 	}
 
 	// --what-if: return description, no writes.

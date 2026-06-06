@@ -401,3 +401,39 @@ func containsCall(calls []string, target string) bool {
 	}
 	return false
 }
+
+// TestExecute_BasePreservesFetchKind verifies that FetchKind and
+// FetchLastError flow from RepoState into RepoResult via the base struct
+// in Execute.
+func TestExecute_BasePreservesFetchKind(t *testing.T) {
+	state := syncp.RepoState{
+		RepoPath:       "/x",
+		FetchKind:      syncp.FetchKindTransientGaveUp,
+		FetchLastError: "curl 18 transfer closed",
+	}
+	action := syncp.Action{Type: syncp.ActionSkip, SkipReason: syncp.SkipFetchTimeout}
+	r := syncp.Execute(context.Background(), state, action, syncp.Flags{}, &syncp.StashRegistry{}, syncp.DefaultSyncer{})
+	if r.FetchKind != syncp.FetchKindTransientGaveUp {
+		t.Errorf("FetchKind = %v, want FetchKindTransientGaveUp", r.FetchKind)
+	}
+	if r.FetchLastError != "curl 18 transfer closed" {
+		t.Errorf("FetchLastError lost: %q", r.FetchLastError)
+	}
+}
+
+// TestExecute_BasePreservesFetchKindOK covers the success path — without it
+// only the failure-path FetchKind values are exercised.
+func TestExecute_BasePreservesFetchKindOK(t *testing.T) {
+	state := syncp.RepoState{
+		RepoPath:  "/x",
+		FetchKind: syncp.FetchKindOK,
+	}
+	action := syncp.Action{Type: syncp.ActionNoOp}
+	r := syncp.Execute(context.Background(), state, action, syncp.Flags{}, &syncp.StashRegistry{}, syncp.DefaultSyncer{})
+	if r.FetchKind != syncp.FetchKindOK {
+		t.Errorf("FetchKind = %v, want FetchKindOK (success path must propagate)", r.FetchKind)
+	}
+	if r.FetchLastError != "" {
+		t.Errorf("FetchLastError = %q, want empty on success", r.FetchLastError)
+	}
+}
