@@ -93,7 +93,7 @@ func (f *Formatter) Format(r sync.RepoResult) string {
 		return fmt.Sprintf("  %s %s (up to date)", bullet, namePad)
 
 	case r.Status == sync.StatusSkipped:
-		return fmt.Sprintf("  %s %s (%s)", skip, namePad, r.SkipReason)
+		return fmt.Sprintf("  %s %s (%s)%s", skip, namePad, r.SkipReason, remediationHint(r))
 
 	case r.Status == sync.StatusStashConflict:
 		return fmt.Sprintf("  %s %s (stash pop conflict — run: git stash pop)", skip, namePad)
@@ -110,6 +110,23 @@ func (f *Formatter) Format(r sync.RepoResult) string {
 	default:
 		return fmt.Sprintf("  ? %s (unknown status %d)", namePad, r.Status)
 	}
+}
+
+// remediationHint returns a concrete shell-command hint for fetch-failure
+// FetchKinds. Returns "" when no hint applies (RepoGone has its own message;
+// success path has nothing to remediate). Hints are appended to the skipped-
+// line so the user gets an immediate actionable next step.
+func remediationHint(r sync.RepoResult) string {
+	switch r.FetchKind {
+	case sync.FetchKindTimeout:
+		return "  try: gitsync --fetch-timeout=300"
+	case sync.FetchKindTransientGaveUp:
+		if r.FetchLastError != "" {
+			return "  try: gitsync --fetch-timeout=300  # last err: " + r.FetchLastError
+		}
+		return "  try: gitsync --fetch-timeout=300"
+	}
+	return ""
 }
 
 // ComputeMaxNameLen returns the display-column width for the name column —

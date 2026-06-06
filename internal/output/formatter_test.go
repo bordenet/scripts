@@ -266,3 +266,64 @@ func TestShowSummary_CompactMode_SyncedNamed(t *testing.T) {
 		t.Errorf("'already current' must appear before 'synced', got: %q", got)
 	}
 }
+
+// TestFormat_RemediationHintForTransientGaveUp verifies the formatter emits
+// a concrete shell-command hint for transient retry-exhaustion failures.
+func TestFormat_RemediationHintForTransientGaveUp(t *testing.T) {
+	r := sync.RepoResult{
+		RepoPath:       "/x/CallBox/core",
+		DisplayName:    "CallBox/core",
+		Status:         sync.StatusSkipped,
+		SkipReason:     sync.SkipFetchTimeout,
+		FetchKind:      sync.FetchKindTransientGaveUp,
+		FetchLastError: "curl 18 transfer closed",
+	}
+	got := output.NewFormatter(false, 40).Format(r)
+	if !strings.Contains(got, "try: gitsync --fetch-timeout=") {
+		t.Errorf("missing remediation hint; got: %s", got)
+	}
+	if !strings.Contains(got, "curl 18") {
+		t.Errorf("missing underlying error: %s", got)
+	}
+}
+
+// TestFormat_RemediationHintForTimeout verifies the formatter emits a hint
+// for plain timeout failures (no last-error suffix needed).
+func TestFormat_RemediationHintForTimeout(t *testing.T) {
+	r := sync.RepoResult{
+		RepoPath:    "/x/CallBox/core",
+		DisplayName: "CallBox/core",
+		Status:      sync.StatusSkipped,
+		SkipReason:  sync.SkipFetchTimeout,
+		FetchKind:   sync.FetchKindTimeout,
+	}
+	got := output.NewFormatter(false, 40).Format(r)
+	if !strings.Contains(got, "try: gitsync --fetch-timeout=") {
+		t.Errorf("missing remediation hint; got: %s", got)
+	}
+}
+
+// TestFormat_NoHintForSuccess verifies success lines stay clean — no "try:" noise.
+func TestFormat_NoHintForSuccess(t *testing.T) {
+	r := sync.RepoResult{RepoPath: "/x", DisplayName: "x", Status: sync.StatusNoOp}
+	got := output.NewFormatter(false, 40).Format(r)
+	if strings.Contains(got, "try: ") {
+		t.Errorf("hint shown on success line: %s", got)
+	}
+}
+
+// TestFormat_NoHintForRepoGone verifies the existing RemoteGone message is
+// not duplicated by a new remediation hint.
+func TestFormat_NoHintForRepoGone(t *testing.T) {
+	r := sync.RepoResult{
+		RepoPath:    "/x",
+		DisplayName: "x",
+		Status:      sync.StatusSkipped,
+		SkipReason:  sync.SkipRemoteGone,
+		FetchKind:   sync.FetchKindRepoGone,
+	}
+	got := output.NewFormatter(false, 40).Format(r)
+	if strings.Contains(got, "try: gitsync --fetch-timeout") {
+		t.Errorf("remediation hint should not appear for RepoGone: %s", got)
+	}
+}
