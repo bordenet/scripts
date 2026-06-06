@@ -18,8 +18,8 @@ var parentCandidates = []string{"main", "master", "dev", "develop", "staging"}
 // perAttempt × FetchMaxAttempts × refCount. It calls cancel() before
 // returning so the caller never sees a leaked context.
 //
-// refCount lets multi-ref callers (FetchMultiRef iterates 5 parent candidates)
-// allocate a fair share to every ref instead of letting a flaky first ref
+// refCount lets multi-ref callers (FetchMultiRef iterates len(parentCandidates)
+// refs) allocate a fair share to every ref instead of letting a flaky first ref
 // drain the whole budget — without refCount, the second-through-Nth refs
 // would never run when ref-1 hits transient errors. Single-ref callers pass 1.
 //
@@ -71,10 +71,11 @@ func applyFetchFailure(s *RepoState, kind FetchKind, err error) {
 	case FetchKindTransientGaveUp:
 		s.FetchErr = err
 		s.FetchLastError = truncateError(err.Error(), 200)
-	default:
-		// FetchKindOK should not reach here; defensive fall-through preserves err
-		s.FetchErr = err
 	}
+	// FetchKindOK is unreachable here: callers only invoke applyFetchFailure
+	// after fetchWithBudget returns a non-nil error. A future kind added
+	// without a case will silently leave only FetchKind set, which the
+	// formatter can still render — better than mis-attributing the error.
 }
 
 // classifyFetchError maps a fetch error + the two relevant contexts to a
