@@ -77,15 +77,15 @@ func TestIsTransientFetchError(t *testing.T) {
 }
 
 // TestFetchRetryDelaysInvariant verifies that fetchRetryDelays has exactly
-// fetchMaxAttempts-1 positive-duration entries. This is the runtime guard for
-// the coupling between the constant and the slice: if fetchMaxAttempts is bumped
+// FetchMaxAttempts-1 positive-duration entries. This is the runtime guard for
+// the coupling between the constant and the slice: if FetchMaxAttempts is bumped
 // without a corresponding delay, this test fails at CI time. The positivity check
 // ensures a negative/zero entry cannot silently make retries instantaneous.
 func TestFetchRetryDelaysInvariant(t *testing.T) {
-	want := fetchMaxAttempts - 1
+	want := FetchMaxAttempts - 1
 	if len(fetchRetryDelays) != want {
-		t.Fatalf("fetchRetryDelays has %d entries, want %d (= fetchMaxAttempts-1 = %d-1)",
-			len(fetchRetryDelays), want, fetchMaxAttempts)
+		t.Fatalf("fetchRetryDelays has %d entries, want %d (= FetchMaxAttempts-1 = %d-1)",
+			len(fetchRetryDelays), want, FetchMaxAttempts)
 	}
 	for i, d := range fetchRetryDelays {
 		if d <= 0 {
@@ -99,7 +99,7 @@ func TestFetchRetryDelaysInvariant(t *testing.T) {
 // refs slice). Scenarios that do reach the network belong in integration tests.
 func TestFetchMultiRef(t *testing.T) {
 	t.Run("empty refs returns no-refs error", func(t *testing.T) {
-		err := FetchMultiRef(context.Background(), t.TempDir(), nil)
+		err := FetchMultiRef(context.Background(), 100*time.Millisecond, t.TempDir(), nil)
 		if err == nil {
 			t.Fatal("want error for empty refs, got nil")
 		}
@@ -113,7 +113,7 @@ func TestFetchMultiRef(t *testing.T) {
 		cancel()
 
 		// The loop guard fires on the first iteration; no git subprocess is launched.
-		err := FetchMultiRef(ctx, t.TempDir(), []string{"refs/heads/main"})
+		err := FetchMultiRef(ctx, 100*time.Millisecond, t.TempDir(), []string{"refs/heads/main"})
 		if !errors.Is(err, context.Canceled) {
 			t.Errorf("want context.Canceled, got %v", err)
 		}
@@ -123,7 +123,7 @@ func TestFetchMultiRef(t *testing.T) {
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
 		defer cancel()
 
-		err := FetchMultiRef(ctx, t.TempDir(), []string{"refs/heads/main"})
+		err := FetchMultiRef(ctx, 100*time.Millisecond, t.TempDir(), []string{"refs/heads/main"})
 		if !errors.Is(err, context.DeadlineExceeded) {
 			t.Errorf("want context.DeadlineExceeded, got %v", err)
 		}
@@ -138,7 +138,7 @@ func TestFetchWithRetry(t *testing.T) {
 
 	t.Run("succeeds on first attempt", func(t *testing.T) {
 		calls := 0
-		err := fetchWithRetry(context.Background(), func(_ context.Context) error {
+		err := fetchWithRetry(context.Background(), 100*time.Millisecond, func(_ context.Context) error {
 			calls++
 			return nil
 		})
@@ -152,7 +152,7 @@ func TestFetchWithRetry(t *testing.T) {
 
 	t.Run("retries transient error and succeeds on second attempt", func(t *testing.T) {
 		calls := 0
-		err := fetchWithRetry(context.Background(), func(_ context.Context) error {
+		err := fetchWithRetry(context.Background(), 100*time.Millisecond, func(_ context.Context) error {
 			calls++
 			if calls == 1 {
 				return transientErr
@@ -169,15 +169,15 @@ func TestFetchWithRetry(t *testing.T) {
 
 	t.Run("exhausts all attempts on transient error", func(t *testing.T) {
 		calls := 0
-		err := fetchWithRetry(context.Background(), func(_ context.Context) error {
+		err := fetchWithRetry(context.Background(), 100*time.Millisecond, func(_ context.Context) error {
 			calls++
 			return transientErr
 		})
 		if err == nil {
 			t.Fatal("want error after exhausting attempts, got nil")
 		}
-		if calls != fetchMaxAttempts {
-			t.Fatalf("want %d attempts, got %d", fetchMaxAttempts, calls)
+		if calls != FetchMaxAttempts {
+			t.Fatalf("want %d attempts, got %d", FetchMaxAttempts, calls)
 		}
 		// Error must mention attempt count for operational context.
 		// Check the full prefix so a rename of the message is caught explicitly.
@@ -188,7 +188,7 @@ func TestFetchWithRetry(t *testing.T) {
 
 	t.Run("does not retry permanent error", func(t *testing.T) {
 		calls := 0
-		err := fetchWithRetry(context.Background(), func(_ context.Context) error {
+		err := fetchWithRetry(context.Background(), 100*time.Millisecond, func(_ context.Context) error {
 			calls++
 			return errors.New("ERROR: Repository not found")
 		})
@@ -205,7 +205,7 @@ func TestFetchWithRetry(t *testing.T) {
 		cancel() // cancel before calling
 
 		calls := 0
-		err := fetchWithRetry(ctx, func(_ context.Context) error {
+		err := fetchWithRetry(ctx, 100*time.Millisecond, func(_ context.Context) error {
 			calls++
 			return nil
 		})
@@ -221,7 +221,7 @@ func TestFetchWithRetry(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
 		calls := 0
-		err := fetchWithRetry(ctx, func(_ context.Context) error {
+		err := fetchWithRetry(ctx, 100*time.Millisecond, func(_ context.Context) error {
 			calls++
 			cancel() // cancel after first transient failure — fires during next backoff check
 			return transientErr
@@ -244,7 +244,7 @@ func TestFetchWithRetry(t *testing.T) {
 		defer func() { fetchRetryDelays = orig }()
 
 		calls := 0
-		err := fetchWithRetry(context.Background(), func(_ context.Context) error {
+		err := fetchWithRetry(context.Background(), 100*time.Millisecond, func(_ context.Context) error {
 			calls++
 			if calls == 1 {
 				return transientErr // triggers backoff + jitter before attempt 2
@@ -259,6 +259,96 @@ func TestFetchWithRetry(t *testing.T) {
 		}
 		// If we reach here, rand.Int63n(5_000_000) ran without panic.
 	})
+}
+
+// TestFetchWithRetry_PerAttemptTimeout exercises the per-attempt timeout
+// derivation: with a generous parent budget, the loop should attempt up to
+// FetchMaxAttempts times even when each attempt fails with a transient
+// curl-18-class error within its per-attempt window.
+func TestFetchWithRetry_PerAttemptTimeout(t *testing.T) {
+	origDelays := fetchRetryDelays
+	fetchRetryDelays = []time.Duration{1 * time.Millisecond, 1 * time.Millisecond}
+	defer func() { fetchRetryDelays = origDelays }()
+
+	parentCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	attempts := 0
+	perAttempt := 50 * time.Millisecond
+	err := fetchWithRetry(parentCtx, perAttempt, func(_ context.Context) error {
+		attempts++
+		time.Sleep(5 * time.Millisecond)
+		return errors.New("error: RPC failed; curl 18 transfer closed")
+	})
+	if attempts != FetchMaxAttempts {
+		t.Errorf("got %d attempts, want %d", attempts, FetchMaxAttempts)
+	}
+	if err == nil || !strings.Contains(err.Error(), "curl 18") {
+		t.Errorf("err %v does not preserve last curl 18", err)
+	}
+}
+
+// TestFetchWithRetry_ParentBudgetExhausted verifies that the loop exits
+// early when parentCtx expires, NOT making the full FetchMaxAttempts.
+func TestFetchWithRetry_ParentBudgetExhausted(t *testing.T) {
+	origDelays := fetchRetryDelays
+	fetchRetryDelays = []time.Duration{20 * time.Millisecond, 20 * time.Millisecond}
+	defer func() { fetchRetryDelays = origDelays }()
+
+	parentCtx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+
+	attempts := 0
+	perAttempt := 200 * time.Millisecond
+	err := fetchWithRetry(parentCtx, perAttempt, func(ctx context.Context) error {
+		attempts++
+		select {
+		case <-time.After(25 * time.Millisecond):
+			return errors.New("error: RPC failed; curl 18 transfer closed")
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	})
+	if attempts >= FetchMaxAttempts {
+		t.Errorf("expected early exit, got %d attempts", attempts)
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("err %v is not DeadlineExceeded", err)
+	}
+}
+
+// TestFetchWithRetry_PerAttemptCancelsLongAttempt verifies that per-attempt
+// expiry is treated as transient and retried within the remaining parent
+// budget. With strict per-attempt timeout and a long lambda, we expect
+// exactly FetchMaxAttempts attempts and the "fetch failed after" wrapper.
+func TestFetchWithRetry_PerAttemptCancelsLongAttempt(t *testing.T) {
+	origDelays := fetchRetryDelays
+	fetchRetryDelays = []time.Duration{1 * time.Millisecond, 1 * time.Millisecond}
+	defer func() { fetchRetryDelays = origDelays }()
+
+	parentCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	perAttempt := 20 * time.Millisecond
+	attempts := 0
+	err := fetchWithRetry(parentCtx, perAttempt, func(ctx context.Context) error {
+		attempts++
+		select {
+		case <-time.After(100 * time.Millisecond):
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	})
+	if attempts != FetchMaxAttempts {
+		t.Errorf("attempts = %d, want %d (per-attempt expiry should retry)", attempts, FetchMaxAttempts)
+	}
+	if err == nil {
+		t.Fatal("expected non-nil err after exhausting attempts")
+	}
+	if !strings.Contains(err.Error(), "fetch failed after") {
+		t.Errorf("err = %v; expected 'fetch failed after' wrapper", err)
+	}
 }
 
 // TestIsTransientFetchError_NewPatterns covers the additional patterns added

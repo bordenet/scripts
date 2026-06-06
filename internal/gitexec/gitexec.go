@@ -164,31 +164,39 @@ func isTransientFetchError(err error) bool {
 		strings.Contains(msg, "ssl_read")
 }
 
-const fetchMaxAttempts = 3
+// FetchMaxAttempts is the maximum number of fetch attempts per ref.
+// Exported so callers (state.go) can derive the total retry budget.
+const FetchMaxAttempts = 3
 
 // fetchRetryDelays holds the backoff base duration before each retry attempt
 // (i.e. before attempt 1, before attempt 2, …). Length must equal
-// fetchMaxAttempts-1; TestFetchRetryDelaysInvariant enforces this at test time.
-// To add a fourth attempt: increment fetchMaxAttempts AND add a third entry here.
+// FetchMaxAttempts-1; TestFetchRetryDelaysInvariant enforces this at test time.
+// To add a fourth attempt: increment FetchMaxAttempts AND add a third entry here.
 var fetchRetryDelays = []time.Duration{1 * time.Second, 3 * time.Second}
 
-// fetchWithRetry calls fetch up to fetchMaxAttempts times, retrying on transient
+// fetchWithRetry calls fetch up to FetchMaxAttempts times, retrying on transient
 // network errors (curl 18, early EOF, sideband disconnect, invalid index-pack
-// output). Backoff uses fetchRetryDelays + up-to-50% jitter; both sleeps are
-// ctx-cancellable via time.NewTimer so no goroutine outlives the call.
+// output, curl 28, gnutls/ssl handshake failures). Backoff uses fetchRetryDelays
+// + up-to-50% jitter; both sleeps are ctx-cancellable via time.NewTimer so no
+// goroutine outlives the call.
+//
+// Each attempt receives a child context with the perAttempt timeout derived
+// from parentCtx; the loop also exits when parentCtx itself expires (caller's
+// total budget exhausted). Per-attempt context.DeadlineExceeded (with parent
+// still alive) is treated as a transient timeout-class failure and retried.
 //
 // The global math/rand source is auto-seeded (Go ≥1.20, enforced by go.mod) so
 // jitter is uncorrelated across parallel goroutines without explicit seeding.
-func fetchWithRetry(ctx context.Context, fetch func(context.Context) error) error {
+func fetchWithRetry(parentCtx context.Context, perAttempt time.Duration, fetch func(context.Context) error) error {
 	var lastErr error
-	for attempt := 0; attempt < fetchMaxAttempts; attempt++ {
-		if ctx.Err() != nil {
-			return ctx.Err()
+	for attempt := 0; attempt < FetchMaxAttempts; attempt++ {
+		if parentCtx.Err() != nil {
+			return parentCtx.Err()
 		}
 		if attempt > 0 {
 			// idx is always in-bounds: TestFetchRetryDelaysInvariant guarantees
-			// len(fetchRetryDelays) == fetchMaxAttempts-1, and attempt-1 ranges
-			// from 0 to fetchMaxAttempts-2 inclusive.
+			// len(fetchRetryDelays) == FetchMaxAttempts-1, and attempt-1 ranges
+			// from 0 to FetchMaxAttempts-2 inclusive.
 			base := fetchRetryDelays[attempt-1]
 			// Jitter up to 50% of base to spread retries across parallel goroutines.
 			// Guard against base ≤ 1ns (test fixtures) where int64(base)/2 == 0.
@@ -199,7 +207,7 @@ func fetchWithRetry(ctx context.Context, fetch func(context.Context) error) erro
 			t := time.NewTimer(base + jitter)
 			select {
 			case <-t.C:
-			case <-ctx.Done():
+			case <-parentCtx.Done():
 				// Stop() returns false when the timer already fired and put a value
 				// in t.C's one-element buffer. Drain it now so the buffer is empty;
 				// t is about to go out of scope, but the buffered value would otherwise
@@ -207,35 +215,40 @@ func fetchWithRetry(ctx context.Context, fetch func(context.Context) error) erro
 				if !t.Stop() {
 					<-t.C
 				}
-				return ctx.Err()
+				return parentCtx.Err()
 			}
 		}
-		err := fetch(ctx)
+		attemptCtx, cancel := context.WithTimeout(parentCtx, perAttempt)
+		err := fetch(attemptCtx)
+		cancel()
 		if err == nil {
 			return nil
+		}
+		// Per-attempt budget elapsed while parent still alive — retry as transient.
+		if errors.Is(err, context.DeadlineExceeded) && parentCtx.Err() == nil {
+			lastErr = fmt.Errorf("attempt %d: per-attempt timeout after %s", attempt+1, perAttempt)
+			continue
 		}
 		if !isTransientFetchError(err) {
 			return err
 		}
 		lastErr = err
 	}
-	return fmt.Errorf("fetch failed after %d attempts: %w", fetchMaxAttempts, lastErr)
+	return fmt.Errorf("fetch failed after %d attempts: %w", FetchMaxAttempts, lastErr)
 }
 
 // FetchMultiRef attempts to fetch every ref in turn, retrying transient errors
-// per fetchWithRetry. All refs are tried regardless of intermediate successes so
-// the local cache is fully populated. It returns nil if at least one ref
-// succeeds (including partial success where cancellation interrupts later refs).
-// It returns ctx.Err() only when the context is cancelled before any ref has
-// successfully landed. If refs is empty or all refs fail, it returns a wrapped
-// error explaining why.
-func FetchMultiRef(ctx context.Context, dir string, refs []string) error {
+// per fetchWithRetry. All refs share the parentCtx total budget. Returns nil
+// if at least one ref succeeds (including partial success where cancellation
+// interrupts later refs). Returns parentCtx.Err() when the context is
+// cancelled before any ref has successfully landed.
+func FetchMultiRef(parentCtx context.Context, perAttempt time.Duration, dir string, refs []string) error {
 	// Fetch each candidate individually so a missing ref on the remote doesn't
 	// prevent other candidates from being updated.
 	anySucceeded := false
 	var errs []error
 	for _, ref := range refs {
-		if err := ctx.Err(); err != nil {
+		if err := parentCtx.Err(); err != nil {
 			// Context cancelled before we could attempt this ref.
 			if anySucceeded {
 				// Some refs landed — caller can proceed with what's available.
@@ -243,8 +256,8 @@ func FetchMultiRef(ctx context.Context, dir string, refs []string) error {
 			}
 			return err
 		}
-		err := fetchWithRetry(ctx, func(ctx context.Context) error {
-			_, err := run(ctx, dir, "fetch", "origin", ref)
+		err := fetchWithRetry(parentCtx, perAttempt, func(ctx context.Context) error {
+			_, err := runFetch(ctx, dir, ref)
 			return err
 		})
 		if err == nil {
@@ -260,7 +273,7 @@ func FetchMultiRef(ctx context.Context, dir string, refs []string) error {
 	}
 	// If the context was cancelled mid-loop (fetchWithRetry propagates ctx.Err()
 	// directly), return that rather than a misleading domain error.
-	if ctxErr := ctx.Err(); ctxErr != nil {
+	if ctxErr := parentCtx.Err(); ctxErr != nil {
 		return ctxErr
 	}
 	if len(errs) > 0 {
@@ -270,11 +283,19 @@ func FetchMultiRef(ctx context.Context, dir string, refs []string) error {
 }
 
 // FetchSingleRef fetches a single ref from origin.
-func FetchSingleRef(ctx context.Context, dir, ref string) error {
-	return fetchWithRetry(ctx, func(ctx context.Context) error {
-		_, err := run(ctx, dir, "fetch", "origin", ref)
+func FetchSingleRef(parentCtx context.Context, perAttempt time.Duration, dir, ref string) error {
+	return fetchWithRetry(parentCtx, perAttempt, func(ctx context.Context) error {
+		_, err := runFetch(ctx, dir, ref)
 		return err
 	})
+}
+
+// runFetch invokes `git -c http.version=HTTP/1.1 fetch origin <ref>`. The
+// HTTP/1.1 downgrade applies only to this subprocess (no global git config
+// mutation) and mitigates HTTP/2 multiplexing failures (curl 18 / sideband
+// disconnect) on flaky links / large packs.
+func runFetch(ctx context.Context, dir, ref string) (string, error) {
+	return run(ctx, dir, "-c", "http.version=HTTP/1.1", "fetch", "origin", ref)
 }
 
 // RevParse returns the SHA for a git ref. Returns "" if not found.

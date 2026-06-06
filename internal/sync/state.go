@@ -57,9 +57,11 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 		state.IsPushed = gitexec.RemoteTrackingRefExists(ctx, repoPath, state.CurrentBranch)
 
 		// 12b. Multi-ref fetch (covers parent detection AND data sync in one call)
-		fetchCtx, cancel := context.WithTimeout(ctx, time.Duration(flags.FetchTimeout)*time.Second)
+		// Transitional: per-attempt == total budget until Task 3 introduces fetchWithBudget.
+		perAttempt := time.Duration(flags.FetchTimeout) * time.Second
+		fetchCtx, cancel := context.WithTimeout(ctx, perAttempt)
 		defer cancel()
-		err := gitexec.FetchMultiRef(fetchCtx, repoPath, parentCandidates)
+		err := gitexec.FetchMultiRef(fetchCtx, perAttempt, repoPath, parentCandidates)
 		if err != nil {
 			if errors.Is(fetchCtx.Err(), context.DeadlineExceeded) {
 				state.FetchTimeout = true
@@ -93,9 +95,11 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 		}
 		state.ParentBranch = parent
 
-		fetchCtx, cancel := context.WithTimeout(ctx, time.Duration(flags.FetchTimeout)*time.Second)
+		// Transitional: per-attempt == total budget until Task 3 introduces fetchWithBudget.
+		perAttempt := time.Duration(flags.FetchTimeout) * time.Second
+		fetchCtx, cancel := context.WithTimeout(ctx, perAttempt)
 		defer cancel()
-		if err := gitexec.FetchSingleRef(fetchCtx, repoPath, parent); err != nil {
+		if err := gitexec.FetchSingleRef(fetchCtx, perAttempt, repoPath, parent); err != nil {
 			if errors.Is(fetchCtx.Err(), context.DeadlineExceeded) {
 				state.FetchTimeout = true
 			} else if ctx.Err() != nil {
