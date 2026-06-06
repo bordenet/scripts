@@ -27,6 +27,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "error: --concurrency must be >= 1")
 		os.Exit(1)
 	}
+	if flags.FetchTimeout < 1 {
+		fmt.Fprintln(os.Stderr, "error: --fetch-timeout must be >= 1 (use a larger timeout to disable retries, not 0)")
+		os.Exit(1)
+	}
 
 	// Check if the shell wrapper already updated itself (GITSYNC_SELF_UPDATED).
 	// Resolve to canonical path so we can match against discovered repos.
@@ -297,7 +301,7 @@ func parseFlags() (gosync.Flags, []string) {
 		noStash       = flag.Bool("no-stash", false, "skip repos with local changes instead of stashing")
 		forceRebase   = flag.Bool("force-rebase", false, "rebase pushed branches (solo repos only)")
 		concurrency   = flag.Int("concurrency", int(math.Min(float64(runtime.NumCPU()), 8)), "max parallel repos")
-		fetchTimeout  = flag.Int("fetch-timeout", 60, "per-repo fetch timeout in seconds")
+		fetchTimeout  = flag.Int("fetch-timeout", 180, "per-attempt fetch timeout in seconds (>=1); total retry budget is 3x")
 		rebaseTimeout = flag.Int("rebase-timeout", 120, "per-repo rebase timeout in seconds")
 		// Deprecated/compat flags — accepted silently, have no effect.
 		_ = flag.Bool("all", false, "")
