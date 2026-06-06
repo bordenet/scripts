@@ -3,10 +3,25 @@ package sync
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"gitsync/internal/gitexec"
 )
+
+// isUntrackedConflictError detects the specific git error from
+// `git pull --ff-only` when an untracked working-tree file would be
+// overwritten by the incoming merge. This is a common cross-machine-sync
+// artifact (e.g., OneDrive-synced sibling clone leaves an untracked file
+// that remote main has since added as tracked) — classifying it lets the
+// formatter render a precise remediation hint instead of multi-line stderr.
+func isUntrackedConflictError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()),
+		"untracked working tree files would be overwritten")
+}
 
 // Execute carries out the Action for a repo. It manages stash lifecycle explicitly
 // (NOT via defer — stash pop is suppressed when rebase fails to avoid popping on
@@ -68,7 +83,7 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 	case ActionResetHard:
 		if err := syncer.ResetHard(ctx, state, flags); err != nil {
 			r := withStatus(base, StatusFailed)
-			r.FailReason = "reset --hard failed: " + err.Error()
+			r.FailReason = truncateError("reset --hard failed: "+err.Error(), 300)
 			return r
 		}
 		return withStatus(base, StatusReset)
@@ -89,7 +104,7 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 	if action.RequiresCleanWorktree && state.HasLocalChanges {
 		if err := gitexec.StashPush(ctx, state.RepoPath, stashMsg); err != nil {
 			r := withStatus(base, StatusFailed)
-			r.FailReason = "stash push failed: " + err.Error()
+			r.FailReason = truncateError("stash push failed: "+err.Error(), 300)
 			return r
 		}
 		stashed = true
@@ -118,8 +133,22 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 	case ActionFastForward:
 		if err := syncer.FastForward(ctx, state, flags); err != nil {
 			popStash() // safe: no rebase in flight
+			// Untracked-file collision is a common cross-machine-sync artifact
+			// (OneDrive / sibling-clone workflows). Surface it as a skip with
+			// a concrete remediation path, not as a wall of multi-line stderr.
+			if isUntrackedConflictError(err) {
+				r := withStatus(base, StatusSkipped)
+				r.SkipReason = SkipUntrackedConflict
+				r.ManualSteps = []string{
+					"cd " + state.RepoPath,
+					"git status                          # find the untracked file(s)",
+					"git stash push --include-untracked  # or move/delete them",
+					"gitsync " + state.RepoPath + "      # retry",
+				}
+				return r
+			}
 			r := withStatus(base, StatusFailed)
-			r.FailReason = "pull --ff-only failed: " + err.Error()
+			r.FailReason = truncateError("pull --ff-only failed: "+err.Error(), 300)
 			return r
 		}
 		if popStash() {

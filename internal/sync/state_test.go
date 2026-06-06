@@ -350,3 +350,47 @@ func TestTruncateError_StripsNewlines(t *testing.T) {
 		}
 	}
 }
+
+// TestIsUntrackedConflictError verifies the classifier for the specific
+// git error `pull --ff-only` returns when untracked working-tree files
+// would be overwritten. Commonly seen on workstations that receive files
+// via OneDrive / sibling-clone sync.
+func TestIsUntrackedConflictError(t *testing.T) {
+	cases := []struct {
+		name string
+		msg  string
+		want bool
+	}{
+		{
+			name: "real git stderr from pull --ff-only",
+			msg:  "git pull --ff-only origin main: exit status 1 (stderr: From https://x\n * branch main -> FETCH_HEAD\nerror: The following untracked working tree files would be overwritten by merge:\n    internal/gitexec/gitexec_test.go\nPlease move or remove them before you merge.\nAborting)",
+			want: true,
+		},
+		{
+			name: "case insensitive",
+			msg:  "Untracked Working Tree Files Would Be Overwritten",
+			want: true,
+		},
+		{
+			name: "merge conflict (different error class)",
+			msg:  "error: Merge conflict in foo.txt",
+			want: false,
+		},
+		{
+			name: "ff-only refused (non-ff)",
+			msg:  "fatal: Not possible to fast-forward, aborting.",
+			want: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := fmt.Errorf("%s", tc.msg)
+			if got := isUntrackedConflictError(err); got != tc.want {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+	if isUntrackedConflictError(nil) {
+		t.Error("isUntrackedConflictError(nil) should return false")
+	}
+}

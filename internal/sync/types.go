@@ -45,6 +45,7 @@ const (
 	SkipWhatIf             SkipReason = "dry run (--what-if)"
 	SkipDefaultDiverged    SkipReason = "default branch diverged (manual intervention needed)"
 	SkipRemoteGone         SkipReason = "remote repository no longer exists"
+	SkipUntrackedConflict  SkipReason = "untracked files would be overwritten by pull"
 )
 
 // ActionType is the category of action Decide returns.

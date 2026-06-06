@@ -437,3 +437,4 @@ func TestExecute_BasePreservesFetchKindOK(t *testing.T) {
 		t.Errorf("FetchLastError = %q, want empty on success", r.FetchLastError)
 	}
 }
+

@@ -332,6 +332,28 @@ func TestFormat_NoHintForSuccess(t *testing.T) {
 	}
 }
 
+// TestFormat_UntrackedConflict_NoHintNoise verifies the untracked-conflict
+// skip reason renders cleanly without a fetch-timeout hint (the user's fix
+// is in their working tree, not in --fetch-timeout).
+func TestFormat_UntrackedConflict_NoHintNoise(t *testing.T) {
+	r := sync.RepoResult{
+		RepoPath:    "/x/CallBox/Tools/gitsync",
+		DisplayName: "CallBox/Tools/gitsync",
+		Status:      sync.StatusSkipped,
+		SkipReason:  sync.SkipUntrackedConflict,
+	}
+	got := output.NewFormatter(false, 40).Format(r)
+	if !strings.Contains(got, "untracked") {
+		t.Errorf("missing untracked reason; got: %s", got)
+	}
+	if strings.Contains(got, "try: gitsync --fetch-timeout") {
+		t.Errorf("fetch-timeout hint should not appear for untracked conflicts: %s", got)
+	}
+	if strings.Contains(got, "\n") {
+		t.Errorf("rendered line contains newline (would break TUI): %s", got)
+	}
+}
+
 // TestFormat_NoHintForRepoGone verifies the existing RemoteGone message is
 // not duplicated by a new remediation hint.
 func TestFormat_NoHintForRepoGone(t *testing.T) {
