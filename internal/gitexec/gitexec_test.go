@@ -3,6 +3,7 @@ package gitexec
 import (
 	"context"
 	"errors"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -426,5 +427,47 @@ func TestIsTransientFetchError_NewPatterns(t *testing.T) {
 				t.Errorf("expected transient=false for: %s", tc.msg)
 			}
 		})
+	}
+}
+
+// TestRemoteDefaultBranch verifies the ls-remote symref parse against a real
+// local remote, including the master→main rename case (the recovery path's
+// authoritative, write-free default-branch query).
+func TestRemoteDefaultBranch(t *testing.T) {
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	remote := t.TempDir()
+	run(remote, "init", "--initial-branch=master")
+	run(remote, "config", "user.email", "t@t.com")
+	run(remote, "config", "user.name", "T")
+	run(remote, "commit", "--allow-empty", "-m", "init")
+
+	local := t.TempDir()
+	run(remote, "clone", remote, local)
+
+	ctx := context.Background()
+	if got, err := RemoteDefaultBranch(ctx, local); err != nil || got != "master" {
+		t.Fatalf("before rename: got %q err %v, want \"master\"", got, err)
+	}
+
+	// Remote renames its default master→main; ls-remote must report the NEW
+	// default even though the local origin/HEAD still cached the old one.
+	run(remote, "branch", "-m", "master", "main")
+	if got, err := RemoteDefaultBranch(ctx, local); err != nil || got != "main" {
+		t.Fatalf("after rename: got %q err %v, want \"main\"", got, err)
+	}
+
+	// Unreachable / non-repo origin must surface an error, not "".
+	bad := t.TempDir()
+	run(bad, "init")
+	run(bad, "remote", "add", "origin", t.TempDir()) // points at an empty non-repo dir
+	if _, err := RemoteDefaultBranch(ctx, bad); err == nil {
+		t.Error("expected error for unreachable origin, got nil")
 	}
 }

@@ -46,6 +46,7 @@ const (
 	SkipDefaultDiverged    SkipReason = "default branch diverged (manual intervention needed)"
 	SkipRemoteGone         SkipReason = "remote repository no longer exists"
 	SkipUntrackedConflict  SkipReason = "untracked files would be overwritten by pull"
+	SkipDefaultRenamed     SkipReason = "remote renamed its default branch; local branch is stale"
 )
 
 // ActionType is the category of action Decide returns.
@@ -89,6 +90,13 @@ type RepoState struct {
 	CurrentBranch   string     // "" if detached HEAD
 	DefaultBranch   string     // detected via git symbolic-ref (local, no network)
 	ParentBranch    string     // for feature branches; set by DetectParent
+	// RenamedDefaultFrom/To are set by CollectState when a targeted fetch of the
+	// default branch 404s ("couldn't find remote ref") and a network refresh of
+	// origin/HEAD reveals the remote renamed its default branch (e.g. master→main)
+	// while the local branch still carries the old name. Decide routes these to
+	// SkipDefaultRenamed; Execute renders rename remediation steps from them.
+	RenamedDefaultFrom string
+	RenamedDefaultTo   string
 	BranchType      BranchType
 	LocalSHA        string
 	RemoteSHA       string // origin/<parent> AFTER fetch; "" if not found

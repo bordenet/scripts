@@ -80,6 +80,11 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 		case ActionSkip:
 			r.Status = StatusSkipped
 			r.SkipReason = action.SkipReason // real reason — formatter shows ⊘
+			// Surface remediation steps in the dry-run preview too, so --what-if
+			// matches the real run rather than silently dropping them.
+			if action.SkipReason == SkipDefaultRenamed {
+				r.ManualSteps = renameManualSteps(state)
+			}
 		case ActionFail:
 			r.Status = StatusFailed
 			r.FailReason = action.FailReason
@@ -103,6 +108,9 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 	case ActionSkip:
 		r := withStatus(base, StatusSkipped)
 		r.SkipReason = action.SkipReason
+		if action.SkipReason == SkipDefaultRenamed {
+			r.ManualSteps = renameManualSteps(state)
+		}
 		return r
 	case ActionFail:
 		r := withStatus(base, StatusFailed)
@@ -213,6 +221,22 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 	r := withStatus(base, StatusFailed)
 	r.FailReason = "unexpected action type"
 	return r
+}
+
+// renameManualSteps builds the copy-pasteable remediation for a remote
+// default-branch rename (master→main): rename the local branch, re-point its
+// upstream, fast-forward, and refresh the local origin/HEAD. Derived entirely
+// from the Renamed* fields CollectState recorded.
+func renameManualSteps(state RepoState) []string {
+	from, to := state.RenamedDefaultFrom, state.RenamedDefaultTo
+	return []string{
+		"cd " + shellQuotePath(state.RepoPath),
+		"git fetch origin --prune",
+		fmt.Sprintf("git branch -m %s %s", from, to),
+		fmt.Sprintf("git branch -u origin/%s %s", to, to),
+		fmt.Sprintf("git merge --ff-only origin/%s", to),
+		"git remote set-head origin -a",
+	}
 }
 
 func withStatus(base RepoResult, s Status) RepoResult {

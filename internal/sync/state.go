@@ -204,6 +204,30 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 			return gitexec.FetchSingleRef(fetchCtx, perAttempt, repoPath, parent)
 		})
 		if ferr != nil {
+			// A "couldn't find remote ref" failure on the default branch usually
+			// means the remote RENAMED its default (e.g. master→main) and deleted
+			// the old name, leaving the locally-cached origin/HEAD stale so
+			// DefaultBranch() returned the dead name. Ask the remote for its CURRENT
+			// default branch (read-only — no local writes, safe under --what-if, and
+			// authoritative even when origin/HEAD is stale). If it moved, surface a
+			// clear manual-rename skip (Decide → SkipDefaultRenamed) with remediation
+			// steps instead of an opaque fetch failure. We deliberately do NOT mutate
+			// the repo or auto-rename the user's branch — the steps tell the human how.
+			if isMissingRefError(ferr) {
+				rdCtx, cancel := context.WithTimeout(ctx, perAttempt)
+				newDefault, derr := gitexec.RemoteDefaultBranch(rdCtx, repoPath)
+				cancel()
+				if derr == nil && newDefault != "" && newDefault != parent {
+					state.RenamedDefaultFrom = parent
+					state.RenamedDefaultTo = newDefault
+					state.DefaultBranch = newDefault
+					// Set OK explicitly (not relying on the zero value) so Decide's
+					// FetchKind switch falls through to the rename guard rather than
+					// the default-case panic if the enum is ever reordered.
+					state.FetchKind = FetchKindOK
+					return state
+				}
+			}
 			applyFetchFailure(&state, kind, ferr)
 			return state
 		}
@@ -216,6 +240,19 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 	state.BaseSHA = gitexec.MergeBase(ctx, repoPath, "origin/"+state.ParentBranch)
 
 	return state
+}
+
+// isMissingRefError returns true when a fetch error indicates the requested
+// ref does not exist on the remote ("couldn't find remote ref <name>"). For a
+// targeted default-branch fetch this is the signature of a remote default-branch
+// rename (e.g. master→main) where the old name was deleted and the local
+// origin/HEAD cache has gone stale — distinct from a transient network failure
+// or a deleted repository.
+func isMissingRefError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "couldn't find remote ref")
 }
 
 // isRemoteGoneError returns true when a fetch error indicates the remote

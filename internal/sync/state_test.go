@@ -363,6 +363,50 @@ func TestIsUntrackedConflictError(t *testing.T) {
 	}
 }
 
+// TestIsMissingRefError covers the predicate used by CollectState to detect a
+// targeted fetch of a ref the remote no longer has — the signal that a remote
+// may have renamed its default branch (e.g. master→main) and deleted the old
+// name, leaving the locally-cached origin/HEAD stale.
+func TestIsMissingRefError(t *testing.T) {
+	cases := []struct {
+		name string
+		msg  string
+		want bool
+	}{
+		{
+			name: "real git stderr for deleted default branch",
+			msg:  "git fetch origin master: exit status 128 (stderr: fatal: couldn't find remote ref master)",
+			want: true,
+		},
+		{
+			name: "case insensitive",
+			msg:  "fatal: Couldn't Find Remote Ref develop",
+			want: true,
+		},
+		{
+			name: "transient network failure (different class)",
+			msg:  "fatal: unable to access 'https://x': Could not resolve host",
+			want: false,
+		},
+		{
+			name: "repo gone (different class)",
+			msg:  "ERROR: Repository not found",
+			want: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := fmt.Errorf("%s", tc.msg)
+			if got := isMissingRefError(err); got != tc.want {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+	if isMissingRefError(nil) {
+		t.Error("isMissingRefError(nil) should return false")
+	}
+}
+
 // TestShellQuotePath covers the POSIX-shell quoting helper used by
 // execute.go when building ManualSteps. Any path output as part of a
 // copy-pasteable command MUST go through this helper so that paths with

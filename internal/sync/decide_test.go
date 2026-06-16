@@ -215,6 +215,20 @@ func TestDecide_AllScenarios(t *testing.T) {
 			wantAction:     syncp.ActionSkip,
 			wantSkipReason: syncp.SkipNoCommonAncestor,
 		},
+		{
+			// Remote renamed its default branch (master→main) and deleted the old
+			// name; the local branch still carries the dead name. CollectState sets
+			// the Renamed* fields after refreshing origin/HEAD. Decide must skip with
+			// SkipDefaultRenamed rather than fail on the missing ref.
+			name: "21_default_branch_renamed_on_remote",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "master",
+				RenamedDefaultFrom: "master", RenamedDefaultTo: "main",
+			},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipDefaultRenamed,
+		},
 	}
 
 	for _, tt := range tests {
