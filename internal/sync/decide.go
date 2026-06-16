@@ -55,6 +55,14 @@ func Decide(state RepoState, flags Flags) Action {
 		// to the success path would treat an unfetched repo as up-to-date.
 		panic("unhandled FetchKind in Decide: " + state.FetchKind.String())
 	}
+	// Remote renamed its default branch (e.g. master→main) and the local branch
+	// still carries the old name. CollectState set the Renamed* fields after a
+	// network refresh of origin/HEAD. Auto-renaming a user's branch is unsafe for
+	// a sync tool, so require manual intervention; Execute attaches the exact
+	// remediation commands derived from the Renamed* fields.
+	if state.RenamedDefaultTo != "" {
+		return skip(SkipDefaultRenamed)
+	}
 	if state.BranchType == BranchTypeAmbiguous {
 		return skip(SkipAmbiguousBranch)
 	}

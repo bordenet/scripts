@@ -160,6 +160,113 @@ func TestRun_WhatIf(t *testing.T) {
 	}
 }
 
+// TestRun_DefaultBranchRenamed reproduces the master→main migration: a repo
+// cloned while the remote default was "master", after the remote renamed its
+// default to "main" and deleted "master". A targeted fetch of the (now stale)
+// cached default branch fails with "couldn't find remote ref master". gitsync
+// must recover by refreshing origin/HEAD, recognise the rename, and emit a
+// SkipDefaultRenamed result with copy-pasteable remediation steps — NOT a hard
+// fetch failure.
+func TestRun_DefaultBranchRenamed(t *testing.T) {
+	remote := t.TempDir()
+	mustRun(t, remote, "git", "init", "--initial-branch=master")
+	mustRun(t, remote, "git", "config", "user.email", "test@test.com")
+	mustRun(t, remote, "git", "config", "user.name", "Test")
+	mustRun(t, remote, "git", "commit", "--allow-empty", "-m", "init")
+
+	local := t.TempDir()
+	mustRun(t, remote, "git", "clone", remote, local)
+	mustRun(t, local, "git", "config", "user.email", "test@test.com")
+	mustRun(t, local, "git", "config", "user.name", "Test")
+
+	// Simulate the remote renaming its default branch master→main. On a non-bare
+	// remote checked out on master, this also moves HEAD to main and removes the
+	// old refs/heads/master, so the local clone's `git fetch origin master` 404s.
+	mustRun(t, remote, "git", "branch", "-m", "master", "main")
+
+	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
+	registry := &syncp.StashRegistry{}
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
+
+	if result.Status != syncp.StatusSkipped || result.SkipReason != syncp.SkipDefaultRenamed {
+		t.Fatalf("expected Skipped/SkipDefaultRenamed, got status=%v skip=%q fail=%q",
+			result.Status, result.SkipReason, result.FailReason)
+	}
+	// Assert the FULL ordered remediation sequence: order is load-bearing
+	// (prune must precede branch -u origin/main; upstream must be set before the
+	// ff merge). A dropped or reordered step would otherwise pass silently.
+	wantSteps := []string{
+		"cd '" + local + "'",
+		"git fetch origin --prune",
+		"git branch -m master main",
+		"git branch -u origin/main main",
+		"git merge --ff-only origin/main",
+		"git remote set-head origin -a",
+	}
+	if len(result.ManualSteps) != len(wantSteps) {
+		t.Fatalf("ManualSteps length = %d, want %d; got: %v", len(result.ManualSteps), len(wantSteps), result.ManualSteps)
+	}
+	for i, want := range wantSteps {
+		if result.ManualSteps[i] != want {
+			t.Errorf("ManualSteps[%d] = %q, want %q", i, result.ManualSteps[i], want)
+		}
+	}
+}
+
+// TestRun_DefaultBranchRenamed_WhatIf pins the dry-run contract: detecting a
+// default-branch rename must be READ-ONLY. The recovery queries the remote with
+// ls-remote (no local writes) rather than fetch --prune / set-head, so a
+// --what-if run must leave origin/HEAD and the stale origin/master tracking ref
+// byte-identical while still surfacing the SkipDefaultRenamed preview.
+func TestRun_DefaultBranchRenamed_WhatIf(t *testing.T) {
+	remote := t.TempDir()
+	mustRun(t, remote, "git", "init", "--initial-branch=master")
+	mustRun(t, remote, "git", "config", "user.email", "test@test.com")
+	mustRun(t, remote, "git", "config", "user.name", "Test")
+	mustRun(t, remote, "git", "commit", "--allow-empty", "-m", "init")
+
+	local := t.TempDir()
+	mustRun(t, remote, "git", "clone", remote, local)
+	mustRun(t, local, "git", "config", "user.email", "test@test.com")
+	mustRun(t, local, "git", "config", "user.name", "Test")
+	mustRun(t, remote, "git", "branch", "-m", "master", "main")
+
+	before := refState(t, local)
+	flags := syncp.Flags{WhatIf: true, FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
+	registry := &syncp.StashRegistry{}
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
+	after := refState(t, local)
+
+	if result.Status != syncp.StatusSkipped || result.SkipReason != syncp.SkipDefaultRenamed {
+		t.Fatalf("expected Skipped/SkipDefaultRenamed preview, got status=%v skip=%q", result.Status, result.SkipReason)
+	}
+	if before != after {
+		t.Errorf("--what-if mutated local refs:\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+	// The dry-run preview must carry the SAME remediation steps as a real run —
+	// otherwise --what-if understates what the user will see.
+	if len(result.ManualSteps) != 6 {
+		t.Errorf("--what-if dropped remediation steps: got %d, want 6: %v", len(result.ManualSteps), result.ManualSteps)
+	}
+}
+
+// refState captures all remote-tracking refs plus the origin/HEAD symref target
+// so a test can assert a run left them unchanged.
+func refState(t *testing.T, dir string) string {
+	t.Helper()
+	cmd := exec.Command("git", "for-each-ref", "refs/remotes/origin")
+	cmd.Dir = dir
+	refs, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("for-each-ref: %v\n%s", err, refs)
+	}
+	// symbolic-ref may legitimately fail (dangling HEAD); capture either way.
+	head := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
+	head.Dir = dir
+	headOut, _ := head.CombinedOutput()
+	return string(refs) + "|HEAD=" + string(headOut)
+}
+
 func TestRun_EmptyRepo(t *testing.T) {
 	dir := t.TempDir()
 	mustRun(t, dir, "git", "init")

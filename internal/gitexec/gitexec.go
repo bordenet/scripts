@@ -83,6 +83,35 @@ func DefaultBranch(ctx context.Context, dir string) string {
 	return ""
 }
 
+// RemoteDefaultBranch asks the remote for its CURRENT default branch via
+// `git ls-remote --symref origin HEAD` and returns the short branch name
+// (e.g. "main"). This is a NETWORK READ: it does not modify any local ref, so
+// it is safe under --what-if and authoritative even when the locally-cached
+// origin/HEAD has gone stale after a remote default-branch rename (where
+// `git symbolic-ref refs/remotes/origin/HEAD` would still resolve to the dead
+// old name). Returns "" with an error if the remote is unreachable or no
+// HEAD symref is advertised.
+//
+// The first matching ls-remote line looks like: "ref: refs/heads/main\tHEAD".
+func RemoteDefaultBranch(ctx context.Context, dir string) (string, error) {
+	out, err := run(ctx, dir, "ls-remote", "--symref", "origin", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "ref: ") {
+			continue
+		}
+		fields := strings.Fields(strings.TrimPrefix(line, "ref: "))
+		if len(fields) == 0 {
+			continue
+		}
+		return strings.TrimPrefix(fields[0], "refs/heads/"), nil
+	}
+	return "", fmt.Errorf("ls-remote advertised no HEAD symref for origin")
+}
+
 // HasUnmerged returns true if there are unmerged files (conflict in progress).
 func HasUnmerged(ctx context.Context, dir string) bool {
 	out, err := run(ctx, dir, "ls-files", "--unmerged")
