@@ -23,6 +23,8 @@ analyze-malware-sandbox/id_rsa.pub
 analyze-malware-sandbox/*.iso
 analyze-malware-sandbox/shared/*
 analyze-malware-sandbox/vm/*
+.env
+.env.*
 analyze-malware-sandbox/.env
 
 # Purge identity - runtime data
