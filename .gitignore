@@ -71,3 +71,6 @@ SONNET_CONTEXT_HANDOFF.md
 
 # wiki subdir
 wiki/
+
+*.pem
+*.key
