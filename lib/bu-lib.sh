@@ -113,7 +113,9 @@ show_timer() {
 }
 
 timer_loop() {
-    while kill -0 $$ 2>/dev/null; do
+    # MAIN_PID is set in the calling script before backgrounding this function
+    # shellcheck disable=SC2154  # MAIN_PID is set in calling script
+    while kill -0 "$MAIN_PID" 2>/dev/null; do
         show_timer
         sleep 1
     done

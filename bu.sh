@@ -86,7 +86,10 @@ if ! timeout 600 sudo -v; then
 fi
 
 # Keep sudo alive in background
-while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+# Store main script PID so background loop can check if parent is still alive
+MAIN_PID=$$
+while true; do sudo -n true; sleep 60; kill -0 "$MAIN_PID" || exit; done 2>/dev/null &
+SUDO_KEEPALIVE_PID=$!
 
 if [ "$VERBOSE" = false ]; then
     # Clear the screen for clean output
@@ -95,10 +98,10 @@ if [ "$VERBOSE" = false ]; then
     start_timer
 fi
 
-# Ensure timer stops and any background editor jobs are reaped on exit.
+# Ensure timer, sudo keepalive, and any background editor jobs are reaped on exit.
 # Brace-wrapped with `|| true` so a failure in one cleanup step doesn't
 # skip the next (set -u makes naive trap chaining fragile).
-trap '{ cleanup_editor_jobs || true; stop_timer || true; }' EXIT
+trap '{ cleanup_editor_jobs || true; stop_timer || true; [ -n "${SUDO_KEEPALIVE_PID:-}" ] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true; }' EXIT
 
 # --- Background editor extension updates ---
 # Kick off VS Code and Cursor extension updates now so they run concurrently
