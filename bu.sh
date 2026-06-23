@@ -59,7 +59,7 @@ export TIMER_PID=""
 # Parse arguments
 while [ $# -gt 0 ]; do
     case "$1" in
-        -h|--help) show_help ;;
+        -h|--help) show_help; shift ;;
         -v|--verbose) VERBOSE=true; shift ;;
         *) echo "Unknown option: $1" >&2; echo "Use -h or --help for usage information" >&2; exit 1 ;;
     esac
@@ -101,7 +101,7 @@ fi
 # Ensure timer, sudo keepalive, and any background editor jobs are reaped on exit.
 # Brace-wrapped with `|| true` so a failure in one cleanup step doesn't
 # skip the next (set -u makes naive trap chaining fragile).
-trap '{ cleanup_editor_jobs || true; stop_timer || true; [ -n "${SUDO_KEEPALIVE_PID:-}" ] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true; }' EXIT
+trap '{ cleanup_editor_jobs || true; stop_timer || true; [ -n "${SUDO_KEEPALIVE_PID:-}" ] && { kill "$SUDO_KEEPALIVE_PID" 2>/dev/null; wait "$SUDO_KEEPALIVE_PID" 2>/dev/null || true; } || true; }' EXIT
 
 # --- Background editor extension updates ---
 # Kick off VS Code and Cursor extension updates now so they run concurrently
@@ -145,7 +145,7 @@ fi
 # Doctor is informational, don't fail the script
 if [ "$VERBOSE" = true ]; then
     log_info "Running Homebrew Doctor..."
-    if brew doctor 2>&1; then
+    if brew doctor >/dev/null 2>&1; then
         log_success "Homebrew Doctor check passed"
         SUCCEEDED_TASKS+=("Homebrew Doctor")
     else
@@ -180,7 +180,12 @@ if [ "$VERBOSE" = true ]; then
         SKIPPED_TASKS+=("Check missing dependencies")
     fi
 else
-    SUCCEEDED_TASKS+=("Check missing dependencies")
+    # Still check in non-verbose mode, just don't show output
+    if brew missing >/dev/null 2>&1; then
+        SUCCEEDED_TASKS+=("Check missing dependencies")
+    else
+        SKIPPED_TASKS+=("Check missing dependencies")
+    fi
 fi
 
 # --- npm Updates ---
@@ -390,8 +395,8 @@ stop_timer
 
 # Clear timer line and ensure cursor is at start of line
 if [ "$VERBOSE" = false ]; then
-    # Move to top-left, clear that line, then move cursor back to current position
-    echo -ne "\033[s\033[1;1H${ERASE_LINE}\033[u"
+    # Move to top-left, clear that line (don't save/restore - timer already did that)
+    echo -ne "\033[1;1H${ERASE_LINE}\033[1;1H"
     echo  # Blank line after last status
 fi
 
