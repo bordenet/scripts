@@ -97,7 +97,7 @@ func (f *Formatter) Format(r sync.RepoResult) string {
 		return fmt.Sprintf("  %s %s (%s)%s%s", skip, namePad, r.SkipReason, remediationHint(r), manualStepsBlock(r))
 
 	case r.Status == sync.StatusStashConflict:
-		return fmt.Sprintf("  %s %s (stash pop conflict — run: git stash pop)%s", skip, namePad, manualStepsBlock(r))
+		return fmt.Sprintf("  %s %s (stash pop conflict — resolve, git add, git stash drop)%s", skip, namePad, manualStepsBlock(r))
 
 	case r.Status == sync.StatusRebaseConflict:
 		return fmt.Sprintf("  %s %s (rebase conflict, rolled back)%s", cross, namePad, manualStepsBlock(r))

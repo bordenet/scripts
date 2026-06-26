@@ -174,7 +174,13 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 		}
 		if popStash() {
 			r := withStatus(base, StatusStashConflict)
-			r.ManualSteps = []string{"cd " + shellQuotePath(state.RepoPath), "git stash pop  # resolve conflicts manually"}
+			r.ManualSteps = []string{
+				"cd " + shellQuotePath(state.RepoPath),
+				"git status                  # shows the conflicted (unmerged) path(s)",
+				"# resolve the <<<<<<< ======= >>>>>>> markers in each file",
+				"git add -A                  # mark resolved (pop already applied what it could)",
+				"git stash drop              # discard the now-applied stash",
+			}
 			return r
 		}
 		return withStatus(base, StatusUpdated)
@@ -199,7 +205,14 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 			// If stash pop also conflicts, surface that to the user.
 			if popStash() {
 				r := withStatus(base, StatusStashConflict)
-				r.ManualSteps = []string{"cd " + shellQuotePath(state.RepoPath), "git stash pop  # rebase rolled back; stash pop also conflicted"}
+				r.ManualSteps = []string{
+					"cd " + shellQuotePath(state.RepoPath),
+					"# rebase rolled back, then stash pop conflicted",
+					"git status                  # shows the conflicted (unmerged) path(s)",
+					"# resolve the markers, then:",
+					"git add -A",
+					"git stash drop              # discard the now-applied stash",
+				}
 				return r
 			}
 			r := withStatus(base, StatusRebaseConflict)
@@ -209,7 +222,13 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 		// Rebase succeeded — pop stash
 		if popStash() {
 			r := withStatus(base, StatusStashConflict)
-			r.ManualSteps = []string{"cd " + shellQuotePath(state.RepoPath), "git stash pop  # resolve conflicts manually"}
+			r.ManualSteps = []string{
+				"cd " + shellQuotePath(state.RepoPath),
+				"git status                  # shows the conflicted (unmerged) path(s)",
+				"# resolve the <<<<<<< ======= >>>>>>> markers in each file",
+				"git add -A                  # mark resolved (pop already applied what it could)",
+				"git stash drop              # discard the now-applied stash",
+			}
 			return r
 		}
 		r := withStatus(base, StatusRebased)

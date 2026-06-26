@@ -132,7 +132,7 @@ func ShowSummary(w io.Writer, results []sync.RepoResult, elapsed time.Duration, 
 		printForcePushCommands(w, forcePushNeeded, displayName, flags.WhatIf)
 	}
 
-	// Stash conflicts require manual user action (git stash pop + resolve), so
+	// Stash conflicts require manual user action (resolve markers, git add, git stash drop), so
 	// they count as issues that should produce a non-zero exit code.
 	hasIssues := len(failed)+len(rebaseConflict)+len(manual)+len(stashConflict) > 0
 

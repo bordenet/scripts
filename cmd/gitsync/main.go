@@ -246,7 +246,7 @@ func main() {
 					top := gosync.TopStashMessage(cleanupCtx, entry.RepoPath)
 					if top == entry.StashMessage {
 						if err := gosync.PopStash(cleanupCtx, entry.RepoPath); err != nil {
-							prog.Send(output.MsgPrint{Line: fmt.Sprintf("⚠ Stash pop failed in %s — run: git stash pop",
+							prog.Send(output.MsgPrint{Line: fmt.Sprintf("⚠ Stash pop failed in %s — run: git status, resolve, git add, git stash drop",
 								filepath.Base(entry.RepoPath))})
 						} else {
 							registry.Remove(entry.RepoPath)
