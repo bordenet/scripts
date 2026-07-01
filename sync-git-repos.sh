@@ -91,12 +91,13 @@ cached_hash=$(cat "$HASH_FILE" 2>/dev/null || echo "")
 #     treats the leading word "File" as a variable name; with `set -u` that
 #     crashes with "File: unbound variable". _mtime_of() guards with a numeric
 #     regex so any non-numeric stat output falls back to 0 rather than crashing.
-#     Degradation is safe, not an independent guarantee: an mtime of 0 sorts below
-#     any real binary mtime, so a broken stat drops this secondary check back to
-#     the hash-gate-only baseline — it never detects LESS staleness than the hash
-#     gate alone, and never crashes. In the rare stale-HASH_FILE cases 4b targets
-#     (see above), a simultaneously-broken stat leaves both gates quiet until the
-#     next clean run — no worse than having no mtime gate at all.
+#     Degradation is safe, not an independent guarantee: a broken stat makes every
+#     mtime fall back to 0, so `newest_source_mtime > binary_mtime` is `0 > 0`
+#     (false) and this secondary check simply never fires — dropping back to the
+#     hash-gate-only baseline. It never detects LESS staleness than the hash gate
+#     alone, and never crashes. In the rare stale-HASH_FILE cases 4b targets (see
+#     above), a simultaneously-broken stat leaves both gates quiet until the next
+#     clean run — no worse than having no mtime gate at all.
 if [[ "$(uname -s)" == "Darwin" ]]; then
     STAT_MTIME=(stat -f %m)
 else
