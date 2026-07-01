@@ -85,27 +85,60 @@ cached_hash=$(cat "$HASH_FILE" 2>/dev/null || echo "")
 #     can return "match" even though source files are newer than the binary.
 #     Compare the newest source mtime against the binary mtime as a fallback.
 #     macOS uses `stat -f %m`, Linux/WSL uses `stat -c %Y`.
+#     On systems where `stat` does not recognise `-c` as a format flag it may
+#     output its default verbose report (e.g. "  File: /path\n  Size: ...") to
+#     stdout and exit 0, so the `|| echo 0` fallback never fires. In `(( ))` bash
+#     treats the leading word "File" as a variable name; with `set -u` that
+#     crashes with "File: unbound variable". _mtime_of() guards with a numeric
+#     regex so any non-numeric stat output falls back to 0 rather than crashing.
+#     Degradation is safe, not an independent guarantee: an mtime of 0 sorts below
+#     any real binary mtime, so a broken stat drops this secondary check back to
+#     the hash-gate-only baseline — it never detects LESS staleness than the hash
+#     gate alone, and never crashes. In the rare stale-HASH_FILE cases 4b targets
+#     (see above), a simultaneously-broken stat leaves both gates quiet until the
+#     next clean run — no worse than having no mtime gate at all.
 if [[ "$(uname -s)" == "Darwin" ]]; then
     STAT_MTIME=(stat -f %m)
 else
     STAT_MTIME=(stat -c %Y)
 fi
+
+# Resolve a file's mtime into the global `_mtime`. Called directly (not in a
+# command-substitution subshell) so the one-shot `_stat_warned` flag persists
+# across calls and the degraded-stat warning fires once per run, not per file.
+_stat_warned=0
+_mtime_of() {
+    _mtime=$("${STAT_MTIME[@]}" "$1" 2>/dev/null || echo 0)
+    if [[ ! "$_mtime" =~ ^[0-9]+$ ]]; then
+        if (( ! _stat_warned )); then
+            echo "Warning: stat returned non-numeric output (e.g. for '$1'); mtime gate disabled — a stale binary may not be auto-rebuilt if the hash cache still matches (stale hash file); force a rebuild by removing .gitsync.hash or touching a source file" >&2
+            _stat_warned=1
+        fi
+        _mtime=0
+    fi
+}
+
 newest_source_mtime=0
 while IFS= read -r _f; do
-    _m=$("${STAT_MTIME[@]}" "$_f" 2>/dev/null || echo 0)
-    (( _m > newest_source_mtime )) && newest_source_mtime=$_m
+    _mtime_of "$_f"
+    if (( _mtime > newest_source_mtime )); then newest_source_mtime=$_mtime; fi
 done < <(
-    find "$SCRIPT_DIR/cmd" "$SCRIPT_DIR/internal" -name "*.go" -type f
+    find "$SCRIPT_DIR/cmd" "$SCRIPT_DIR/internal" -name "*.go" -type f 2>/dev/null || true
     printf '%s\n' "$SCRIPT_DIR/go.mod"
-    [[ -f "$SCRIPT_DIR/go.sum" ]] && printf '%s\n' "$SCRIPT_DIR/go.sum"
+    [[ -f "$SCRIPT_DIR/go.sum" ]] && printf '%s\n' "$SCRIPT_DIR/go.sum" || true
 )
 binary_mtime=0
-[[ -x "$BINARY" ]] && binary_mtime=$("${STAT_MTIME[@]}" "$BINARY" 2>/dev/null || echo 0)
-unset _f _m
+if [[ -x "$BINARY" ]]; then
+    _mtime_of "$BINARY"
+    binary_mtime=$_mtime
+fi
+# `_stat_warned` is intentionally left set; any future second mtime pass must
+# reset it to re-arm the once-per-run warning.
+unset _f _mtime
 
 # 5. Rebuild if hash changed OR binary missing OR source newer than binary
 mtime_stale=0
-(( newest_source_mtime > binary_mtime )) && mtime_stale=1
+if (( newest_source_mtime > binary_mtime )); then mtime_stale=1; fi
 
 if [[ "$current_hash" != "$cached_hash" ]] || [[ ! -x "$BINARY" ]] || (( mtime_stale )); then
     if (( mtime_stale )) && [[ "$current_hash" == "$cached_hash" ]]; then
