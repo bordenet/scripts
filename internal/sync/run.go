@@ -2,6 +2,8 @@ package sync
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"time"
 
 	"gitsync/internal/gitexec"
@@ -10,6 +12,24 @@ import (
 // Run processes a single repo: collect state → decide → execute.
 func Run(ctx context.Context, repoPath string, flags Flags, registry *StashRegistry, syncer RepoSyncer) RepoResult {
 	start := time.Now()
+
+	// Skip-recent gate: if FETCH_HEAD was written within flags.SkipRecent seconds,
+	// the remote is presumed unchanged and all work is skipped. This lets callers
+	// run gitsync multiple times in a session without paying full network cost.
+	// Fail-open: any stat/parse error falls through to the normal path.
+	if flags.SkipRecent > 0 {
+		if fi, err := os.Stat(filepath.Join(repoPath, ".git", "FETCH_HEAD")); err == nil {
+			if time.Since(fi.ModTime()) < time.Duration(flags.SkipRecent)*time.Second {
+				return RepoResult{
+					RepoPath:  repoPath,
+					Status:    StatusSkipped,
+					SkipReason: SkipRecentFetch,
+					ElapsedMs: time.Since(start).Milliseconds(),
+				}
+			}
+		}
+	}
+
 	state := CollectState(ctx, repoPath, flags)
 
 	// Auto-abort stale in-progress rebase or merge operations.

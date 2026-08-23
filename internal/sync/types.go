@@ -47,6 +47,7 @@ const (
 	SkipRemoteGone         SkipReason = "remote repository no longer exists"
 	SkipUntrackedConflict  SkipReason = "untracked files would be overwritten by pull"
 	SkipDefaultRenamed     SkipReason = "remote renamed its default branch; local branch is stale"
+	SkipRecentFetch        SkipReason = "fetched recently (--skip-recent)"
 )
 
 // ActionType is the category of action Decide returns.
@@ -180,6 +181,7 @@ type Flags struct {
 	Concurrency   int
 	FetchTimeout  int // seconds
 	RebaseTimeout int // seconds
+	SkipRecent    int // seconds; 0 = disabled
 	Verbose       bool
 	All           bool
 }
@@ -215,8 +217,8 @@ func IsNoteworthyResult(r RepoResult) bool {
 		// Clean rebase is silent; force-push warning must surface.
 		return r.ForceRebase
 	case StatusSkipped:
-		// Cancellation skips are informational — not surfaced inline.
-		return r.SkipReason != SkipCancelled
+		// Cancellation and recent-fetch skips are informational — not surfaced inline.
+		return r.SkipReason != SkipCancelled && r.SkipReason != SkipRecentFetch
 	}
 	return true
 }
