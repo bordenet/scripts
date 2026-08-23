@@ -303,6 +303,7 @@ func parseFlags() (gosync.Flags, []string) {
 		concurrency   = flag.Int("concurrency", int(math.Min(float64(runtime.NumCPU()), 8)), "max parallel repos")
 		fetchTimeout  = flag.Int("fetch-timeout", 180, "per-attempt fetch timeout in seconds (>=1); total retry budget is 3x")
 		rebaseTimeout = flag.Int("rebase-timeout", 120, "per-repo rebase timeout in seconds")
+		skipRecent    = flag.Int("skip-recent", 0, "skip repos whose FETCH_HEAD was written within N seconds (0=disabled)")
 		// Deprecated/compat flags — accepted silently, have no effect.
 		_ = flag.Bool("all", false, "")
 		_ = flag.Bool("merge", false, "")
@@ -350,6 +351,7 @@ func parseFlags() (gosync.Flags, []string) {
 		Concurrency:   *concurrency,
 		FetchTimeout:  *fetchTimeout,
 		RebaseTimeout: *rebaseTimeout,
+		SkipRecent:    *skipRecent,
 	}
 	return f, targetDirs
 }
