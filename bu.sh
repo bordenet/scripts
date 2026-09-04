@@ -119,10 +119,23 @@ fi
 retry_command "Homebrew update" "Updating Homebrew" brew update
 
 # Upgrade with escalation: standard → refresh+retry → per-package.
-# In Homebrew 5.x, `brew upgrade` handles both formulae and casks, so no
-# separate --cask pass is needed. The escalation handles mid-run releases
+# In Homebrew 5.x+, `brew upgrade` handles both formulae and casks, so no
+# blanket --cask pass is needed. The escalation handles mid-run releases
 # and isolates any stuck packages instead of giving up on the first miss.
 brew_upgrade_with_escalation
+
+# Targeted retry for the claude-code CLI — the tool this script is most often
+# launched from. `brew_upgrade_with_escalation` already covers it in the batch
+# pass; this repeats it explicitly so its freshness shows as its own line in the
+# run summary and so a transient miss in the batch pass gets a second attempt.
+# Guarded so it is a no-op when the cask is not installed; timeout-bounded for
+# unattended runs; routed through safe_command so output never leaks past the
+# status line. Only the @latest cask is checked (the fast-moving variant); users
+# on the plain `claude-code` cask rely on the batch pass above.
+if brew list --cask claude-code@latest &>/dev/null; then
+    safe_command "Claude Code CLI upgrade" "Upgrading Claude Code CLI" \
+        timeout 600 brew upgrade --cask claude-code@latest
+fi
 
 safe_command "Homebrew cleanup" "Cleaning up Homebrew" brew cleanup -s
 
