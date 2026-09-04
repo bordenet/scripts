@@ -25,6 +25,10 @@ analyze-malware-sandbox/shared/*
 analyze-malware-sandbox/vm/*
 .env
 .env.*
+# ...but keep committed scaffolding templates (starter-kit/, etc.)
+!.env.example
+!.env.template
+!.env.sample
 analyze-malware-sandbox/.env
 
 # Purge identity - runtime data
