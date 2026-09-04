@@ -50,40 +50,50 @@ jobs:
             EXCLUDES="-e SC1091 -e SC2034"
 
             # 2. ShellCheck errors
-            if shellcheck -S error $EXCLUDES "$script" 2>&1 | grep -q "^In "; then
+            # `|| true` so shellcheck's non-zero exit does not poison the pipe
+            # under `set -o pipefail` (the GitHub Actions default) — without it
+            # the `grep` verdict is never reached and this check is inert.
+            if { shellcheck -S error $EXCLUDES "$script" 2>&1 || true; } | grep -q "^In "; then
               echo "  ✗ ShellCheck errors found"
               ((SHELLCHECK_ERRORS++)) || true
             fi
 
             # 3. ShellCheck warnings
-            if shellcheck -S warning $EXCLUDES "$script" 2>&1 | grep -q "^In "; then
+            if { shellcheck -S warning $EXCLUDES "$script" 2>&1 || true; } | grep -q "^In "; then
               echo "  ✗ ShellCheck warnings found"
               ((SHELLCHECK_WARNINGS++)) || true
             fi
 
-            # 4. Check shebang
-            if ! head -1 "$script" | grep -q "^#!/usr/bin/env bash"; then
-              echo "  ✗ Wrong shebang (expected: #!/usr/bin/env bash)"
-              ((WRONG_SHEBANG++)) || true
+            # 4. Check shebang (skip lib/ — sourced helpers inherit the caller's
+            #    interpreter and mark themselves with `# shellcheck shell=bash`)
+            if [[ ! "$script" =~ /lib/ ]]; then
+              if ! head -1 "$script" | grep -q "^#!/usr/bin/env bash"; then
+                echo "  ✗ Wrong shebang (expected: #!/usr/bin/env bash)"
+                ((WRONG_SHEBANG++)) || true
+              fi
             fi
 
             # 5. Check error handling (skip bu.sh, mu.sh, lib files, and experimental/)
+            #    Accept `set -Eeuo pipefail` (errtrace) as well as `set -euo pipefail`.
             if [[ ! "$script" =~ (bu\.sh|mu\.sh|/lib/|/experimental/) ]]; then
-              if ! grep -q "^set -euo pipefail" "$script"; then
+              if ! grep -qE "^set -E?euo pipefail" "$script"; then
                 echo "  ✗ Missing error handling (set -euo pipefail)"
                 ((MISSING_ERROR_HANDLING++)) || true
               fi
             fi
 
-            # 6. Check line count
+            # 6. Check line count. lib/ helpers carry the bulk extracted from their
+            #    entry-point scripts, so they get a higher cap rather than a free pass.
             LINE_COUNT=$(wc -l < "$script")
-            if [ "$LINE_COUNT" -gt 400 ]; then
+            LINE_LIMIT=400
+            if [[ "$script" =~ /lib/ ]]; then LINE_LIMIT=800; fi
+            if [ "$LINE_COUNT" -gt "$LINE_LIMIT" ]; then
               # Allow known large scripts that are well-structured and have extracted libraries
               case "$(basename "$script")" in
                 bu.sh|purge-stale-claude-code-web-branches.sh|integrate-claude-web-branch.sh|purge-identity.sh|common.sh)
                   ;;
                 *)
-                  echo "  ✗ Script exceeds 400 lines ($LINE_COUNT lines)"
+                  echo "  ✗ Script exceeds $LINE_LIMIT lines ($LINE_COUNT lines)"
                   ((OVERSIZED_SCRIPTS++)) || true
                   ;;
               esac
