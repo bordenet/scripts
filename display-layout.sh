@@ -112,7 +112,10 @@ current_command() {
 }
 
 command_ids() {
-  sed -nE 's/.*id:([^ ]+).*/\1/p' "$1" | tr ' ' '\n' | sed 's/"$//' | sort -u
+  # grep -o extracts every non-overlapping "id:<value>" token on the line;
+  # a greedy sed s/// substitution here would only capture the LAST id
+  # when multiple displays are listed on one saved-layout command line.
+  grep -ohE 'id:[^[:space:]]+' "$1" | sed 's/^id://' | sort -u
 }
 
 current_ids() {
