@@ -24,11 +24,12 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/lib/bu-lib.sh"
 ensure_dependencies  # Check/install coreutils for timeout command
 
-# Suppress Homebrew env hints (tap trust warnings, etc.) — they leak to the
-# terminal via /dev/tty and corrupt the status-line display.
+# Suppress Homebrew env hints — they leak to the terminal and corrupt the
+# status-line display.
 export HOMEBREW_NO_ENV_HINTS=1
-# Keep existing taps allowed by default (current behaviour, no behavioural change).
-export HOMEBREW_NO_REQUIRE_TAP_TRUST=1
+# HOMEBREW_NO_REQUIRE_TAP_TRUST was removed: it is deprecated in Homebrew 4.x+.
+# Non-official taps (anomalyco/tap, microsoft/git) are trusted via `brew trust`
+# and recorded in ~/.homebrew/trust.json — no env var needed.
 
 # --- Colors for Output (exported for library use) ---
 export RED='\033[0;31m'

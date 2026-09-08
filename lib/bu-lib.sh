@@ -528,6 +528,8 @@ brew_upgrade_with_escalation() {
         FAILED_TASKS+=("${task_name} (brew outdated query failed)")
         return 1
     fi
+    # Strip diagnostic/warning lines so they are never mistaken for package names.
+    remaining=$(grep -v "^Warning:" <<< "$remaining" || true)
 
     if [ -z "$remaining" ]; then
         local upgrade_count
@@ -574,6 +576,8 @@ brew_upgrade_with_escalation() {
         FAILED_TASKS+=("${task_name} (brew outdated query failed)")
         return 1
     fi
+    # Strip diagnostic/warning lines so they are never mistaken for package names.
+    remaining=$(grep -v "^Warning:" <<< "$remaining" || true)
 
     if [ -z "$remaining" ]; then
         complete_status "${GREEN}✓${NC} Upgrading Homebrew packages (stage 2 recovered)"
@@ -643,6 +647,8 @@ brew_upgrade_with_escalation() {
         FAILED_TASKS+=("${task_name} (brew outdated query failed)")
         return 1
     fi
+    # Strip diagnostic/warning lines so they are never mistaken for package names.
+    remaining=$(grep -v "^Warning:" <<< "$remaining" || true)
 
     local stuck_count=0
     if [ -n "$remaining" ]; then
