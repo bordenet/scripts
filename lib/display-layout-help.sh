@@ -9,6 +9,10 @@ $SCRIPT_NAME — deterministic macOS display-layout capture and recovery
 SYNOPSIS
   $SCRIPT_NAME [--dir DIRECTORY] [-v|--verbose] <command> [arguments]
   $SCRIPT_NAME --help
+  $SCRIPT_NAME
+      With no command: auto-detects a saved layout matching the currently
+      connected displays and restores it (still confirms before applying).
+      Falls back to this help text only if no saved layouts exist yet.
 
 PURPOSE
   macOS can forget or reinterpret multi-monitor arrangements after sleep/wake,

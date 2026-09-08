@@ -24,6 +24,8 @@ done
 _SCRIPT_DIR="$(cd "$(dirname "$_SCRIPT_PATH")" && pwd)"
 # shellcheck source=lib/display-layout-help.sh
 source "$_SCRIPT_DIR/lib/display-layout-help.sh"
+# shellcheck source=lib/display-layout-auto.sh
+source "$_SCRIPT_DIR/lib/display-layout-auto.sh"
 unset _SCRIPT_PATH _SCRIPT_DIR
 
 die() {
@@ -321,8 +323,13 @@ main() {
     esac
   done
 
-  local command="${1:-help}"
+  local command="${1:-}"
   shift || true
+
+  if [[ -z "$command" ]]; then
+    auto_run
+    return
+  fi
 
   case "$command" in
     help)
