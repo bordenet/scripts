@@ -92,7 +92,7 @@ meta_file() {
 
 extract_suggested_command() {
   awk '
-    /Execute the command below to set your screens to the current arrangement:/ {capture=1; next}
+    /Execute the command below to set your screens/ {capture=1; next}
     capture && /^displayplacer / {print; exit}
     capture && /^\// && /displayplacer/ {print; exit}
   '
