@@ -248,7 +248,14 @@ restore_layout() {
   # command is validated as a displayplacer invocation immediately above.
   # shellcheck disable=SC2294
   eval "$command"
-  printf "Done. Verify the result, then re-save '%s' if this is the new desired state.\n" "$name"
+  printf 'Done.\n'
+  printf '\n'
+  printf 'Next step: look at your screens now.\n'
+  printf '  - If the arrangement is correct, lock it in as the new baseline:\n'
+  printf '      %s save %s\n' "$SCRIPT_NAME" "$name"
+  printf "      (you'll be asked to confirm overwriting the existing saved layout)\n"
+  printf '  - If it is NOT correct, fix the arrangement manually (System Settings > Displays),\n'
+  printf '    then run the save command above once it looks right. Do not save a bad layout.\n'
 }
 
 delete_layout() {
