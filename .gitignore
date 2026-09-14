@@ -89,3 +89,8 @@ id_ed25519
 id_ecdsa_sk
 id_ed25519_sk
 .worktrees/
+
+# Real IP-audit patterns (contains actual employer-proprietary terms —
+# local-only; tools/public-repo-ip-check.sh falls back to the tracked
+# .example file with generic placeholders if this is absent)
+tools/ip-patterns.local

@@ -8,24 +8,30 @@ set -euo pipefail
 
 # ---------------------------------------------------------------------------
 # Patterns that must NEVER appear in this public repo.
-# Update this list when new internal tooling is adopted.
+#
+# Real patterns live in the gitignored tools/ip-patterns.local (one grep -E
+# alternative per line; # comments and blank lines ignored). This keeps the
+# actual employer-proprietary terms out of the tracked, public source — a
+# scanner that hardcodes what it's scanning for leaks that content to anyone
+# who reads the repo. If ip-patterns.local is absent (e.g. a fresh clone),
+# falls back to the generic tools/ip-patterns.local.example list.
 # ---------------------------------------------------------------------------
-readonly PATTERNS=(
-    # Employer name (case-insensitive match via character class)
-    "[Cc]all[Bb]ox"
-    # Internal domains
-    "callbox\\.net"
-    "callbox\\.int"
-    "gitlab\\.int"
-    # Internal product overlays
-    "superpowers-callbox"
-    "superpowers-cari"
-    # Internal service names
-    "telephony-service"
-    "cari-shared"
-    # Work email pattern
-    "mbordenet@callbox"
-)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOCAL_PATTERNS_FILE="$SCRIPT_DIR/ip-patterns.local"
+EXAMPLE_PATTERNS_FILE="$SCRIPT_DIR/ip-patterns.local.example"
+
+if [[ -f "$LOCAL_PATTERNS_FILE" ]]; then
+    PATTERNS_FILE="$LOCAL_PATTERNS_FILE"
+else
+    PATTERNS_FILE="$EXAMPLE_PATTERNS_FILE"
+    echo "⚠️  tools/ip-patterns.local not found — using generic example patterns (protection reduced). See tools/ip-patterns.local.example." >&2
+fi
+
+PATTERNS=()
+while IFS= read -r pattern_line; do
+    [[ -z "$pattern_line" || "$pattern_line" == \#* ]] && continue
+    PATTERNS+=("$pattern_line")
+done < "$PATTERNS_FILE"
 
 PATTERN=$(printf "%s|" "${PATTERNS[@]}"); PATTERN="${PATTERN%|}"
 

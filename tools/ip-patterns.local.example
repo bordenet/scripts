@@ -1,0 +1,17 @@
+# IP-audit patterns for public-repo-ip-check.sh
+#
+# One extended-regex (grep -E) pattern per line. Blank lines and lines
+# starting with # are ignored. Each pattern is OR'd together to form the
+# scanner's match expression.
+#
+# This is the TRACKED example file — keep it generic. Copy it to
+# tools/ip-patterns.local (already gitignored) and fill in your own
+# employer-proprietary terms; the real file is never committed.
+#
+# Example patterns (fictional company/product names). No quoting needed —
+# each line is read verbatim as one grep -E alternative.
+[Ee]xample[Cc]orp
+examplecorp\.net
+examplecorp\.int
+internal-widget-service
+jdoe@examplecorp
