@@ -13,6 +13,10 @@ captures/*.pid
 .github/instructions/codacy.instructions.md
 .cursor/rules/codacy.mdc
 
+# perplexity-relay — ephemeral working files, not durable history
+perplexity-relay/current-request.txt
+perplexity-relay/pending/*.json
+
 # Temporary/personal scripts
 resume-at-0801.sh
 delete-time-machine-snapshots.sh

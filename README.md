@@ -114,6 +114,7 @@ Tools for keeping the repository compliant, documented, and clean.
 | [`resume-claude.sh`](./resume-claude.sh) | Automates the process of resuming an AI assistant session with "Claude" within VS Code. |
 | [`schedule-claude.sh`](./schedule-claude.sh) | Schedules the execution of the 'resume-claude.sh' script after a specified delay. |
 | [`tell-vscode-at.sh`](./tell-vscode-at.sh) | Send messages to VS Code instances at specified times using AppleScript. [Docs](./docs/tell-vscode-at.md) |
+| [`perplexity-relay/server.js`](./perplexity-relay/server.js) | Single-shot local relay: pops a browser tab with a drafted Perplexity request, captures the pasted-back response, writes it to `pending/` for Claude to pick up. [Docs](./perplexity-relay/README.md) |
 
 ## Experimental
 
