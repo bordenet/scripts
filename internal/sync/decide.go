@@ -5,8 +5,8 @@ package sync
 // The state machine mirrors the spec (docs/superpowers/specs/2026-04-09-gitsync-design.md §6).
 func Decide(state RepoState, flags Flags) Action {
 	skip := func(r SkipReason) Action { return Action{Type: ActionSkip, SkipReason: r} }
-	fail := func(r string) Action    { return Action{Type: ActionFail, FailReason: r} }
-	noop := func() Action            { return Action{Type: ActionNoOp} }
+	fail := func(r string) Action { return Action{Type: ActionFail, FailReason: r} }
+	noop := func() Action { return Action{Type: ActionNoOp} }
 	ff := func() Action {
 		return Action{Type: ActionFastForward, RequiresCleanWorktree: true}
 	}
@@ -65,6 +65,12 @@ func Decide(state RepoState, flags Flags) Action {
 	}
 	if state.BranchType == BranchTypeAmbiguous {
 		return skip(SkipAmbiguousBranch)
+	}
+	// Fork repos: feature branch tracks upstream (not origin) → MR workflow.
+	// Auto-rebasing here would conflict because origin/main and upstream/main
+	// have diverged intentionally. Skip cleanly rather than attempt and fail.
+	if state.BranchType == BranchTypeFeature && state.HasUpstream && state.TrackingRemote == "upstream" {
+		return skip(SkipUpstreamFeature)
 	}
 	if state.RemoteSHA == "" {
 		return skip(SkipNoRemoteTracking)

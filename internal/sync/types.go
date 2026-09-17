@@ -46,6 +46,7 @@ const (
 	SkipDefaultDiverged    SkipReason = "default branch diverged (manual intervention needed)"
 	SkipRemoteGone         SkipReason = "remote repository no longer exists"
 	SkipUntrackedConflict  SkipReason = "untracked files would be overwritten by pull"
+	SkipUpstreamFeature    SkipReason = "feature branch tracks upstream -- MR workflow"
 	SkipDefaultRenamed     SkipReason = "remote renamed its default branch; local branch is stale"
 	SkipRecentFetch        SkipReason = "fetched recently (--skip-recent)"
 )
@@ -110,6 +111,8 @@ type RepoState struct {
 	HasSubmodules      bool // .gitmodules file exists in repo root
 	IsPushed           bool // refs/remotes/origin/<CurrentBranch> exists locally (Feature only)
 	HasOrigin          bool
+	HasUpstream        bool   // true if a remote named "upstream" is configured
+	TrackingRemote     string // the remote that CurrentBranch is configured to track ("origin", "upstream", etc.)
 	// FetchErr is set only when FetchKind == FetchKindTransientGaveUp — it
 	// carries the wrapped git error so decide.go can surface it as FailReason.
 	FetchErr error

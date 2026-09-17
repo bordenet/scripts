@@ -144,6 +144,9 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 	// 3. Current branch (empty = detached HEAD)
 	state.CurrentBranch = gitexec.CurrentBranch(ctx, repoPath)
 
+	// 3a. Fork detection: does an "upstream" remote exist?
+	state.HasUpstream = gitexec.HasUpstreamRemote(ctx, repoPath)
+
 	// 4-6. In-progress guards (cheap filesystem checks)
 	state.HasUnmerged = gitexec.HasUnmerged(ctx, repoPath)
 	state.HasRebaseHead = gitexec.HasRebaseHead(ctx, repoPath)
@@ -163,10 +166,18 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 	state.BranchType = branch.Classify(state.CurrentBranch, state.DefaultBranch)
 
 	if state.BranchType == BranchTypeFeature {
-		// 12a. IsPushed: LOCAL check BEFORE fetch (reflects pre-fetch state)
+		// 12a. Detect which remote this branch tracks (before fetch). Fork repos
+		// where the branch tracks "upstream" go through MR workflow rather than
+		// auto-rebase; Decide() uses TrackingRemote to gate that skip.
+		state.TrackingRemote = gitexec.BranchTrackingRemote(ctx, repoPath, state.CurrentBranch)
+		if state.TrackingRemote == "" {
+			state.TrackingRemote = "origin"
+		}
+
+		// 12b. IsPushed: LOCAL check BEFORE fetch (reflects pre-fetch state)
 		state.IsPushed = gitexec.RemoteTrackingRefExists(ctx, repoPath, state.CurrentBranch)
 
-		// 12b. Multi-ref fetch (covers parent detection AND data sync in one call)
+		// 12c. Multi-ref fetch (covers parent detection AND data sync in one call)
 		// Multi-ref budget scales by len(parentCandidates): each candidate
 		// gets a fair retry budget, so a flaky first ref cannot drain refs 2..N.
 		perAttempt := time.Duration(flags.FetchTimeout) * time.Second
@@ -179,7 +190,7 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 		}
 		state.FetchKind = FetchKindOK
 
-		// 12c. Detect parent by finding closest candidate
+		// 12d. Detect parent by finding closest candidate
 		commitsBehind := map[string]int{}
 		for _, c := range parentCandidates {
 			if gitexec.RemoteTrackingRefExists(ctx, repoPath, c) {
@@ -234,10 +245,17 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 		state.FetchKind = FetchKindOK
 	}
 
-	// 14-16. Position SHAs (all require fetch to have completed)
+	// 14-16. Position SHAs (all require fetch to have completed).
+	// For feature branches tracking "upstream" the position SHAs are computed
+	// against upstream/<parent>; Decide() will skip via SkipUpstreamFeature
+	// before any rebase is attempted but the state stays meaningful for display.
+	remotePrefix := "origin"
+	if state.BranchType == BranchTypeFeature && state.TrackingRemote == "upstream" {
+		remotePrefix = "upstream"
+	}
 	state.LocalSHA = gitexec.RevParse(ctx, repoPath, "HEAD")
-	state.RemoteSHA = gitexec.RevParse(ctx, repoPath, "origin/"+state.ParentBranch)
-	state.BaseSHA = gitexec.MergeBase(ctx, repoPath, "origin/"+state.ParentBranch)
+	state.RemoteSHA = gitexec.RevParse(ctx, repoPath, remotePrefix+"/"+state.ParentBranch)
+	state.BaseSHA = gitexec.MergeBase(ctx, repoPath, remotePrefix+"/"+state.ParentBranch)
 
 	return state
 }
