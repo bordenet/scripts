@@ -471,3 +471,65 @@ func TestRemoteDefaultBranch(t *testing.T) {
 		t.Error("expected error for unreachable origin, got nil")
 	}
 }
+
+// TestCommonGitDir verifies that a repo's main checkout and any of its git
+// worktree checkouts (`git worktree add`) resolve to the SAME common git dir
+// -- this is what main.go uses to detect and serialize concurrent fetches
+// against repos that share one physical ref namespace.
+func TestCommonGitDir(t *testing.T) {
+	run := func(dir string, args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", args...) //nolint:gosec // test helper, hardcoded git subcommands
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+
+	bare := t.TempDir()
+	run(bare, "init", "-q", "--bare", "-b", "main")
+
+	main := t.TempDir()
+	run(main, "clone", "-q", bare, ".")
+	run(main, "config", "user.email", "t@t.com")
+	run(main, "config", "user.name", "T")
+	run(main, "commit", "-q", "--allow-empty", "-m", "c1")
+	run(main, "push", "-q", "-u", "origin", "main")
+
+	ctx := context.Background()
+
+	mainCommon := CommonGitDir(ctx, main)
+	if mainCommon == "" {
+		t.Fatal("CommonGitDir(main checkout) returned empty string")
+	}
+
+	worktreePath := t.TempDir() + "-wt"
+	run(main, "worktree", "add", "-q", "-b", "feat/x", worktreePath, "main")
+
+	wtCommon := CommonGitDir(ctx, worktreePath)
+	if wtCommon == "" {
+		t.Fatal("CommonGitDir(worktree checkout) returned empty string")
+	}
+	if wtCommon != mainCommon {
+		t.Errorf("worktree common dir (%s) != main checkout common dir (%s) -- worktrees of the same repo must share one common dir", wtCommon, mainCommon)
+	}
+
+	// An unrelated repo must NOT share a common dir with the one above.
+	other := t.TempDir()
+	run(other, "init", "-q", "-b", "main")
+	otherCommon := CommonGitDir(ctx, other)
+	if otherCommon == "" {
+		t.Fatal("CommonGitDir(unrelated repo) returned empty string")
+	}
+	if otherCommon == mainCommon {
+		t.Error("unrelated repo must not share a common dir with the worktree-having repo")
+	}
+
+	// Non-repo directory: fail closed to "" (caller must not force
+	// serialization on a guess).
+	if got := CommonGitDir(ctx, t.TempDir()); got != "" {
+		t.Errorf("CommonGitDir(non-repo) = %q, want \"\"", got)
+	}
+}
