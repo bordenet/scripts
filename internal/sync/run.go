@@ -19,12 +19,13 @@ func Run(ctx context.Context, repoPath string, flags Flags, registry *StashRegis
 	// Fail-open: any stat/parse error falls through to the normal path.
 	if flags.SkipRecent > 0 {
 		if fi, err := os.Stat(filepath.Join(repoPath, ".git", "FETCH_HEAD")); err == nil {
-			if time.Since(fi.ModTime()) < time.Duration(flags.SkipRecent)*time.Second {
+			if age := time.Since(fi.ModTime()); age < time.Duration(flags.SkipRecent)*time.Second {
 				return RepoResult{
-					RepoPath:  repoPath,
-					Status:    StatusSkipped,
+					RepoPath:   repoPath,
+					Status:     StatusSkipped,
 					SkipReason: SkipRecentFetch,
-					ElapsedMs: time.Since(start).Milliseconds(),
+					SkipDetail: age.Round(time.Second).String() + " ago",
+					ElapsedMs:  time.Since(start).Milliseconds(),
 				}
 			}
 		}

@@ -80,12 +80,63 @@ func ShowSummary(w io.Writer, results []sync.RepoResult, elapsed time.Duration, 
 		fmt.Fprintf(w, "%s %d %s: %s\n", style.Render(icon), len(group), label, strings.Join(names, ", "))
 	}
 
+	// printSkippedInline groups skips by SkipReason before printing, one line per
+	// reason. A bare "N skipped: repo1, repo2, ..." reads identically whether the
+	// cause is benign (e.g. fetched moments ago) or a real problem (e.g. no origin
+	// remote) -- naming the reason inline is what tells the reader "this is fine"
+	// vs. "this needs attention" without requiring --verbose.
+	printSkippedInline := func(group []sync.RepoResult) {
+		if len(group) == 0 {
+			return
+		}
+		var order []sync.SkipReason
+		byReason := map[sync.SkipReason][]sync.RepoResult{}
+		for _, r := range group {
+			if _, seen := byReason[r.SkipReason]; !seen {
+				order = append(order, r.SkipReason)
+			}
+			byReason[r.SkipReason] = append(byReason[r.SkipReason], r)
+		}
+		for _, reason := range order {
+			rs := byReason[reason]
+			names := make([]string, len(rs))
+			for i, r := range rs {
+				names[i] = displayName(r)
+			}
+			label := "skipped"
+			if reason != "" {
+				label = fmt.Sprintf("skipped (%s)", reason)
+			}
+			fmt.Fprintf(w, "%s %d %s: %s\n", styleYellow.Render("⊘"), len(rs), label, strings.Join(names, ", "))
+		}
+	}
+
+	// printSkippedGroup is printGroup's verbose/WhatIf-mode counterpart for the
+	// Skipped bucket: each bullet gets its reason (and optional detail, e.g.
+	// "12s ago") appended so the bulleted view actually explains why, not just what.
+	printSkippedGroup := func(label string, group []sync.RepoResult) {
+		if len(group) == 0 {
+			return
+		}
+		fmt.Fprintf(w, "%s %s (%d):\n", styleYellow.Render("⊘"), label, len(group))
+		for _, r := range group {
+			switch {
+			case r.SkipReason != "" && r.SkipDetail != "":
+				fmt.Fprintf(w, "  • %s (%s, %s)\n", displayName(r), r.SkipReason, r.SkipDetail)
+			case r.SkipReason != "":
+				fmt.Fprintf(w, "  • %s (%s)\n", displayName(r), r.SkipReason)
+			default:
+				fmt.Fprintf(w, "  • %s\n", displayName(r))
+			}
+		}
+	}
+
 	if flags.WhatIf {
 		printGroup(styleBlue, "○", "Would update", updated)
 		printGroup(styleBlue, "○", "Would rebase", rebased)
 		printGroup(styleBlue, "○", "Would reset --hard", reset)
 		printGroup(styleBlue, "•", "Up to date", noops)
-		printGroup(styleYellow, "⊘", "Would skip", skipped)
+		printSkippedGroup("Would skip", skipped)
 		printGroup(styleYellow, "⚠", "Stash conflicts", stashConflict)
 		printGroup(styleRed, "✗", "Rebase conflicts", rebaseConflict)
 		printGroup(styleRed, "✗", "Failed", failed)
@@ -95,7 +146,7 @@ func ShowSummary(w io.Writer, results []sync.RepoResult, elapsed time.Duration, 
 		printGroup(styleGreen, "✓", "Rebased", rebased)
 		printGroup(styleGreen, "✓", "Reset (unrelated history)", reset)
 		printGroup(styleBlue, "•", "Up to date", noops)
-		printGroup(styleYellow, "⊘", "Skipped", skipped)
+		printSkippedGroup("Skipped", skipped)
 		printGroup(styleYellow, "⚠", "Stash conflicts", stashConflict)
 		printGroup(styleRed, "✗", "Rebase conflicts", rebaseConflict)
 		printGroup(styleRed, "✗", "Failed", failed)
@@ -121,7 +172,7 @@ func ShowSummary(w io.Writer, results []sync.RepoResult, elapsed time.Duration, 
 		if len(parts) > 0 {
 			fmt.Fprintf(w, "%s %s\n", styleGreen.Render("✓"), strings.Join(parts, ", "))
 		}
-		printInline(styleYellow, "⊘", "skipped", skipped)
+		printSkippedInline(skipped)
 		printInline(styleYellow, "⚠", "stash conflict", stashConflict)
 		printInline(styleRed, "✗", "rebase conflict", rebaseConflict)
 		printInline(styleRed, "✗", "failed", failed)

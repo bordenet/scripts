@@ -11,15 +11,15 @@ import (
 type Status int
 
 const (
-	StatusUpdated              Status = iota // fast-forward succeeded
-	StatusRebased                            // rebase succeeded
-	StatusReset                              // git reset --hard to origin (unrelated history)
-	StatusNoOp                               // already up to date or local ahead
-	StatusSkipped                            // deliberate skip (see SkipReason)
-	StatusFailed                             // unrecoverable error
-	StatusRebaseConflict                     // rebase attempted, conflict, rolled back
-	StatusStashConflict                      // stash pop conflicted after successful op
-	StatusManualInterventionRequired         // git state corrupt, human must fix
+	StatusUpdated                    Status = iota // fast-forward succeeded
+	StatusRebased                                  // rebase succeeded
+	StatusReset                                    // git reset --hard to origin (unrelated history)
+	StatusNoOp                                     // already up to date or local ahead
+	StatusSkipped                                  // deliberate skip (see SkipReason)
+	StatusFailed                                   // unrecoverable error
+	StatusRebaseConflict                           // rebase attempted, conflict, rolled back
+	StatusStashConflict                            // stash pop conflicted after successful op
+	StatusManualInterventionRequired               // git state corrupt, human must fix
 )
 
 // SkipReason describes why a repo was skipped.
@@ -54,7 +54,7 @@ const (
 type ActionType int
 
 const (
-	ActionNoOp        ActionType = iota
+	ActionNoOp ActionType = iota
 	ActionFastForward
 	ActionRebase
 	ActionResetHard // git reset --hard origin/<parent> for unrelated-history default branches
@@ -86,11 +86,11 @@ const (
 // Guard order in Decide is load-bearing and must match the order fields are populated
 // in CollectState.
 type RepoState struct {
-	RepoPath        string
-	IsEmpty         bool       // true if no HEAD (git rev-parse HEAD fails)
-	CurrentBranch   string     // "" if detached HEAD
-	DefaultBranch   string     // detected via git symbolic-ref (local, no network)
-	ParentBranch    string     // for feature branches; set by DetectParent
+	RepoPath      string
+	IsEmpty       bool   // true if no HEAD (git rev-parse HEAD fails)
+	CurrentBranch string // "" if detached HEAD
+	DefaultBranch string // detected via git symbolic-ref (local, no network)
+	ParentBranch  string // for feature branches; set by DetectParent
 	// RenamedDefaultFrom/To are set by CollectState when a targeted fetch of the
 	// default branch 404s ("couldn't find remote ref") and a network refresh of
 	// origin/HEAD reveals the remote renamed its default branch (e.g. master→main)
@@ -98,18 +98,18 @@ type RepoState struct {
 	// SkipDefaultRenamed; Execute renders rename remediation steps from them.
 	RenamedDefaultFrom string
 	RenamedDefaultTo   string
-	BranchType      BranchType
-	LocalSHA        string
-	RemoteSHA       string // origin/<parent> AFTER fetch; "" if not found
-	BaseSHA         string // merge-base HEAD origin/<parent>; "" if no common ancestor
-	HasLocalChanges bool
-	HasUnmerged     bool // true if git ls-files --unmerged has output
-	HasRebaseHead   bool // true if .git/REBASE_HEAD exists
-	HasMergeHead    bool // true if .git/MERGE_HEAD exists
-	IsShallow       bool
-	HasSubmodules   bool // .gitmodules file exists in repo root
-	IsPushed        bool // refs/remotes/origin/<CurrentBranch> exists locally (Feature only)
-	HasOrigin       bool
+	BranchType         BranchType
+	LocalSHA           string
+	RemoteSHA          string // origin/<parent> AFTER fetch; "" if not found
+	BaseSHA            string // merge-base HEAD origin/<parent>; "" if no common ancestor
+	HasLocalChanges    bool
+	HasUnmerged        bool // true if git ls-files --unmerged has output
+	HasRebaseHead      bool // true if .git/REBASE_HEAD exists
+	HasMergeHead       bool // true if .git/MERGE_HEAD exists
+	IsShallow          bool
+	HasSubmodules      bool // .gitmodules file exists in repo root
+	IsPushed           bool // refs/remotes/origin/<CurrentBranch> exists locally (Feature only)
+	HasOrigin          bool
 	// FetchErr is set only when FetchKind == FetchKindTransientGaveUp — it
 	// carries the wrapped git error so decide.go can surface it as FailReason.
 	FetchErr error
@@ -128,11 +128,11 @@ type RepoState struct {
 type FetchKind int
 
 const (
-	FetchKindOK FetchKind = iota
-	FetchKindTimeout         // parent ctx OR fetch ctx DeadlineExceeded
-	FetchKindCancelled       // ctx.Canceled (SIGINT propagation) — distinct from Timeout
-	FetchKindTransientGaveUp // FetchMaxAttempts exhausted on curl 18 / EOF / etc.
-	FetchKindRepoGone        // repository not found / does not exist
+	FetchKindOK              FetchKind = iota
+	FetchKindTimeout                   // parent ctx OR fetch ctx DeadlineExceeded
+	FetchKindCancelled                 // ctx.Canceled (SIGINT propagation) — distinct from Timeout
+	FetchKindTransientGaveUp           // FetchMaxAttempts exhausted on curl 18 / EOF / etc.
+	FetchKindRepoGone                  // repository not found / does not exist
 )
 
 func (k FetchKind) String() string {
@@ -155,15 +155,16 @@ func (k FetchKind) String() string {
 // RepoResult is sent on the results channel after a repo is processed.
 type RepoResult struct {
 	RepoPath      string
-	DisplayName   string   // relative path for output (set by main after discovery)
+	DisplayName   string // relative path for output (set by main after discovery)
 	Status        Status
 	SkipReason    SkipReason
+	SkipDetail    string // optional extra context appended to SkipReason in output (e.g. "12s ago")
 	FailReason    string
 	CurrentBranch string
 	ParentBranch  string
 	BranchType    BranchType
-	ForceRebase   bool     // triggers force-push warning in summary
-	WhatIfAction  string   // non-empty when --what-if
+	ForceRebase   bool   // triggers force-push warning in summary
+	WhatIfAction  string // non-empty when --what-if
 	ElapsedMs     int64
 	ManualSteps   []string // actionable recovery instructions
 	// FetchKind / FetchLastError are propagated from RepoState by Execute()
