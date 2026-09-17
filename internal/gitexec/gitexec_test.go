@@ -533,3 +533,73 @@ func TestCommonGitDir(t *testing.T) {
 		t.Errorf("CommonGitDir(non-repo) = %q, want \"\"", got)
 	}
 }
+
+// TestHasUpstreamRemote verifies fork detection: a repo with only "origin"
+// configured is not a fork clone from gitsync's perspective; adding a second
+// remote named "upstream" flips it to true. Backs Decide()'s SkipUpstreamFeature
+// guard, which must not fire for a plain (non-fork) clone.
+func TestHasUpstreamRemote(t *testing.T) {
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...) //nolint:gosec // test helper, hardcoded git subcommands
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	dir := t.TempDir()
+	run(dir, "init", "-q", "-b", "main")
+	run(dir, "remote", "add", "origin", t.TempDir())
+
+	ctx := context.Background()
+	if HasUpstreamRemote(ctx, dir) {
+		t.Error("expected false before an upstream remote is configured")
+	}
+
+	run(dir, "remote", "add", "upstream", t.TempDir())
+	if !HasUpstreamRemote(ctx, dir) {
+		t.Error("expected true once an upstream remote is configured")
+	}
+}
+
+// TestBranchTrackingRemote verifies the branch.<name>.remote config lookup
+// used to distinguish a fork branch tracking "upstream" (MR workflow, skip)
+// from one tracking "origin" (normal rebase path).
+func TestBranchTrackingRemote(t *testing.T) {
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...) //nolint:gosec // test helper, hardcoded git subcommands
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	remote := t.TempDir()
+	run(remote, "init", "-q", "-b", "main")
+	run(remote, "config", "user.email", "t@t.com")
+	run(remote, "config", "user.name", "T")
+	run(remote, "commit", "--allow-empty", "-m", "init")
+
+	local := t.TempDir()
+	run(remote, "clone", "-q", remote, local)
+	ctx := context.Background()
+
+	if got := BranchTrackingRemote(ctx, local, "main"); got != "origin" {
+		t.Errorf("cloned branch: got %q, want %q", got, "origin")
+	}
+
+	// Add a second remote and point a new branch's tracking config at it,
+	// simulating a fork branch created with `git checkout -b feature/x upstream/main`.
+	run(local, "remote", "add", "upstream", remote)
+	run(local, "checkout", "-q", "-b", "feature/x")
+	run(local, "config", "branch.feature/x.remote", "upstream")
+	if got := BranchTrackingRemote(ctx, local, "feature/x"); got != "upstream" {
+		t.Errorf("upstream-tracking branch: got %q, want %q", got, "upstream")
+	}
+
+	// A branch created without --track has no branch.<name>.remote config → "".
+	run(local, "checkout", "-q", "--no-track", "-b", "untracked/y")
+	if got := BranchTrackingRemote(ctx, local, "untracked/y"); got != "" {
+		t.Errorf("untracked branch: got %q, want empty string", got)
+	}
+}
