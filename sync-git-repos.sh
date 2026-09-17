@@ -91,13 +91,12 @@ cached_hash=$(cat "$HASH_FILE" 2>/dev/null || echo "")
 #     treats the leading word "File" as a variable name; with `set -u` that
 #     crashes with "File: unbound variable". _mtime_of() guards with a numeric
 #     regex so any non-numeric stat output falls back to 0 rather than crashing.
-#     Degradation is safe, not an independent guarantee: a broken stat makes every
-#     mtime fall back to 0, so `newest_source_mtime > binary_mtime` is `0 > 0`
-#     (false) and this secondary check simply never fires — dropping back to the
-#     hash-gate-only baseline. It never detects LESS staleness than the hash gate
-#     alone, and never crashes. In the rare stale-HASH_FILE cases 4b targets (see
-#     above), a simultaneously-broken stat leaves both gates quiet until the next
-#     clean run — no worse than having no mtime gate at all.
+#     Degradation is safe, not an independent guarantee: an mtime of 0 sorts below
+#     any real binary mtime, so a broken stat drops this secondary check back to
+#     the hash-gate-only baseline — it never detects LESS staleness than the hash
+#     gate alone, and never crashes. In the rare stale-HASH_FILE cases 4b targets
+#     (see above), a simultaneously-broken stat leaves both gates quiet until the
+#     next clean run — no worse than having no mtime gate at all.
 if [[ "$(uname -s)" == "Darwin" ]]; then
     STAT_MTIME=(stat -f %m)
 else
@@ -148,7 +147,14 @@ if [[ "$current_hash" != "$cached_hash" ]] || [[ ! -x "$BINARY" ]] || (( mtime_s
         echo "Building gitsync..." >&2
     fi
     rm -f "$SCRIPT_DIR/gitsync_new"
-    if (cd "$SCRIPT_DIR" && go build -o "$SCRIPT_DIR/gitsync_new" ./cmd/gitsync/); then
+    # -buildvcs=false: SCRIPT_DIR is frequently a plain deployment directory
+    # (e.g. a workspace container like ~/git that intentionally is NOT itself
+    # a git repo -- see AGENTS.md), not this repo's own checkout. `go build`'s
+    # default VCS stamping walks up looking for a .git dir and fails with
+    # "error obtaining VCS status: exit status 128" in that layout. Disabling
+    # stamping is a no-op when SCRIPT_DIR *is* a real git checkout (this repo's
+    # own dev loop), so it is safe unconditionally.
+    if (cd "$SCRIPT_DIR" && go build -buildvcs=false -o "$SCRIPT_DIR/gitsync_new" ./cmd/gitsync/); then
         mv "$SCRIPT_DIR/gitsync_new" "$BINARY"
         echo "$current_hash" > "$HASH_FILE"
     else
