@@ -53,6 +53,22 @@ func HasOrigin(ctx context.Context, dir string) bool {
 	return err == nil
 }
 
+// HasUpstreamRemote returns true if a remote named "upstream" is configured.
+func HasUpstreamRemote(ctx context.Context, dir string) bool {
+	_, err := run(ctx, dir, "remote", "get-url", "upstream")
+	return err == nil
+}
+
+// BranchTrackingRemote returns the name of the remote that the given branch
+// is configured to track (e.g. "origin" or "upstream"), or "" if not set.
+func BranchTrackingRemote(ctx context.Context, dir, branch string) string {
+	out, err := run(ctx, dir, "config", "--get", "branch."+branch+".remote")
+	if err != nil {
+		return ""
+	}
+	return out
+}
+
 // CurrentBranch returns the current branch name, or "" if detached HEAD.
 func CurrentBranch(ctx context.Context, dir string) string {
 	out, err := run(ctx, dir, "symbolic-ref", "--short", "HEAD")

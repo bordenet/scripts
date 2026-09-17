@@ -95,8 +95,8 @@ func TestDecide_AllScenarios(t *testing.T) {
 			name: "9_diverged_no_rebase",
 			state: syncp.RepoState{
 				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
-				BranchType:   syncp.BranchTypeFeature, ParentBranch: "main",
-				LocalSHA:     shaB, RemoteSHA: shaC, BaseSHA: shaA, // all different → diverged
+				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA: shaB, RemoteSHA: shaC, BaseSHA: shaA, // all different → diverged
 			},
 			flags:          syncp.Flags{NoRebase: true, FetchTimeout: 30, RebaseTimeout: 120},
 			wantAction:     syncp.ActionSkip,
@@ -106,9 +106,9 @@ func TestDecide_AllScenarios(t *testing.T) {
 			name: "10_diverged_rebase_not_pushed",
 			state: syncp.RepoState{
 				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
-				BranchType:   syncp.BranchTypeFeature, ParentBranch: "main",
-				LocalSHA:     shaB, RemoteSHA: shaC, BaseSHA: shaA,
-				IsPushed:     false,
+				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA: shaB, RemoteSHA: shaC, BaseSHA: shaA,
+				IsPushed: false,
 			},
 			flags:      defaultFlags(),
 			wantAction: syncp.ActionRebase,
@@ -117,9 +117,9 @@ func TestDecide_AllScenarios(t *testing.T) {
 			name: "11_diverged_pushed_no_force",
 			state: syncp.RepoState{
 				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
-				BranchType:   syncp.BranchTypeFeature, ParentBranch: "main",
-				LocalSHA:     shaB, RemoteSHA: shaC, BaseSHA: shaA,
-				IsPushed:     true,
+				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA: shaB, RemoteSHA: shaC, BaseSHA: shaA,
+				IsPushed: true,
 			},
 			flags:          defaultFlags(),
 			wantAction:     syncp.ActionSkip,
@@ -129,9 +129,9 @@ func TestDecide_AllScenarios(t *testing.T) {
 			name: "12_diverged_force_rebase",
 			state: syncp.RepoState{
 				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
-				BranchType:   syncp.BranchTypeFeature, ParentBranch: "main",
-				LocalSHA:     shaB, RemoteSHA: shaC, BaseSHA: shaA,
-				IsPushed:     true,
+				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA: shaB, RemoteSHA: shaC, BaseSHA: shaA,
+				IsPushed: true,
 			},
 			flags:      syncp.Flags{ForceRebase: true, FetchTimeout: 30, RebaseTimeout: 120},
 			wantAction: syncp.ActionRebase,
@@ -140,9 +140,9 @@ func TestDecide_AllScenarios(t *testing.T) {
 			name: "13_shallow_diverged",
 			state: syncp.RepoState{
 				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
-				BranchType:   syncp.BranchTypeFeature, ParentBranch: "main",
-				LocalSHA:     shaB, RemoteSHA: shaC, BaseSHA: shaA,
-				IsShallow:    true,
+				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA: shaB, RemoteSHA: shaC, BaseSHA: shaA,
+				IsShallow: true,
 			},
 			flags:          defaultFlags(),
 			wantAction:     syncp.ActionSkip,
@@ -152,8 +152,8 @@ func TestDecide_AllScenarios(t *testing.T) {
 			name: "14_submodules_diverged",
 			state: syncp.RepoState{
 				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
-				BranchType:    syncp.BranchTypeFeature, ParentBranch: "main",
-				LocalSHA:      shaB, RemoteSHA: shaC, BaseSHA: shaA,
+				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA: shaB, RemoteSHA: shaC, BaseSHA: shaA,
 				HasSubmodules: true,
 			},
 			flags:          defaultFlags(),
@@ -196,8 +196,8 @@ func TestDecide_AllScenarios(t *testing.T) {
 			name: "18_no_common_ancestor_default_branch_dirty",
 			state: syncp.RepoState{
 				HasOrigin: true, CurrentBranch: "main", DefaultBranch: "main",
-				BranchType:      syncp.BranchTypeDefault,
-				LocalSHA:        shaA, RemoteSHA: shaB, BaseSHA: "",
+				BranchType: syncp.BranchTypeDefault,
+				LocalSHA:   shaA, RemoteSHA: shaB, BaseSHA: "",
 				HasLocalChanges: true,
 			},
 			flags:          defaultFlags(),
@@ -209,7 +209,7 @@ func TestDecide_AllScenarios(t *testing.T) {
 			state: syncp.RepoState{
 				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
 				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
-				LocalSHA:   shaA, RemoteSHA: shaB, BaseSHA: "", // unrelated history
+				LocalSHA: shaA, RemoteSHA: shaB, BaseSHA: "", // unrelated history
 			},
 			flags:          defaultFlags(),
 			wantAction:     syncp.ActionSkip,
@@ -228,6 +228,48 @@ func TestDecide_AllScenarios(t *testing.T) {
 			flags:          defaultFlags(),
 			wantAction:     syncp.ActionSkip,
 			wantSkipReason: syncp.SkipDefaultRenamed,
+		},
+		// Fork repo: feature branch tracks upstream → skip (MR workflow), never rebase.
+		{
+			name: "22_upstream_feature_branch_tracks_upstream",
+			state: syncp.RepoState{
+				HasOrigin: true, HasUpstream: true,
+				CurrentBranch: "feature/x", DefaultBranch: "main",
+				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
+				TrackingRemote: "upstream",
+				LocalSHA:       shaB, RemoteSHA: shaC, BaseSHA: shaA,
+			},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipUpstreamFeature,
+		},
+		// Fork repo: feature branch tracks origin (not upstream) → normal rebase path.
+		{
+			name: "23_upstream_feature_branch_tracks_origin",
+			state: syncp.RepoState{
+				HasOrigin: true, HasUpstream: true,
+				CurrentBranch: "feature/x", DefaultBranch: "main",
+				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
+				TrackingRemote: "origin",
+				LocalSHA:       shaB, RemoteSHA: shaC, BaseSHA: shaA,
+				IsPushed: false,
+			},
+			flags:      defaultFlags(),
+			wantAction: syncp.ActionRebase,
+		},
+		// Fork repo: upstream remote present but branch is default branch (not feature) → unchanged path.
+		{
+			name: "24_upstream_present_default_branch_diverged",
+			state: syncp.RepoState{
+				HasOrigin: true, HasUpstream: true,
+				CurrentBranch: "main", DefaultBranch: "main",
+				BranchType:     syncp.BranchTypeDefault,
+				TrackingRemote: "origin",
+				LocalSHA:       shaB, RemoteSHA: shaC, BaseSHA: shaA, // diverged default branch
+			},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipDefaultDiverged,
 		},
 	}
 
