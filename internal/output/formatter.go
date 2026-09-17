@@ -61,10 +61,10 @@ func (f *Formatter) Format(r sync.RepoResult) string {
 		branch = fmt.Sprintf(" [%s]", r.CurrentBranch)
 	}
 
-	check  := styleGreen.Render("✓")
-	warn   := styleYellow.Render("⚠")
-	cross  := styleRed.Render("✗")
-	skip   := styleYellow.Render("⊘")
+	check := styleGreen.Render("✓")
+	warn := styleYellow.Render("⚠")
+	cross := styleRed.Render("✗")
+	skip := styleYellow.Render("⊘")
 	circle := styleBlue.Render("○")
 	bullet := styleBlue.Render("•")
 

@@ -7,7 +7,7 @@ package types
 type BranchType int
 
 const (
-	BranchTypeDefault   BranchType = iota
+	BranchTypeDefault BranchType = iota
 	BranchTypeFeature
 	BranchTypeAmbiguous
 )

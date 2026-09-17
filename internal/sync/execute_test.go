@@ -425,7 +425,6 @@ func TestRun_FastForward_StashConflict(t *testing.T) {
 	}
 }
 
-
 // ---------------------------------------------------------------------------
 // Spy syncer — verifies that Execute routes through the RepoSyncer interface
 // ---------------------------------------------------------------------------
@@ -544,4 +543,3 @@ func TestExecute_BasePreservesFetchKindOK(t *testing.T) {
 		t.Errorf("FetchLastError = %q, want empty on success", r.FetchLastError)
 	}
 }
-
