@@ -460,6 +460,36 @@ func TopStashMessage(ctx context.Context, dir string) string {
 	return out
 }
 
+// CommonGitDir returns the absolute path of the repo's COMMON git directory
+// (`git rev-parse --git-common-dir`, resolved to absolute). For an ordinary
+// repo this is the same as its own .git dir. For a worktree checkout
+// (`git worktree add`), this returns the MAIN checkout's .git dir -- the one
+// thing every worktree of the same repo shares, since they all read/write
+// the same refs/remotes/origin/* and object store even though each worktree
+// has its own HEAD, index, and working files.
+//
+// Callers use this to detect when two discovered repo paths are actually
+// worktrees of the same physical repo, so concurrent `git fetch` calls
+// against them can be serialized: fetching into a shared remote-tracking ref
+// from two processes at once races on git's ref-lock and fails intermittently
+// ("cannot lock ref ... is at X but expected Y"). Returns "" on any error;
+// callers must treat "" as "unknown / do not assume shared" rather than as a
+// shared empty-string key across unrelated repos.
+func CommonGitDir(ctx context.Context, dir string) string {
+	out, err := run(ctx, dir, "rev-parse", "--git-common-dir")
+	if err != nil || out == "" {
+		return ""
+	}
+	if !filepath.IsAbs(out) {
+		out = filepath.Join(dir, out)
+	}
+	resolved, err := filepath.EvalSymlinks(out)
+	if err != nil {
+		return out
+	}
+	return resolved
+}
+
 // gitDir returns the .git directory path for a repo (handles worktrees where .git is a file).
 // ctx is used for the git subprocess in the worktree/submodule case so it can be cancelled.
 func gitDir(ctx context.Context, dir string) (string, error) {

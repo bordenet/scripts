@@ -163,3 +163,128 @@ func TestFind_ContainerRepoIsRecursed(t *testing.T) {
 		}
 	}
 }
+
+// initRepoWithCommit creates a repo with a real commit and a remote pointing
+// at a local bare repo, so `git worktree add` (which requires a valid HEAD)
+// works against it. Returns the repo dir.
+func initRepoWithCommit(t *testing.T, dir string) {
+	t.Helper()
+	bareDir := dir + "-bare.git"
+	for _, args := range [][]string{
+		{"git", "init", "-q", "--bare", "-b", "main", bareDir},
+		{"git", "clone", "-q", bareDir, dir},
+		{"git", "-C", dir, "config", "user.email", "test@test.com"},
+		{"git", "-C", dir, "config", "user.name", "Test"},
+	} {
+		if err := exec.Command(args[0], args[1:]...).Run(); err != nil {
+			t.Fatalf("setup %v: %v", args, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("a\n"), 0644); err != nil {
+		t.Fatalf("write f.txt: %v", err)
+	}
+	for _, args := range [][]string{
+		{"git", "-C", dir, "add", "f.txt"},
+		{"git", "-C", dir, "commit", "-q", "-m", "c1"},
+		{"git", "-C", dir, "push", "-q", "-u", "origin", "main"},
+	} {
+		if err := exec.Command(args[0], args[1:]...).Run(); err != nil {
+			t.Fatalf("setup %v: %v", args, err)
+		}
+	}
+}
+
+// addWorktree runs `git worktree add -b <branch> <worktreePath> <fromRef>`
+// against repoDir.
+func addWorktree(t *testing.T, repoDir, worktreePath, branch, fromRef string) {
+	t.Helper()
+	cmd := exec.Command("git", "-C", repoDir, "worktree", "add", "-q", "-b", branch, worktreePath, fromRef)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git worktree add: %v\n%s", err, out)
+	}
+}
+
+// TestFind_WorktreeDiscoveredWhenTargetDirIsRepo covers pointing gitsync
+// directly at a repo (targetDir IS the repo) that has a ".worktrees"
+// subdirectory: both the main checkout and the worktree checkout must be
+// discovered, since each is an independently-syncable branch.
+func TestFind_WorktreeDiscoveredWhenTargetDirIsRepo(t *testing.T) {
+	root := t.TempDir()
+	repo := filepath.Join(root, "repo")
+	initRepoWithCommit(t, repo)
+	addWorktree(t, repo, filepath.Join(repo, ".worktrees", "feat", "x"), "feat/x", "main")
+
+	repoCanon, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatalf("EvalSymlinks: %v", err)
+	}
+
+	repos := discover.Find(repo)
+	if len(repos) != 2 {
+		t.Fatalf("expected 2 repos (main checkout + worktree), got %d: %v", len(repos), repos)
+	}
+	found := map[string]bool{}
+	for _, r := range repos {
+		found[r] = true
+	}
+	if !found[repoCanon] {
+		t.Errorf("main checkout %s not in results: %v", repoCanon, repos)
+	}
+	wtPath := filepath.Join(repoCanon, ".worktrees", "feat", "x")
+	if !found[wtPath] {
+		t.Errorf("worktree %s not in results: %v", wtPath, repos)
+	}
+}
+
+// TestFind_WorktreeDiscoveredViaParentWalk covers the more common case: the
+// user points gitsync at a PARENT directory containing several repos, one of
+// which has a ".worktrees" subdirectory. The worktree must be discovered as a
+// sibling result alongside the repo's main checkout, not silently dropped.
+func TestFind_WorktreeDiscoveredViaParentWalk(t *testing.T) {
+	root := t.TempDir()
+	repo := filepath.Join(root, "repo")
+	initRepoWithCommit(t, repo)
+	addWorktree(t, repo, filepath.Join(repo, ".worktrees", "feat", "y"), "feat/y", "main")
+
+	repoCanon, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatalf("EvalSymlinks: %v", err)
+	}
+
+	repos := discover.Find(root)
+	if len(repos) != 2 {
+		t.Fatalf("expected 2 repos (main checkout + worktree), got %d: %v", len(repos), repos)
+	}
+	found := map[string]bool{}
+	for _, r := range repos {
+		found[r] = true
+	}
+	if !found[repoCanon] {
+		t.Errorf("main checkout %s not in results: %v", repoCanon, repos)
+	}
+	wtPath := filepath.Join(repoCanon, ".worktrees", "feat", "y")
+	if !found[wtPath] {
+		t.Errorf("worktree %s not in results: %v", wtPath, repos)
+	}
+}
+
+// TestFind_PlainDotDirectoriesStillSkipped verifies the ".worktrees" carve-out
+// didn't accidentally widen the dot-directory skip to other dot-dirs (.git,
+// .github, etc. must remain invisible to discovery).
+func TestFind_PlainDotDirectoriesStillSkipped(t *testing.T) {
+	root := t.TempDir()
+	repo := filepath.Join(root, "repo")
+	initRepo(t, repo)
+	// A dot-directory containing what LOOKS like a repo must still be skipped
+	// (e.g. .github/, .vscode/ never house real per-branch checkouts).
+	hidden := filepath.Join(repo, ".hidden-nested")
+	if err := os.MkdirAll(hidden, 0755); err != nil {
+		t.Fatal(err)
+	}
+	initRepo(t, filepath.Join(hidden, "should-not-be-found"))
+
+	repos := discover.Find(root)
+	if len(repos) != 1 {
+		t.Errorf("expected 1 repo (dot-dir contents skipped), got %d: %v", len(repos), repos)
+	}
+}

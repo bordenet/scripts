@@ -17,8 +17,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"gitsync/internal/discover"
+	"gitsync/internal/gitexec"
 	"gitsync/internal/output"
 	gosync "gitsync/internal/sync"
+	"gitsync/internal/worktreelock"
 )
 
 func main() {
@@ -131,6 +133,23 @@ func main() {
 	sem := make(chan struct{}, flags.Concurrency)
 	drainDone := make(chan struct{}) // closed by drain goroutine after MsgDone is sent
 
+	// worktreeLocks serializes access to repos that share a common git
+	// directory (git-worktrees: `git worktree add <path>` checkouts of the
+	// same repo). All worktrees of one repo share refs/remotes/origin/* and
+	// the object store even though each has its own HEAD/index/working files;
+	// concurrent `git fetch` calls into that shared ref namespace race on
+	// git's ref-lock and intermittently fail ("cannot lock ref ... is at X
+	// but expected Y"). Repos with no shared common dir (the overwhelming
+	// common case) never contend on any lock here.
+	var worktreeLocks worktreelock.Registry
+	lockFor := func(repoPath string) chan struct{} {
+		commonDir := gitexec.CommonGitDir(rootCtx, repoPath)
+		if commonDir == "" {
+			return nil // unknown common dir -- don't force serialization on a guess
+		}
+		return worktreeLocks.Get(commonDir)
+	}
+
 	// Print header
 	fmt.Printf("%s: %s\n",
 		lipgloss.NewStyle().Bold(true).Render("Git Repository Updates"),
@@ -153,6 +172,34 @@ func main() {
 	// Launch goroutines
 	for _, repo := range repos {
 		go func(repoPath string) {
+			// Acquire the worktree lock BEFORE the concurrency semaphore.
+			// lockFor's underlying git rev-parse is a cheap, local, non-network
+			// call, unlike Run()'s fetch -- so letting all goroutines race to
+			// resolve/acquire it unbounded is harmless. Doing it in this order
+			// (lock, then semaphore) means a goroutine waiting on a busy
+			// sibling worktree does NOT hold a concurrency slot hostage and
+			// starve unrelated repos; only once it actually owns the right to
+			// run does it compete for a semaphore slot alongside every other
+			// repo. Reversing this order would let a --concurrency-limited
+			// batch of goroutines fill up entirely with siblings of one
+			// worktree group, each blocked on the same lock.
+			var worktreeLock chan struct{}
+			if l := lockFor(repoPath); l != nil {
+				select {
+				case l <- struct{}{}:
+					worktreeLock = l
+				case <-rootCtx.Done():
+					results <- gosync.RepoResult{
+						RepoPath:    repoPath,
+						DisplayName: displayNames[repoPath],
+						Status:      gosync.StatusSkipped,
+						SkipReason:  gosync.SkipCancelled,
+					}
+					return
+				}
+				defer func() { <-worktreeLock }()
+			}
+
 			// Context-aware semaphore: don't block forever if cancelled.
 			select {
 			case sem <- struct{}{}:
