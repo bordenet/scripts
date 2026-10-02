@@ -85,6 +85,9 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 			if action.SkipReason == SkipDefaultRenamed {
 				r.ManualSteps = renameManualSteps(state)
 			}
+			if action.SkipReason == SkipAlreadyLanded {
+				r.ManualSteps = alreadyLandedManualSteps(state)
+			}
 		case ActionFail:
 			r.Status = StatusFailed
 			r.FailReason = action.FailReason
@@ -110,6 +113,9 @@ func Execute(ctx context.Context, state RepoState, action Action, flags Flags, r
 		r.SkipReason = action.SkipReason
 		if action.SkipReason == SkipDefaultRenamed {
 			r.ManualSteps = renameManualSteps(state)
+		}
+		if action.SkipReason == SkipAlreadyLanded {
+			r.ManualSteps = alreadyLandedManualSteps(state)
 		}
 		return r
 	case ActionFail:
@@ -256,6 +262,26 @@ func renameManualSteps(state RepoState) []string {
 		fmt.Sprintf("git merge --ff-only origin/%s", to),
 		"git remote set-head origin -a",
 	}
+}
+
+// alreadyLandedManualSteps builds copy-pasteable cleanup commands for a
+// Feature branch whose content is already upstream under a different SHA
+// (squash-merge/rebase-merge via MR). Deliberately does NOT suggest deleting
+// the remote branch — that is a push-like action a human should confirm
+// explicitly, same boundary as every other destructive step this tool
+// surfaces but never executes itself.
+func alreadyLandedManualSteps(state RepoState) []string {
+	steps := []string{"cd " + shellQuotePath(state.RepoPath)}
+	if state.RepoPath != "" {
+		// Worktree removal is only valid when this checkout IS a worktree;
+		// git no-ops harmlessly (non-zero exit, no damage) when it isn't one,
+		// so it's safe to always suggest both lines and let the human pick.
+		steps = append(steps, "git worktree remove "+shellQuotePath(state.RepoPath)+"  # if this is a worktree checkout")
+	}
+	steps = append(steps,
+		fmt.Sprintf("git branch -D %s  # safe: content already matches origin/%s", state.CurrentBranch, state.ParentBranch),
+	)
+	return steps
 }
 
 func withStatus(base RepoResult, s Status) RepoResult {

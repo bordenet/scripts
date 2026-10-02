@@ -114,6 +114,47 @@ func TestDecide_AllScenarios(t *testing.T) {
 			wantAction: syncp.ActionRebase,
 		},
 		{
+			name: "10b_subsumed_by_remote_not_pushed",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
+				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA: shaB, RemoteSHA: shaC, BaseSHA: shaA, // diverged
+				IsPushed: false, SubsumedByRemote: true, // but content already landed upstream
+			},
+			flags:          defaultFlags(),
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipAlreadyLanded,
+		},
+		{
+			name: "10c_subsumed_by_remote_pushed_no_force",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
+				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA: shaB, RemoteSHA: shaC, BaseSHA: shaA,
+				IsPushed: true, SubsumedByRemote: true,
+			},
+			flags: defaultFlags(),
+			// Already-landed takes priority over the pushed/force-rebase gate —
+			// rebasing a stale, fully-landed branch is never the right action
+			// regardless of whether it was pushed.
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipAlreadyLanded,
+		},
+		{
+			name: "10d_subsumed_by_remote_no_rebase_flag",
+			state: syncp.RepoState{
+				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",
+				BranchType: syncp.BranchTypeFeature, ParentBranch: "main",
+				LocalSHA: shaB, RemoteSHA: shaC, BaseSHA: shaA,
+				IsPushed: false, SubsumedByRemote: true,
+			},
+			// Already-landed also takes priority over --no-rebase: it is not a
+			// rebase decision at all, so the flag is irrelevant to it.
+			flags:          syncp.Flags{NoRebase: true, FetchTimeout: 30, RebaseTimeout: 120},
+			wantAction:     syncp.ActionSkip,
+			wantSkipReason: syncp.SkipAlreadyLanded,
+		},
+		{
 			name: "11_diverged_pushed_no_force",
 			state: syncp.RepoState{
 				HasOrigin: true, CurrentBranch: "feature/x", DefaultBranch: "main",

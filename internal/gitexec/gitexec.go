@@ -388,6 +388,47 @@ func CommitsBehind(ctx context.Context, dir, remoteRef string) int {
 	return n
 }
 
+// DiffNameOnly returns the list of paths that differ between fromRef and
+// toRef. Returns nil on any git error.
+func DiffNameOnly(ctx context.Context, dir, fromRef, toRef string) []string {
+	out, err := run(ctx, dir, "diff", "--name-only", fromRef, toRef)
+	if err != nil || out == "" {
+		return nil
+	}
+	return strings.Split(out, "\n")
+}
+
+// DiffEmptyPaths reports whether `git diff fromRef toRef -- paths...`
+// produces zero output — i.e. fromRef and toRef are identical across exactly
+// those paths (no full-tree comparison; paths outside the list may differ
+// freely). Used to detect a feature branch whose own changes already exist,
+// file-for-file, at the current remote tip under a different commit SHA
+// (squash-merge, rebase-merge, or cherry-pick landed it upstream; the local
+// branch/worktree is stale but `git merge-base --is-ancestor` can't see
+// that — it only walks parent links, not tree content). An empty paths list
+// returns false (nothing to compare, so no claim of identity is safe to
+// make). Returns false (i.e. "assume NOT identical") on any git error so
+// callers fail safe into the existing rebase/skip path.
+func DiffEmptyPaths(ctx context.Context, dir, fromRef, toRef string, paths []string) bool {
+	if len(paths) == 0 {
+		return false
+	}
+	args := append([]string{"diff", "--quiet", fromRef, toRef, "--"}, paths...)
+	out, err := run(ctx, dir, args...)
+	// `git diff --quiet` exits 0 when there is no difference, 1 when there is
+	// a difference, and >1 on error. `run` only distinguishes err==nil from
+	// err!=nil, so recover the exit code via exec.ExitError when non-nil.
+	if err == nil {
+		return true
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+		return false
+	}
+	_ = out
+	return false // ambiguous/error case: fail safe, let the normal path handle it
+}
+
 // ResetHard resets the current branch to ref, discarding all local changes.
 func ResetHard(ctx context.Context, dir, ref string) error {
 	_, err := run(ctx, dir, "reset", "--hard", ref)

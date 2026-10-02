@@ -120,6 +120,47 @@ func TestRun_Diverged_Rebase(t *testing.T) {
 	}
 }
 
+// TestRun_AlreadyLandedSquashMerge reproduces the 2026-10-02 incident end to
+// end via the real Run() entry point: a feature branch's content gets
+// squash-merged into the remote's default branch under a brand-new commit
+// SHA (same content, no ancestry relationship), while the remote also
+// advances with an unrelated commit. The feature checkout is diverged by SHA
+// but fully subsumed by content — Run must report SkipAlreadyLanded with
+// cleanup ManualSteps, not attempt a rebase or report a bare "pushed, use
+// --force-rebase" skip.
+func TestRun_AlreadyLandedSquashMerge(t *testing.T) {
+	local, remote := makeRepoWithFile(t)
+	mustRun(t, local, "git", "checkout", "-b", "feature/x")
+	writeFile(t, local, "tracked.txt", "initial\nfeature change\n")
+	mustRun(t, local, "git", "commit", "-am", "feature: add a line")
+
+	// Remote advances independently, then lands the same content change
+	// under its own new commit (squash-merge via MR simulation).
+	addCommit(t, remote, "unrelated remote commit")
+	writeFile(t, remote, "tracked.txt", "initial\nfeature change\n")
+	mustRun(t, remote, "git", "commit", "-am", "feature: add a line (squashed)")
+
+	flags := syncp.Flags{FetchTimeout: 10, RebaseTimeout: 30, Concurrency: 1}
+	registry := &syncp.StashRegistry{}
+	result := syncp.Run(context.Background(), local, flags, registry, syncp.DefaultSyncer{})
+	if result.Status != syncp.StatusSkipped || result.SkipReason != syncp.SkipAlreadyLanded {
+		t.Fatalf("expected Skipped/SkipAlreadyLanded, got status=%v reason=%q (fail: %s)",
+			result.Status, result.SkipReason, result.FailReason)
+	}
+	if len(result.ManualSteps) == 0 {
+		t.Error("expected ManualSteps with cleanup guidance, got none")
+	}
+	foundDeleteStep := false
+	for _, step := range result.ManualSteps {
+		if step == "git branch -D feature/x  # safe: content already matches origin/main" {
+			foundDeleteStep = true
+		}
+	}
+	if !foundDeleteStep {
+		t.Errorf("expected a 'git branch -D feature/x' cleanup step, got: %v", result.ManualSteps)
+	}
+}
+
 func TestRun_NoRebase_Diverged(t *testing.T) {
 	local, remote := makeRepoWithRemote(t)
 	addCommit(t, remote, "remote commit")

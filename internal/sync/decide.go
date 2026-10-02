@@ -105,6 +105,13 @@ func Decide(state RepoState, flags Flags) Action {
 	}
 
 	// Diverged — LocalSHA != RemoteSHA && LocalSHA != BaseSHA && RemoteSHA != BaseSHA
+	// Already-landed check comes first, before NoRebase/Default-branch gates: a
+	// subsumed branch needs cleanup, not a rebase, regardless of --no-rebase or
+	// branch type — skipping it as a plain "diverged" would misdirect the user
+	// toward rebasing content that is already upstream under a different SHA.
+	if state.BranchType == BranchTypeFeature && state.SubsumedByRemote {
+		return skip(SkipAlreadyLanded)
+	}
 	if flags.NoRebase {
 		return skip(SkipDivergedNoRebase)
 	}

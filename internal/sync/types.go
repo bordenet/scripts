@@ -49,6 +49,7 @@ const (
 	SkipUpstreamFeature    SkipReason = "feature branch tracks upstream -- MR workflow"
 	SkipDefaultRenamed     SkipReason = "remote renamed its default branch; local branch is stale"
 	SkipRecentFetch        SkipReason = "fetched recently (--skip-recent)"
+	SkipAlreadyLanded      SkipReason = "already landed upstream under a different SHA; branch/worktree is stale"
 )
 
 // ActionType is the category of action Decide returns.
@@ -110,9 +111,17 @@ type RepoState struct {
 	IsShallow          bool
 	HasSubmodules      bool // .gitmodules file exists in repo root
 	IsPushed           bool // refs/remotes/origin/<CurrentBranch> exists locally (Feature only)
-	HasOrigin          bool
-	HasUpstream        bool   // true if a remote named "upstream" is configured
-	TrackingRemote     string // the remote that CurrentBranch is configured to track ("origin", "upstream", etc.)
+	// SubsumedByRemote is true when a Feature branch's own changes (the diff
+	// between BaseSHA and LocalSHA) already exist, file-for-file, in RemoteSHA.
+	// This catches squash-merged/rebase-merged branches: the MR landed under a
+	// brand-new commit SHA, so `merge-base --is-ancestor` can't see it, but the
+	// content is already upstream and the branch is stale, not diverged.
+	// Computed lazily (only once Decide would otherwise classify the branch as
+	// diverged) since it costs an extra `git diff` call. Feature branches only.
+	SubsumedByRemote bool
+	HasOrigin        bool
+	HasUpstream      bool   // true if a remote named "upstream" is configured
+	TrackingRemote   string // the remote that CurrentBranch is configured to track ("origin", "upstream", etc.)
 	// FetchErr is set only when FetchKind == FetchKindTransientGaveUp — it
 	// carries the wrapped git error so decide.go can surface it as FailReason.
 	FetchErr error

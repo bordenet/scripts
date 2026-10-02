@@ -257,6 +257,19 @@ func CollectState(ctx context.Context, repoPath string, flags Flags) RepoState {
 	state.RemoteSHA = gitexec.RevParse(ctx, repoPath, remotePrefix+"/"+state.ParentBranch)
 	state.BaseSHA = gitexec.MergeBase(ctx, repoPath, remotePrefix+"/"+state.ParentBranch)
 
+	// 17. Subsumed-by-remote check: only meaningful for a Feature branch that
+	// Decide would otherwise classify as diverged (all three SHAs distinct).
+	// Gated here (not in Decide, which must stay pure/I-O-free) so the extra
+	// `git diff` pair only runs on the uncommon diverged path, not every repo.
+	if state.BranchType == BranchTypeFeature &&
+		state.BaseSHA != "" &&
+		state.LocalSHA != state.RemoteSHA &&
+		state.LocalSHA != state.BaseSHA &&
+		state.RemoteSHA != state.BaseSHA {
+		touched := gitexec.DiffNameOnly(ctx, repoPath, state.BaseSHA, state.LocalSHA)
+		state.SubsumedByRemote = gitexec.DiffEmptyPaths(ctx, repoPath, state.LocalSHA, state.RemoteSHA, touched)
+	}
+
 	return state
 }
 

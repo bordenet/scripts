@@ -3,6 +3,7 @@ package gitexec
 import (
 	"context"
 	"errors"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -602,4 +603,85 @@ func TestBranchTrackingRemote(t *testing.T) {
 	if got := BranchTrackingRemote(ctx, local, "untracked/y"); got != "" {
 		t.Errorf("untracked branch: got %q, want empty string", got)
 	}
+}
+
+// TestDiffEmptyPaths_SquashMergedBranch reproduces the 2026-10-02 incident:
+// a feature branch is squash-merged into main under a brand-new commit SHA,
+// so the old branch tip is neither an ancestor of, nor identical to, main's
+// new tip — but every file it touched now matches main byte-for-byte. This
+// is exactly the case DiffNameOnly + DiffEmptyPaths must recognize as
+// "already landed", not "diverged".
+func TestDiffEmptyPaths_SquashMergedBranch(t *testing.T) {
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	writeFile := func(dir, name, content string) {
+		t.Helper()
+		if err := os.WriteFile(dir+"/"+name, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	repo := t.TempDir()
+	run(repo, "init", "-q", "--initial-branch=main")
+	run(repo, "config", "user.email", "t@t.com")
+	run(repo, "config", "user.name", "T")
+	writeFile(repo, "a.txt", "base\n")
+	run(repo, "add", ".")
+	run(repo, "commit", "-q", "-m", "init")
+	baseSHA := strings.TrimSpace(mustRun(t, repo, "rev-parse", "HEAD"))
+
+	// Feature branch makes one real change.
+	run(repo, "checkout", "-q", "-b", "feature/x")
+	writeFile(repo, "a.txt", "base\nfeature change\n")
+	run(repo, "add", ".")
+	run(repo, "commit", "-q", "-m", "feature: add a line")
+	localSHA := strings.TrimSpace(mustRun(t, repo, "rev-parse", "HEAD"))
+
+	// main advances independently with an unrelated file, THEN squash-merges
+	// the same content change from feature/x under a new commit SHA.
+	run(repo, "checkout", "-q", "main")
+	writeFile(repo, "unrelated.txt", "unrelated\n")
+	run(repo, "add", ".")
+	run(repo, "commit", "-q", "-m", "unrelated change on main")
+	writeFile(repo, "a.txt", "base\nfeature change\n") // same content, new commit
+	run(repo, "add", ".")
+	run(repo, "commit", "-q", "-m", "feature: add a line (squashed)")
+	remoteSHA := strings.TrimSpace(mustRun(t, repo, "rev-parse", "HEAD"))
+
+	ctx := context.Background()
+	touched := DiffNameOnly(ctx, repo, baseSHA, localSHA)
+	if len(touched) != 1 || touched[0] != "a.txt" {
+		t.Fatalf("DiffNameOnly(base, local) = %v, want [a.txt]", touched)
+	}
+	if !DiffEmptyPaths(ctx, repo, localSHA, remoteSHA, touched) {
+		t.Error("DiffEmptyPaths(local, remote, touched) = false, want true (content matches upstream)")
+	}
+
+	// Sanity: a REAL divergence (different content) must NOT be reported as subsumed.
+	run(repo, "checkout", "-q", "feature/x")
+	writeFile(repo, "a.txt", "base\nDIFFERENT change\n")
+	run(repo, "add", ".")
+	run(repo, "commit", "-q", "-m", "feature: actually different")
+	divergedSHA := strings.TrimSpace(mustRun(t, repo, "rev-parse", "HEAD"))
+	touched2 := DiffNameOnly(ctx, repo, baseSHA, divergedSHA)
+	if DiffEmptyPaths(ctx, repo, divergedSHA, remoteSHA, touched2) {
+		t.Error("DiffEmptyPaths(diverged, remote, touched) = true, want false (content genuinely differs)")
+	}
+}
+
+func mustRun(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git %v: %v", args, err)
+	}
+	return string(out)
 }
