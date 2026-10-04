@@ -20,12 +20,12 @@ Required proof before push approval can be granted:
 - ❌ **NEVER** push a branch to the work CI remote — branch pushes trigger CI/CD pipelines that auto-deploy
 - ❌ **NEVER** assume "commit" means "push" — they are separate actions requiring separate approval
 - ❌ **NEVER** push based on approval from a prior conversation/session
-- ❌ **NEVER** promote staging → main without explicit, standalone approval — this is a RELEASE, not a sync
+- ❌ **NEVER** promote dev → main without explicit, standalone approval — this is a RELEASE, not a sync
 - ❌ **NEVER** bundle high-stakes actions (branch promotions, releases) into compound questions with low-stakes actions (cleanup, mirror sync)
-- ❌ **NEVER** frame a deliberate branch gap (staging ahead of main) as a "problem to fix" — the gap is intentional workflow state
+- ❌ **NEVER** frame a deliberate branch gap (dev ahead of main) as a "problem to fix" — the gap is intentional workflow state
 - ✅ **ALWAYS** confirm: "I'm about to push branch X to remote Y. This will trigger [pipelines]. Proceed?"
 - ✅ **ALWAYS** verify `git config user.email` matches the remote's identity before pushing
-- ✅ **ALWAYS** ask about staging→main promotion as its own separate question, never combined with other actions
+- ✅ **ALWAYS** ask about dev→main promotion as its own separate question, never combined with other actions
 
 | Date | Incident |
 |------|----------|

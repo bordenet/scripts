@@ -1,12 +1,11 @@
-# superpowers-plus: Dev → Staging → Production (NON-NEGOTIABLE)
+# superpowers-plus: Dev → Production (NON-NEGOTIABLE)
 
-`superpowers-plus` uses a three-tier branching model on GitHub with a private fork sync.
+`superpowers-plus` uses a two-tier branching model (`staging` was retired October 2026) on GitHub with a private fork sync.
 
 | Branch | Purpose | Accepts PRs from | Merges into | Cadence |
 |--------|---------|-------------------|-------------|---------|
-| `dev` | Active development | Feature/fix branches | `staging` | Frequent — per feature/fix |
-| `staging` | Batch validation | `dev` only | `main` | Deliberate — accumulate many changes |
-| `main` | Production releases | `staging` only | Private fork sync | **Rare — explicit human decision** |
+| `dev` | Active development | Feature/fix branches | `main` | Deliberate — accumulate many changes |
+| `main` | Production releases | `dev` only | Private fork sync | **Rare — explicit human decision** |
 
 **Feature flow:**
 
@@ -19,15 +18,12 @@ git push origin feat/my-feature
 # Create PR on GitHub targeting dev → merge
 
 # 2. Accumulate changes in dev until a meaningful batch is ready.
-#    DO NOT promote to staging after every feature.
+#    DO NOT promote to main after every feature.
 
-# 3. Promote dev → staging ONLY when explicitly asked
-#    (after multiple changes are verified working in dev)
-
-# 4. Promote staging → main ONLY when explicitly asked,
+# 3. Promote dev → main ONLY when explicitly asked,
 #    after rigorous batch review of ALL changes since last release.
 
-# 5. Sync private fork AFTER production merge
+# 4. Sync private fork AFTER production merge
 git checkout main && git pull origin main && git push gitlab main
 ```
 
@@ -50,18 +46,17 @@ git checkout main && git pull origin main && git push gitlab main
 ---
 
 **Prohibitions:**
-- ❌ **NEVER** commit directly to `dev`, `staging`, or `main` — always use a branch + PR
-- ❌ **NEVER** branch features from `main` or `staging` (branch from `dev`)
-- ❌ **NEVER** push `dev` or `staging` to the private fork — only `main` is synced
+- ❌ **NEVER** commit directly to `dev` or `main` — always use a branch + PR
+- ❌ **NEVER** branch features from `main` (branch from `dev`)
+- ❌ **NEVER** push `dev` to the private fork — only `main` is synced
 - ❌ **NEVER** skip the private fork sync after a production merge
-- ❌ **NEVER** promote `staging → main` without explicit human instruction in the current conversation
-- ❌ **NEVER** promote `dev → staging` without explicit human instruction in the current conversation
-- ❌ **NEVER** treat a single feature landing in `dev` as a reason to promote — staging must accumulate multiple verified changes
+- ❌ **NEVER** promote `dev → main` without explicit human instruction in the current conversation
+- ❌ **NEVER** treat a single feature landing in `dev` as a reason to promote — dev must accumulate multiple verified changes
 - ✅ **Exception:** Emergency hotfixes may branch from `main`, PR into `main`, then cherry-pick back to `dev`
 
-**Staging → Main gate (MANDATORY before any promotion):**
-1. Human says explicitly "promote staging to main" or "release" in the current conversation
-2. Run a batch code review across ALL changes in staging since the last main release
+**Dev → Main gate (MANDATORY before any promotion):**
+1. Human says explicitly "promote dev to main" or "release" in the current conversation
+2. Run a batch code review across ALL changes in dev since the last main release
 3. Show the human the review verdict before merging
 4. Human approves the merge
 

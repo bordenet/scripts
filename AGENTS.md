@@ -103,7 +103,7 @@ Individual repos have their own `AGENTS.md`/`CLAUDE.md` with repo-specific guida
 
 ### 🔴 superpowers-plus Workflow → `.ai-guidance/superpowers-plus-workflow.md`
 
-Load BEFORE any work on `superpowers-plus`. Three-tier branching: dev → staging → main. Branch from `dev`, PR into `dev`, promote through staging to main.
+Load BEFORE any work on `superpowers-plus`. Two-tier branching: dev → main (the `staging` branch was retired October 2026). Branch from `dev`, PR into `dev`, promote `dev` to `main`.
 
 ### 🔴 Push Authorization Gate → `.ai-guidance/push-authorization-gate.md`
 

@@ -43,8 +43,8 @@ Before requesting approval, invoke `superpowers:pre-push-quality-gate` and show 
 
 - Never push any branch to the work CI remote — branch pushes trigger CI/CD pipelines.
 - "Commit approved" ≠ "push approved" — they require separate explicit approval.
-- Never promote staging → main without its own standalone approval (it is a release decision, not housekeeping).
-- Never bundle high-stakes actions (staging → main, branch promotions, releases) into compound questions with low-stakes actions.
+- Never promote dev → main without its own standalone approval (it is a release decision, not housekeeping).
+- Never bundle high-stakes actions (dev → main, branch promotions, releases) into compound questions with low-stakes actions.
 - Never act on push approval from a prior conversation or session.
 - If you are a sub-agent: push authorization must be explicit in your own task prompt — approval granted to the orchestrating agent does not transfer.
 - If push is blocked, surface the block to the user rather than silently skipping the push.
@@ -53,16 +53,16 @@ Full rules: `.ai-guidance/push-authorization-gate.md`
 
 ## 🔴 superpowers-plus Workflow
 
-Applies to `Personal/superpowers-plus` only. Three-tier branching: `dev → staging → main`.
+Applies to `Personal/superpowers-plus` only. Two-tier branching: `dev → main` (`staging` retired October 2026).
 
-- All work branches off `dev`. Never commit directly to `dev`/`staging`/`main`.
+- All work branches off `dev`. Never commit directly to `dev`/`main`.
 - Source repo: `~/git/Personal/superpowers-plus/` — edit here, then run `./install.sh --upgrade`.
 - Never edit the installed copies under `~/.codex/` or the work-tools installed copy — see `.ai-guidance/superpowers-plus-workflow.md` for exact paths.
-- Never push `dev` or `staging` to the `gitlab` remote — only `main` syncs to GitLab after a release.
+- Never push `dev` to the `gitlab` remote — only `main` syncs to GitLab after a release.
 - Exception: emergency hotfixes may branch from `main`, PR into `main`, then cherry-pick back to `dev`.
 
-**Staging → main gate (all four steps mandatory):**
-1. Human explicitly says "promote staging to main" or "release" in the current conversation.
+**Dev → main gate (all four steps mandatory):**
+1. Human explicitly says "promote dev to main" or "release" in the current conversation.
 2. Run a batch code review across all changes since the last release.
 3. Show the review verdict to the human before merging.
 4. Human approves the merge.
