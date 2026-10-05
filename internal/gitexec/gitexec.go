@@ -313,6 +313,19 @@ func FetchMultiRef(parentCtx context.Context, perAttempt time.Duration, dir stri
 		if err == nil {
 			anySucceeded = true
 		} else {
+			// A branch deleted on the remote leaves a stale refs/remotes/origin/<ref>
+			// behind locally — plain `git fetch origin <ref>` errors on the missing
+			// ref instead of updating/removing it (no implicit --prune). Left in
+			// place, that stale ref still passes RemoteTrackingRefExists, so
+			// DetectParent can pick a long-dead branch as the sync parent purely
+			// because its commits-behind count (frozen at deletion time) happens to
+			// be smaller than a live candidate's. Prune it here, the moment we have
+			// positive proof from the remote that the branch is gone, so later
+			// parent-detection never sees it. Best-effort: a failed prune must not
+			// mask the real fetch error below.
+			if isMissingRefError(err) {
+				pruneStaleTrackingRef(dir, ref)
+			}
 			// Accumulate per-ref errors so the caller sees the full failure picture,
 			// not just the last one. errors.Join preserves errors.Is traversal.
 			errs = append(errs, fmt.Errorf("ref %s: %w", ref, err))
@@ -356,6 +369,34 @@ func runFetch(ctx context.Context, dir, ref string, forceHTTP1 bool) error {
 	args = append(args, "fetch", "origin", ref)
 	_, err := run(ctx, dir, args...)
 	return err
+}
+
+// isMissingRefError returns true when a fetch/pull error indicates the
+// requested ref does not exist on the remote ("couldn't find remote ref
+// <name>") — the signature of a branch deleted upstream (e.g. a retired
+// staging branch), as opposed to a transient network failure.
+func isMissingRefError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "couldn't find remote ref")
+}
+
+// pruneStaleTrackingRef deletes refs/remotes/origin/<branch> after the remote
+// has confirmed the branch no longer exists. `git fetch origin <ref>` does
+// not implicitly prune (no --prune flag here), so a deleted-upstream branch
+// would otherwise leave its local tracking ref frozen at the last-fetched SHA
+// forever. A frozen ref still satisfies RemoteTrackingRefExists, so without
+// this prune, parent-branch detection (closest commits-behind across
+// parentCandidates) can pick a long-dead branch purely because its stale
+// distance happens to be smaller than a live candidate's.
+// ref may be a full ref ("refs/heads/foo") or a short branch name ("foo");
+// callers in this package only ever pass short names from parentCandidates.
+// Best-effort: deletion failure is silently ignored, mirroring the
+// already-non-fatal handling of the fetch error this is a side effect of.
+func pruneStaleTrackingRef(dir, ref string) {
+	branch := strings.TrimPrefix(ref, "refs/heads/")
+	_, _ = run(context.Background(), dir, "update-ref", "-d", "refs/remotes/origin/"+branch)
 }
 
 // RevParse returns the SHA for a git ref. Returns "" if not found.

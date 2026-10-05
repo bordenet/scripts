@@ -130,6 +130,67 @@ func TestFetchMultiRef(t *testing.T) {
 			t.Errorf("want context.DeadlineExceeded, got %v", err)
 		}
 	})
+
+	// Reproduces the superpowers-plus "staging retired" failure: a candidate
+	// parent branch that existed at clone time is later deleted on the
+	// remote. Without pruning, the frozen refs/remotes/origin/staging would
+	// keep satisfying RemoteTrackingRefExists forever and could win
+	// DetectParent purely on stale commits-behind arithmetic.
+	t.Run("prunes stale tracking ref when candidate branch deleted upstream", func(t *testing.T) {
+		run := func(dir string, args ...string) {
+			t.Helper()
+			cmd := exec.Command("git", args...) //nolint:gosec // test helper, hardcoded git subcommands
+			cmd.Dir = dir
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("git %v: %v\n%s", args, err, out)
+			}
+		}
+		remote := t.TempDir()
+		run(remote, "init", "--initial-branch=main")
+		run(remote, "config", "user.email", "t@t.com")
+		run(remote, "config", "user.name", "T")
+		run(remote, "commit", "--allow-empty", "-m", "init")
+		run(remote, "branch", "staging")
+
+		local := t.TempDir()
+		run(remote, "clone", remote, local)
+		run(local, "fetch", "origin", "staging") // seed refs/remotes/origin/staging
+
+		if !RemoteTrackingRefExists(context.Background(), local, "staging") {
+			t.Fatal("setup: expected refs/remotes/origin/staging to exist before deletion")
+		}
+
+		// Remote retires the branch; local's tracking ref is now stale.
+		run(remote, "branch", "-D", "staging")
+
+		err := FetchMultiRef(context.Background(), time.Second, local, []string{"main", "staging"})
+		if err != nil {
+			t.Fatalf("want nil (main still succeeds), got %v", err)
+		}
+		if RemoteTrackingRefExists(context.Background(), local, "staging") {
+			t.Error("stale refs/remotes/origin/staging should have been pruned after deletion was confirmed")
+		}
+	})
+}
+
+func TestIsMissingRefError(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil error", nil, false},
+		{"missing ref", errors.New("git fetch origin staging: exit status 128 (stderr: fatal: couldn't find remote ref staging)"), true},
+		{"missing ref mixed case", errors.New("fatal: Couldn't find remote ref staging"), true},
+		{"unrelated error", errors.New("fatal: early EOF"), false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := isMissingRefError(c.err); got != c.want {
+				t.Errorf("isMissingRefError(%v) = %v, want %v", c.err, got, c.want)
+			}
+		})
+	}
 }
 
 // TestFetchWithRetry covers the retry-loop behavior using a controllable fetch
