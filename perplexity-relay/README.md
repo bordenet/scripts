@@ -1,9 +1,6 @@
 # Perplexity Relay
 
-A single-shot local tool that replaces copy-pasting a Perplexity request/
-response through the chat. Ported from the `shipit` project's
-`tools/perplexity-relay/` (originally built there) so it's easy to find and
-reuse from any project, not tied to one repo's workspace layout.
+A local tool that captures one Perplexity request and response at a time.
 
 **Critical invocation rule:** start it with `node server.js` as the *sole*
 command in a backgrounded Bash call, nothing after it in the same call.
