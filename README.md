@@ -116,6 +116,18 @@ Tools for keeping the repository compliant, documented, and clean.
 | [`tell-vscode-at.sh`](./tell-vscode-at.sh) | Send messages to VS Code instances at specified times using AppleScript. [Docs](./docs/tell-vscode-at.md) |
 | [`perplexity-relay/server.js`](./perplexity-relay/server.js) | Single-shot local relay: pops a browser tab with a drafted Perplexity request, captures the pasted-back response, writes it to `pending/` for Claude to pick up. [Docs](./perplexity-relay/README.md) |
 
+### Narrated demo video
+
+Open the [narrated demo video skill](./skills/narrated-demo-video/SKILL.md) in
+your assistant, or copy the entire skill folder into its skills directory.
+The skill covers screen recordings and slide presentations. It works with
+local editing tools and has no required account or API key.
+
+> Use the narrated demo video skill to make a one-minute walkthrough for
+> first-time users. Show how to filter a sample inventory and clear the
+> filter. Use the supplied test recording and return a captioned MP4 and
+> the narration script.
+
 ## Experimental
 
 Scripts in development or testing. May not meet full compliance standards yet.
